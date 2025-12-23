@@ -11,9 +11,18 @@ export default async function Home() {
       round_order,
       matchups (
         id,
-        team_a:team_a_id ( id, name ),
-        team_b:team_b_id ( id, name ),
-        winner:winner_team_id ( id, name )
+        team_a:team_a_id (
+          id,
+          name
+        ),
+        team_b:team_b_id (
+          id,
+          name
+        ),
+        winner:winner_team_id (
+          id,
+          name
+        )
       )
     `)
     .order('round_order', { ascending: true })
@@ -26,28 +35,22 @@ export default async function Home() {
     )
   }
 
-  const normalizedRounds = rounds?.map(round => ({
-    ...round,
-    matchups: round.matchups.map(m => ({
-      ...m,
-      teamA: m.team_a?.[0] ?? null,
-      teamB: m.team_b?.[0] ?? null,
-      winner: m.winner?.[0] ?? null,
-    })),
-  }))
-
   return (
     <div style={{ padding: 24 }}>
       <h1>PickCrown — NFL Playoffs</h1>
 
-      {normalizedRounds?.map(round => (
+      {rounds?.map(round => (
         <div key={round.id} style={{ marginBottom: 24 }}>
           <h2>{round.name}</h2>
 
-          {round.matchups.map(matchup => (
-            <div key={matchup.id} style={{ marginLeft: 16, marginBottom: 8 }}>
+          {round.matchups?.map(matchup => (
+            <div
+              key={matchup.id}
+              style={{ marginLeft: 16, marginBottom: 8 }}
+            >
               <div>
-                {matchup.teamA?.name ?? '—'} vs {matchup.teamB?.name ?? '—'}
+                {matchup.team_a?.name ?? '—'} vs{' '}
+                {matchup.team_b?.name ?? '—'}
               </div>
 
               {matchup.winner && (
