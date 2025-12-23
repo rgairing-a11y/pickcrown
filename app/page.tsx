@@ -27,9 +27,9 @@ export default async function Home() {
   `)
   .order('round_order', { ascending: true })
 
-  const normalizedRounds = rounds?.map(round => ({
+  const normalizedRounds: any[] | undefined = rounds?.map(round => ({
   ...round,
-  matchups: normalizedRounds.matchups.map(m => ({
+  matchups: round.matchups.map(m => ({
     ...m,
     teamA: m.team_a?.[0] ?? null,
     teamB: m.team_b?.[0] ?? null,
