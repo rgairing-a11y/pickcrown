@@ -35,12 +35,12 @@ export default async function Home() {
           {round.matchups?.map(matchup => (
             <div key={matchup.id} style={{ marginLeft: 16, marginBottom: 8 }}>
               <div>
-                {matchup.team_a.name} vs {matchup.team_b.name}
+                {matchup.team_a[0]?.name} vs {matchup.team_b[0]?.name}
               </div>
 
               {matchup.winner && (
                 <div style={{ fontWeight: 'bold' }}>
-                  Winner: {matchup.winner.name}
+                  Winner: {matchup.winner[0]?.name}
                 </div>
               )}
             </div>
