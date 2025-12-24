@@ -1,8 +1,15 @@
+'use client'
+
 export const dynamic = 'force-dynamic'
 
 import { supabase } from '../lib/supabase'
 
+import { useState } from 'react'
+
+
 export default async function Home() {
+ const [selectedMatchupId, setSelectedMatchupId] = useState(null)
+ 
   const { data: rounds, error } = await supabase
     .from('rounds')
     .select(`
@@ -48,10 +55,21 @@ export default async function Home() {
               key={matchup.id}
               style={{ marginLeft: 16, marginBottom: 8 }}
             >
-              <div>
-                {matchup.team_a?.name ?? '—'} vs{' '}
-                {matchup.team_b?.name ?? '—'}
-              </div>
+             <div
+  onClick={() => setSelectedMatchupId(matchup.id)}
+  style={{
+    cursor: 'pointer',
+    padding: 8,
+    border:
+      selectedMatchupId === matchup.id
+        ? '2px solid orange'
+        : '1px solid #ccc'
+  }}
+>
+  {matchup.team_a?.name ?? '—'} vs{' '}
+  {matchup.team_b?.name ?? '—'}
+</div>
+
 
               {matchup.winner && (
                 <div style={{ fontWeight: 'bold' }}>
