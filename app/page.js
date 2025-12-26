@@ -1,85 +1,94 @@
-'use client'
+import { supabase } from '../lib/supabase'
+import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
 
-import { supabase } from '../lib/supabase'
-
-import { useState } from 'react'
-
-
 export default async function Home() {
- const [selectedMatchupId, setSelectedMatchupId] = useState(null)
- 
-  const { data: rounds, error } = await supabase
-    .from('rounds')
+  // Fetch all pools with their events
+  const { data: pools } = await supabase
+    .from('pools')
     .select(`
-      id,
-      name,
-      round_order,
-      matchups (
-        id,
-        team_a:team_a_id (
-          id,
-          name
-        ),
-        team_b:team_b_id (
-          id,
-          name
-        ),
-        winner:winner_team_id (
-          id,
-          name
-        )
-      )
+      *,
+      event:events (*)
     `)
-    .order('round_order', { ascending: true })
-
-  if (error) {
-    return (
-      <pre style={{ padding: 24 }}>
-        {JSON.stringify(error, null, 2)}
-      </pre>
-    )
-  }
+    .order('created_at', { ascending: false })
 
   return (
-    <div style={{ padding: 24 }}>
-      <h1>PickCrown — NFL Playoffs</h1>
+    <div>
+      <div style={{
+        textAlign: 'center',
+        padding: '48px 0'
+      }}>
+        <h1 style={{ fontSize: 48, marginBottom: 16 }}>👑 PickCrown</h1>
+        <p style={{ fontSize: 20, color: '#666' }}>
+          Prediction pools for sports and entertainment
+        </p>
+      </div>
 
-      {rounds?.map(round => (
-        <div key={round.id} style={{ marginBottom: 24 }}>
-          <h2>{round.name}</h2>
-
-          {round.matchups?.map(matchup => (
-            <div
-              key={matchup.id}
-              style={{ marginLeft: 16, marginBottom: 8 }}
-            >
-             <div
-  onClick={() => setSelectedMatchupId(matchup.id)}
-  style={{
-    cursor: 'pointer',
-    padding: 8,
-    border:
-      selectedMatchupId === matchup.id
-        ? '2px solid orange'
-        : '1px solid #ccc'
-  }}
->
-  {matchup.team_a?.name ?? '—'} vs{' '}
-  {matchup.team_b?.name ?? '—'}
-</div>
-
-
-              {matchup.winner && (
-                <div style={{ fontWeight: 'bold' }}>
-                  Winner: {matchup.winner.name}
+      <h2 style={{ marginBottom: 16 }}>Active Pools</h2>
+      
+      {pools && pools.length > 0 ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {pools.map(pool => {
+            const isLocked = new Date(pool.event?.start_time) < new Date()
+            return (
+              <div 
+                key={pool.id}
+                style={{
+                  background: 'white',
+                  borderRadius: 12,
+                  padding: 24,
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                }}
+              >
+                <h3 style={{ marginBottom: 8 }}>{pool.name}</h3>
+                <p style={{ color: '#666', marginBottom: 16 }}>
+                  {pool.event?.name}
+                  {isLocked && (
+                    <span style={{ 
+                      marginLeft: 8, 
+                      background: '#fff3cd', 
+                      padding: '2px 8px', 
+                      borderRadius: 4,
+                      fontSize: 14 
+                    }}>
+                      Locked
+                    </span>
+                  )}
+                </p>
+                <div style={{ display: 'flex', gap: 16 }}>
+                  <Link 
+                    href={`/pool/${pool.id}`}
+                    style={{
+                      background: isLocked ? '#6c757d' : '#28a745',
+                      color: 'white',
+                      padding: '8px 16px',
+                      borderRadius: 6,
+                      fontWeight: 'bold'
+                    }}
+                  >
+                    {isLocked ? 'View Pool' : 'Make Picks'}
+                  </Link>
+                  <Link 
+                    href={`/pool/${pool.id}/standings`}
+                    style={{
+                      background: '#0070f3',
+                      color: 'white',
+                      padding: '8px 16px',
+                      borderRadius: 6,
+                      fontWeight: 'bold'
+                    }}
+                  >
+                    Standings
+                  </Link>
                 </div>
-              )}
-            </div>
-          ))}
+              </div>
+            )
+          })}
         </div>
-      ))}
+      ) : (
+        <p style={{ color: '#666' }}>No pools yet.</p>
+      )}
     </div>
   )
 }
