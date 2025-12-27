@@ -206,6 +206,18 @@ export default function AdminHome() {
                     Categories
                   </Link>
                   <Link 
+  href={`/admin/events/${event.id}/bracket`}
+  style={{ 
+    fontSize: 13, 
+    color: '#f57c00',
+    padding: '6px 12px',
+    background: '#fff3e0',
+    borderRadius: 4
+  }}
+>
+  Bracket
+</Link>
+                  <Link 
                     href={`/admin/events/${event.id}/results`}
                     style={{ 
                       fontSize: 13, 

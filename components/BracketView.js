@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 
 export default function BracketView({ event, rounds, matchups, teams, conferences }) {
-  const [activeConference, setActiveConference] = useState(conferences?.[0] || 'ALL')
+const [activeConference, setActiveConference] = useState('ALL')
   
   // Build team lookup
   const teamMap = {}
@@ -74,7 +74,7 @@ export default function BracketView({ event, rounds, matchups, teams, conference
 
       <h1 style={{ textAlign: 'center', marginBottom: 8 }}>{event.name}</h1>
       
-      {/* Conference Tabs */}
+     {/* Conference Tabs */}
       {conferences.length > 1 && (
         <div style={{ 
           display: 'flex', 
@@ -83,6 +83,21 @@ export default function BracketView({ event, rounds, matchups, teams, conference
           marginBottom: 24,
           flexWrap: 'wrap'
         }}>
+          <button
+            onClick={() => setActiveConference('ALL')}
+            style={{
+              padding: '10px 20px',
+              border: 'none',
+              borderRadius: 8,
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              background: activeConference === 'ALL' ? '#333' : '#eee',
+              color: activeConference === 'ALL' ? 'white' : '#333',
+              transition: 'all 0.2s'
+            }}
+          >
+            ALL
+          </button>
           {conferences.map(conf => (
             <button
               key={conf}
