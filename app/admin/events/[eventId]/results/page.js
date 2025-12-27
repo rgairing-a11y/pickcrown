@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '../../../../../lib/supabase'
+import Link from 'next/link'
 
 export default function AdminResultsPage({ params }) {
   const [eventId, setEventId] = useState(null)
@@ -23,7 +24,7 @@ export default function AdminResultsPage({ params }) {
 
   async function loadEvent() {
     setLoading(true)
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('events')
       .select(`
         *,
@@ -44,13 +45,11 @@ export default function AdminResultsPage({ params }) {
   async function handleSetCorrect(optionId, categoryId) {
     setSaving(true)
 
-    // First, unmark all options in this category
     await supabase
       .from('category_options')
       .update({ is_correct: false })
       .eq('category_id', categoryId)
 
-    // Then mark the selected one as correct
     await supabase
       .from('category_options')
       .update({ is_correct: true })
@@ -73,9 +72,15 @@ export default function AdminResultsPage({ params }) {
   ) || []
 
   return (
-    <div style={{ padding: 24, maxWidth: 600, margin: '0 auto' }}>
-      <h1>Admin: Enter Results</h1>
-      <h2>{event.name}</h2>
+    <div>
+      <div style={{ marginBottom: 24 }}>
+        <Link href="/admin" style={{ color: '#0070f3' }}>
+          ← Back to Admin
+        </Link>
+      </div>
+
+      <h1>Enter Results</h1>
+      <h2 style={{ color: '#666', marginBottom: 24 }}>{event.name}</h2>
 
       {saving && (
         <div style={{ 
@@ -90,19 +95,23 @@ export default function AdminResultsPage({ params }) {
 
       {categories.map(category => (
         <div key={category.id} style={{ 
-          marginBottom: 32,
-          padding: 16,
-          border: '1px solid #ddd',
-          borderRadius: 8
+          marginBottom: 24,
+          padding: 20,
+          background: 'white',
+          borderRadius: 12,
+          boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
         }}>
-          <h3 style={{ marginTop: 0 }}>{category.name}</h3>
+          <h3 style={{ marginTop: 0, marginBottom: 16 }}>{category.name}</h3>
           
           {category.options?.map(option => (
             <div key={option.id} style={{ marginBottom: 8 }}>
               <label style={{ 
                 display: 'flex', 
                 alignItems: 'center', 
-                cursor: 'pointer' 
+                cursor: 'pointer',
+                padding: 8,
+                borderRadius: 6,
+                background: option.is_correct ? '#d4edda' : 'transparent'
               }}>
                 <input
                   type="radio"
@@ -110,11 +119,11 @@ export default function AdminResultsPage({ params }) {
                   checked={option.is_correct || false}
                   onChange={() => handleSetCorrect(option.id, category.id)}
                   disabled={saving}
-                  style={{ marginRight: 8 }}
+                  style={{ marginRight: 12 }}
                 />
                 <span style={{ 
                   fontWeight: option.is_correct ? 'bold' : 'normal',
-                  color: option.is_correct ? '#28a745' : 'inherit'
+                  color: option.is_correct ? '#155724' : 'inherit'
                 }}>
                   {option.name}
                   {option.is_correct && ' ✓'}
