@@ -1,13 +1,15 @@
 'use client'
 
 import { useState } from 'react'
+import { Card, Button } from './ui'
+import { createMap, getConferences } from '../lib/utils'
+import { CONFERENCE_COLORS } from '../lib/constants'
 
 export default function BracketView({ event, rounds, matchups, teams }) {
-  const conferences = [...new Set(teams.map(t => t.conference).filter(Boolean))]
+  const conferences = getConferences(teams)
   const [activeConference, setActiveConference] = useState('ALL')
 
-  const teamMap = {}
-  teams.forEach(t => teamMap[t.id] = t)
+  const teamMap = createMap(teams)
 
   const matchupsWithTeams = matchups.map(m => ({
     ...m,
@@ -27,16 +29,9 @@ export default function BracketView({ event, rounds, matchups, teams }) {
       })
   }))
 
-  const conferenceColors = {
-    'AFC': { primary: 'var(--color-afc)', light: 'var(--color-afc-light)' },
-    'NFC': { primary: 'var(--color-nfc)', light: 'var(--color-nfc-light)' },
-    'East': { primary: 'var(--color-east)', light: 'var(--color-east-light)' },
-    'West': { primary: 'var(--color-west)', light: 'var(--color-west-light)' },
-    'South': { primary: 'var(--color-south)', light: 'var(--color-south-light)' },
-    'Midwest': { primary: 'var(--color-midwest)', light: 'var(--color-midwest-light)' }
+  const getConferenceColor = (conf) => {
+    return CONFERENCE_COLORS[conf] || { primary: 'var(--color-text-light)', light: 'var(--color-background-dark)' }
   }
-
-  const getConferenceColor = (conf) => conferenceColors[conf] || { primary: 'var(--color-text-light)', light: 'var(--color-background-dark)' }
 
   const filteredRounds = roundsWithMatchups.map(round => {
     const isChampionship = round.round_order === rounds.length
@@ -54,19 +49,12 @@ export default function BracketView({ event, rounds, matchups, teams }) {
   return (
     <div>
       {/* Event Header */}
-      <div style={{
-        background: 'var(--color-white)',
-        padding: 'var(--spacing-xl)',
-        borderRadius: 'var(--radius-xl)',
-        boxShadow: 'var(--shadow-md)',
-        marginBottom: 'var(--spacing-xl)',
-        textAlign: 'center'
-      }}>
+      <Card style={{ marginBottom: 'var(--spacing-xl)', textAlign: 'center' }}>
         <h1 style={{ margin: 0 }}>{event.name}</h1>
         <p style={{ color: 'var(--color-text-light)', margin: 'var(--spacing-sm) 0 0' }}>
           {event.year}
         </p>
-      </div>
+      </Card>
 
       {/* Conference Tabs */}
       {conferences.length > 1 && (
@@ -77,21 +65,12 @@ export default function BracketView({ event, rounds, matchups, teams }) {
           marginBottom: 'var(--spacing-xl)',
           flexWrap: 'wrap'
         }}>
-          <button
+          <Button
             onClick={() => setActiveConference('ALL')}
-            style={{
-              padding: 'var(--spacing-md) var(--spacing-lg)',
-              border: 'none',
-              borderRadius: 'var(--radius-lg)',
-              fontWeight: 'bold',
-              cursor: 'pointer',
-              background: activeConference === 'ALL' ? 'var(--color-text)' : 'var(--color-border-light)',
-              color: activeConference === 'ALL' ? 'white' : 'var(--color-text)',
-              transition: 'all 0.2s'
-            }}
+            variant={activeConference === 'ALL' ? 'primary' : 'secondary'}
           >
             ALL
-          </button>
+          </Button>
           {conferences.map(conf => {
             const colors = getConferenceColor(conf)
             const isActive = activeConference === conf
@@ -118,13 +97,7 @@ export default function BracketView({ event, rounds, matchups, teams }) {
       )}
 
       {/* Bracket Container */}
-      <div style={{
-        background: 'var(--color-white)',
-        borderRadius: 'var(--radius-xl)',
-        boxShadow: 'var(--shadow-md)',
-        padding: 'var(--spacing-xl)',
-        overflowX: 'auto'
-      }}>
+      <Card style={{ overflowX: 'auto' }}>
         <div style={{
           display: 'flex',
           gap: 'var(--spacing-xxl)',
@@ -178,7 +151,7 @@ export default function BracketView({ event, rounds, matchups, teams }) {
                   flex: 1,
                   justifyContent: 'space-around'
                 }}>
-                  {round.matchups.map((matchup, matchupIndex) => (
+                  {round.matchups.map((matchup) => (
                     <MatchupCard
                       key={matchup.id}
                       matchup={matchup}
@@ -191,7 +164,7 @@ export default function BracketView({ event, rounds, matchups, teams }) {
             )
           })}
         </div>
-      </div>
+      </Card>
     </div>
   )
 }
@@ -250,7 +223,9 @@ function TeamRow({ team, isWinner, isBottom = false, isBye = false }) {
   return (
     <div style={{
       padding: 'var(--spacing-md)',
-      background: isBye ? 'var(--color-background-dark)' : (isWinner ? 'var(--color-success-light)' : 'var(--color-white)'),
+      background: isBye
+        ? 'var(--color-background-dark)'
+        : (isWinner ? 'var(--color-success-light)' : 'var(--color-white)'),
       display: 'flex',
       justifyContent: 'space-between',
       alignItems: 'center',
@@ -260,7 +235,9 @@ function TeamRow({ team, isWinner, isBottom = false, isBye = false }) {
       <span style={{
         fontWeight: isWinner ? 'bold' : 'normal',
         fontSize: 'var(--font-size-md)',
-        color: isBye ? 'var(--color-text-muted)' : (isWinner ? 'var(--color-success-dark)' : (team ? 'var(--color-text)' : 'var(--color-text-muted)')),
+        color: isBye
+          ? 'var(--color-text-muted)'
+          : (isWinner ? 'var(--color-success-dark)' : (team ? 'var(--color-text)' : 'var(--color-text-muted)')),
         fontStyle: isBye ? 'italic' : 'normal'
       }}>
         {isBye ? 'BYE' : (team ? `#${team.seed} ${team.name}` : 'TBD')}

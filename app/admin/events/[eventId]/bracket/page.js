@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '../../../../../lib/supabase'
-import Link from 'next/link'
+import { Card, PageHeader, Button, EmptyState, LoadingState } from '../../../../../components/ui'
+import { sortBySeed, getConferences, createMap } from '../../../../../lib/utils'
 
 export default function BracketBuilderPage({ params }) {
   const [eventId, setEventId] = useState(null)
@@ -15,7 +16,6 @@ export default function BracketBuilderPage({ params }) {
 
   const [newRound, setNewRound] = useState({ name: '', points: 1 })
   const [newTeam, setNewTeam] = useState({ name: '', seed: 1, conference: '' })
-  const [conferences, setConferences] = useState([])
 
   useEffect(() => {
     params.then(p => setEventId(p.eventId))
@@ -62,12 +62,10 @@ export default function BracketBuilderPage({ params }) {
     setRounds(roundsData || [])
     setTeams(teamsData)
     setMatchups(matchupsData || [])
-
-    const confs = [...new Set(teamsData.map(t => t.conference).filter(Boolean))]
-    setConferences(confs)
-
     setLoading(false)
   }
+
+  const conferences = getConferences(teams)
 
   async function addRound() {
     if (!newRound.name) return
@@ -113,9 +111,7 @@ export default function BracketBuilderPage({ params }) {
     const round = rounds.find(r => r.id === roundId)
     if (!round) return
 
-    const confTeams = teams
-      .filter(t => t.conference === conference)
-      .sort((a, b) => a.seed - b.seed)
+    const confTeams = sortBySeed(teams.filter(t => t.conference === conference))
 
     if (round.round_order === 1) {
       const numTeams = confTeams.length
@@ -162,63 +158,62 @@ export default function BracketBuilderPage({ params }) {
     loadData()
   }
 
-  if (loading) return <div style={{ padding: 'var(--spacing-xl)' }}>Loading...</div>
-  if (!event) return <div style={{ padding: 'var(--spacing-xl)' }}>Event not found</div>
+  if (loading) {
+    return <LoadingState message="Loading bracket..." />
+  }
 
-  const teamMap = {}
-  teams.forEach(t => teamMap[t.id] = t)
+  if (!event) {
+    return (
+      <div style={{ maxWidth: 500, margin: '0 auto' }}>
+        <PageHeader title="Event Not Found" />
+        <Card>
+          <EmptyState
+            icon="❌"
+            title="Event not found"
+            actionLabel="Back to Admin"
+            actionHref="/admin"
+          />
+        </Card>
+      </div>
+    )
+  }
 
+  const teamMap = createMap(teams)
   const tabs = ['rounds', 'teams', 'matchups']
 
   return (
     <div>
-      <div style={{ marginBottom: 'var(--spacing-xl)' }}>
-        <Link href="/admin" style={{ color: 'var(--color-primary)' }}>← Back to Admin</Link>
-      </div>
-
-      <h1>🏆 Bracket Builder</h1>
-      <h2 style={{ color: 'var(--color-text-light)' }}>{event.name}</h2>
+      <PageHeader
+        title="🏆 Bracket Builder"
+        subtitle={event.name}
+        actions={
+          <Button href={`/bracket/${eventId}`} variant="success">
+            View Bracket →
+          </Button>
+        }
+      />
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-xl)', marginTop: 'var(--spacing-xl)' }}>
+      <div style={{ display: 'flex', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-xl)' }}>
         {tabs.map(tab => (
-          <button
+          <Button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            style={{
-              padding: 'var(--spacing-md) var(--spacing-lg)',
-              border: 'none',
-              borderRadius: 'var(--radius-lg)',
-              fontWeight: 'bold',
-              cursor: 'pointer',
-              background: activeTab === tab ? 'var(--color-primary)' : 'var(--color-border-light)',
-              color: activeTab === tab ? 'white' : 'var(--color-text)',
-              textTransform: 'capitalize'
-            }}
+            variant={activeTab === tab ? 'primary' : 'secondary'}
+            style={{ textTransform: 'capitalize' }}
           >
             {tab} ({tab === 'rounds' ? rounds.length : tab === 'teams' ? teams.length : matchups.length})
-          </button>
+          </Button>
         ))}
-        <Link
-          href={`/bracket/${eventId}`}
-          style={{
-            padding: 'var(--spacing-md) var(--spacing-lg)',
-            background: 'var(--color-success)',
-            color: 'white',
-            borderRadius: 'var(--radius-lg)',
-            fontWeight: 'bold',
-            marginLeft: 'auto'
-          }}
-        >
-          View Bracket →
-        </Link>
       </div>
 
       {/* ROUNDS TAB */}
       {activeTab === 'rounds' && (
-        <div style={{ background: 'var(--color-white)', padding: 'var(--spacing-xl)', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-md)' }}>
+        <Card>
           <h3 style={{ marginTop: 0 }}>Rounds</h3>
-          <p style={{ color: 'var(--color-text-light)', marginBottom: 'var(--spacing-lg)' }}>Add rounds in order (Wildcard → Super Bowl)</p>
+          <p style={{ color: 'var(--color-text-light)', marginBottom: 'var(--spacing-lg)' }}>
+            Add rounds in order (Wildcard → Super Bowl)
+          </p>
 
           <div style={{ display: 'flex', gap: 'var(--spacing-md)', marginBottom: 'var(--spacing-xl)' }}>
             <input
@@ -235,28 +230,48 @@ export default function BracketBuilderPage({ params }) {
               onChange={e => setNewRound({ ...newRound, points: e.target.value })}
               style={{ width: 80 }}
             />
-            <button
-              onClick={addRound}
-              style={{ padding: 'var(--spacing-md) var(--spacing-xl)', background: 'var(--color-success)', color: 'white', border: 'none', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontWeight: 'bold' }}
-            >
+            <Button onClick={addRound} variant="success">
               Add Round
-            </button>
+            </Button>
           </div>
 
-          {rounds.map(round => (
-            <div key={round.id} style={{ display: 'flex', justifyContent: 'space-between', padding: 'var(--spacing-md)', borderBottom: '1px solid var(--color-border-light)' }}>
-              <span><strong>{round.round_order}.</strong> {round.name} ({round.points} pts)</span>
-              <button onClick={() => deleteRound(round.id)} style={{ color: 'var(--color-danger)', background: 'none', border: 'none', cursor: 'pointer' }}>Delete</button>
-            </div>
-          ))}
-
-          {rounds.length === 0 && <p style={{ color: 'var(--color-text-muted)' }}>No rounds yet</p>}
-        </div>
+          {rounds.length === 0 ? (
+            <EmptyState
+              icon="🔢"
+              title="No rounds yet"
+              description="Add your first round above"
+            />
+          ) : (
+            rounds.map(round => (
+              <div key={round.id} style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                padding: 'var(--spacing-md)',
+                borderBottom: '1px solid var(--color-border-light)'
+              }}>
+                <span>
+                  <strong>{round.round_order}.</strong> {round.name} ({round.points} pts)
+                </span>
+                <button
+                  onClick={() => deleteRound(round.id)}
+                  style={{
+                    color: 'var(--color-danger)',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Delete
+                </button>
+              </div>
+            ))
+          )}
+        </Card>
       )}
 
       {/* TEAMS TAB */}
       {activeTab === 'teams' && (
-        <div style={{ background: 'var(--color-white)', padding: 'var(--spacing-xl)', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-md)' }}>
+        <Card>
           <h3 style={{ marginTop: 0 }}>Teams</h3>
 
           <div style={{ display: 'flex', gap: 'var(--spacing-md)', marginBottom: 'var(--spacing-xl)', flexWrap: 'wrap' }}>
@@ -281,86 +296,140 @@ export default function BracketBuilderPage({ params }) {
               onChange={e => setNewTeam({ ...newTeam, conference: e.target.value })}
               style={{ width: 180 }}
             />
-            <button
-              onClick={addTeam}
-              style={{ padding: 'var(--spacing-md) var(--spacing-xl)', background: 'var(--color-success)', color: 'white', border: 'none', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontWeight: 'bold' }}
-            >
+            <Button onClick={addTeam} variant="success">
               Add Team
-            </button>
+            </Button>
           </div>
 
-          {conferences.map(conf => (
-            <div key={conf} style={{ marginBottom: 'var(--spacing-xl)' }}>
-              <h4 style={{ color: 'var(--color-text-light)' }}>{conf}</h4>
-              {teams.filter(t => t.conference === conf).sort((a, b) => a.seed - b.seed).map(team => (
-                <div key={team.id} style={{ display: 'flex', justifyContent: 'space-between', padding: 'var(--spacing-sm)', borderBottom: '1px solid var(--color-border-light)' }}>
-                  <span>#{team.seed} {team.name}</span>
-                  <button onClick={() => deleteTeam(team.id)} style={{ color: 'var(--color-danger)', background: 'none', border: 'none', cursor: 'pointer' }}>Delete</button>
-                </div>
-              ))}
-            </div>
-          ))}
-
-          {teams.length === 0 && <p style={{ color: 'var(--color-text-muted)' }}>No teams yet</p>}
-        </div>
+          {teams.length === 0 ? (
+            <EmptyState
+              icon="👥"
+              title="No teams yet"
+              description="Add your first team above"
+            />
+          ) : (
+            conferences.map(conf => (
+              <div key={conf} style={{ marginBottom: 'var(--spacing-xl)' }}>
+                <h4 style={{ color: 'var(--color-text-light)' }}>{conf}</h4>
+                {sortBySeed(teams.filter(t => t.conference === conf)).map(team => (
+                  <div key={team.id} style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    padding: 'var(--spacing-sm)',
+                    borderBottom: '1px solid var(--color-border-light)'
+                  }}>
+                    <span>#{team.seed} {team.name}</span>
+                    <button
+                      onClick={() => deleteTeam(team.id)}
+                      style={{
+                        color: 'var(--color-danger)',
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ))
+          )}
+        </Card>
       )}
 
       {/* MATCHUPS TAB */}
       {activeTab === 'matchups' && (
-        <div style={{ background: 'var(--color-white)', padding: 'var(--spacing-xl)', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-md)' }}>
+        <Card>
           <h3 style={{ marginTop: 0 }}>Matchups</h3>
 
           {rounds.length > 0 && conferences.length > 0 && (
-            <div style={{ marginBottom: 'var(--spacing-xl)', padding: 'var(--spacing-lg)', background: 'var(--color-background)', borderRadius: 'var(--radius-lg)' }}>
-              <p style={{ marginBottom: 'var(--spacing-md)' }}><strong>Auto-generate first round matchups:</strong></p>
+            <div style={{
+              marginBottom: 'var(--spacing-xl)',
+              padding: 'var(--spacing-lg)',
+              background: 'var(--color-background)',
+              borderRadius: 'var(--radius-lg)'
+            }}>
+              <p style={{ marginBottom: 'var(--spacing-md)' }}>
+                <strong>Auto-generate first round matchups:</strong>
+              </p>
               <div style={{ display: 'flex', gap: 'var(--spacing-sm)', flexWrap: 'wrap' }}>
                 {conferences.map(conf => (
-                  <button
+                  <Button
                     key={conf}
                     onClick={() => generateMatchups(rounds[0]?.id, conf)}
-                    style={{ padding: 'var(--spacing-sm) var(--spacing-lg)', background: 'var(--color-primary)', color: 'white', border: 'none', borderRadius: 'var(--radius-md)', cursor: 'pointer' }}
+                    variant="primary"
+                    size="sm"
                   >
                     Generate {conf}
-                  </button>
+                  </Button>
                 ))}
               </div>
             </div>
           )}
 
-          {rounds.map(round => {
-            const roundMatchups = matchups
-              .filter(m => m.round_id === round.id)
-              .sort((a, b) => (a.bracket_position || 0) - (b.bracket_position || 0))
+          {matchups.length === 0 ? (
+            <EmptyState
+              icon="⚔️"
+              title="No matchups yet"
+              description="Add rounds and teams first, then generate matchups"
+            />
+          ) : (
+            rounds.map(round => {
+              const roundMatchups = matchups
+                .filter(m => m.round_id === round.id)
+                .sort((a, b) => (a.bracket_position || 0) - (b.bracket_position || 0))
 
-            return (
-              <div key={round.id} style={{ marginBottom: 'var(--spacing-xl)' }}>
-                <h4>{round.name}</h4>
-                {roundMatchups.length === 0 ? (
-                  <p style={{ color: 'var(--color-text-muted)' }}>No matchups</p>
-                ) : (
-                  roundMatchups.map(m => {
+              if (roundMatchups.length === 0) return null
+
+              return (
+                <div key={round.id} style={{ marginBottom: 'var(--spacing-xl)' }}>
+                  <h4>{round.name}</h4>
+                  {roundMatchups.map(m => {
                     const teamA = teamMap[m.team_a_id]
                     const teamB = teamMap[m.team_b_id]
                     const winner = teamMap[m.winner_team_id]
 
                     return (
-                      <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)', padding: 'var(--spacing-sm)', borderBottom: '1px solid var(--color-border-light)' }}>
-                        <span style={{ width: 30, color: 'var(--color-text-muted)' }}>#{m.bracket_position}</span>
+                      <div key={m.id} style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 'var(--spacing-md)',
+                        padding: 'var(--spacing-sm)',
+                        borderBottom: '1px solid var(--color-border-light)'
+                      }}>
+                        <span style={{ width: 30, color: 'var(--color-text-muted)' }}>
+                          #{m.bracket_position}
+                        </span>
                         <span style={{ flex: 1 }}>
                           <strong>{teamB ? `#${teamB.seed} ${teamB.name}` : 'BYE'}</strong>
                           {' vs '}
                           <strong>#{teamA?.seed} {teamA?.name}</strong>
-                          {winner && <span style={{ color: 'var(--color-success)', marginLeft: 'var(--spacing-sm)' }}>→ {winner.name}</span>}
+                          {winner && (
+                            <span style={{ color: 'var(--color-success)', marginLeft: 'var(--spacing-sm)' }}>
+                              → {winner.name}
+                            </span>
+                          )}
                         </span>
-                        <button onClick={() => deleteMatchup(m.id)} style={{ color: 'var(--color-danger)', background: 'none', border: 'none', cursor: 'pointer' }}>Delete</button>
+                        <button
+                          onClick={() => deleteMatchup(m.id)}
+                          style={{
+                            color: 'var(--color-danger)',
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Delete
+                        </button>
                       </div>
                     )
-                  })
-                )}
-              </div>
-            )
-          })}
-        </div>
+                  })}
+                </div>
+              )
+            })
+          )}
+        </Card>
       )}
     </div>
   )

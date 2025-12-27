@@ -2,13 +2,15 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '../../../../../lib/supabase'
-import Link from 'next/link'
+import { Card, PageHeader, Button, EmptyState, LoadingState, FormField } from '../../../../../components/ui'
+import { CATEGORY_TYPES, CATEGORY_TYPE_LABELS } from '../../../../../lib/constants'
+import { sortByOrderIndex } from '../../../../../lib/utils'
 
 export default function CategoriesPage({ params }) {
   const [eventId, setEventId] = useState(null)
   const [event, setEvent] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [newCategory, setNewCategory] = useState({ name: '', type: 'single_select' })
+  const [newCategory, setNewCategory] = useState({ name: '', type: CATEGORY_TYPES.SINGLE_SELECT })
   const [newOptions, setNewOptions] = useState({})
 
   useEffect(() => {
@@ -48,7 +50,7 @@ export default function CategoriesPage({ params }) {
       order_index: nextOrder
     })
 
-    setNewCategory({ name: '', type: 'single_select' })
+    setNewCategory({ name: '', type: CATEGORY_TYPES.SINGLE_SELECT })
     loadEvent()
   }
 
@@ -78,92 +80,77 @@ export default function CategoriesPage({ params }) {
   }
 
   if (loading) {
-    return <div style={{ padding: 'var(--spacing-xl)' }}>Loading...</div>
+    return <LoadingState message="Loading categories..." />
   }
 
   if (!event) {
-    return <div style={{ padding: 'var(--spacing-xl)' }}>Event not found</div>
+    return (
+      <div style={{ maxWidth: 500, margin: '0 auto' }}>
+        <PageHeader title="Event Not Found" />
+        <Card>
+          <EmptyState
+            icon="❌"
+            title="Event not found"
+            actionLabel="Back to Admin"
+            actionHref="/admin"
+          />
+        </Card>
+      </div>
+    )
   }
 
-  const categories = event.categories?.sort((a, b) => a.order_index - b.order_index) || []
+  const categories = sortByOrderIndex(event.categories || [])
 
   return (
-    <div>
-      <div style={{ marginBottom: 'var(--spacing-xl)' }}>
-        <Link href="/admin" style={{ color: 'var(--color-primary)' }}>
-          ← Back to Admin
-        </Link>
-      </div>
-
-      <h1>Categories</h1>
-      <h2 style={{ color: 'var(--color-text-light)', marginBottom: 'var(--spacing-xl)' }}>{event.name}</h2>
+    <div style={{ maxWidth: 700 }}>
+      <PageHeader 
+        title="Categories" 
+        subtitle={event.name}
+      />
 
       {/* Add Category Form */}
-      <div style={{
-        background: 'var(--color-white)',
-        padding: 'var(--spacing-lg)',
-        borderRadius: 'var(--radius-xl)',
-        boxShadow: 'var(--shadow-md)',
-        marginBottom: 'var(--spacing-xl)'
-      }}>
+      <Card style={{ marginBottom: 'var(--spacing-xl)' }}>
         <h3 style={{ marginTop: 0, marginBottom: 'var(--spacing-lg)' }}>Add Category</h3>
         <div style={{ display: 'flex', gap: 'var(--spacing-md)', flexWrap: 'wrap' }}>
-          <input
-            type="text"
-            placeholder="Category name (e.g., Best Picture)"
-            value={newCategory.name}
-            onChange={(e) => setNewCategory({ ...newCategory, name: e.target.value })}
-            onKeyDown={(e) => e.key === 'Enter' && addCategory()}
-            style={{ flex: 1, minWidth: 200 }}
-          />
-          <select
-            value={newCategory.type}
-            onChange={(e) => setNewCategory({ ...newCategory, type: e.target.value })}
-            style={{ width: 180 }}
-          >
-            <option value="single_select">Single Select</option>
-            <option value="yes_no">Yes / No</option>
-            <option value="match_prediction">Match Prediction</option>
-          </select>
-          <button
-            onClick={addCategory}
-            style={{
-              padding: 'var(--spacing-md) var(--spacing-xl)',
-              background: 'var(--color-success)',
-              color: 'white',
-              border: 'none',
-              borderRadius: 'var(--radius-md)',
-              cursor: 'pointer',
-              fontWeight: 'bold'
-            }}
-          >
+          <div style={{ flex: 1, minWidth: 200 }}>
+            <input
+              type="text"
+              placeholder="Category name (e.g., Best Picture)"
+              value={newCategory.name}
+              onChange={(e) => setNewCategory({ ...newCategory, name: e.target.value })}
+              onKeyDown={(e) => e.key === 'Enter' && addCategory()}
+            />
+          </div>
+          <div style={{ width: 180 }}>
+            <select
+              value={newCategory.type}
+              onChange={(e) => setNewCategory({ ...newCategory, type: e.target.value })}
+            >
+              {Object.entries(CATEGORY_TYPE_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+          </div>
+          <Button onClick={addCategory} variant="success">
             Add
-          </button>
+          </Button>
         </div>
-      </div>
+      </Card>
 
       {/* Categories List */}
       {categories.length === 0 ? (
-        <div style={{
-          background: 'var(--color-white)',
-          padding: 'var(--spacing-xl)',
-          borderRadius: 'var(--radius-xl)',
-          textAlign: 'center',
-          color: 'var(--color-text-muted)'
-        }}>
-          No categories yet. Add your first category above.
-        </div>
+        <Card>
+          <EmptyState
+            icon="📋"
+            title="No categories yet"
+            description="Add your first category above"
+          />
+        </Card>
       ) : (
         categories.map((category, idx) => (
-          <div
+          <Card
             key={category.id}
-            style={{
-              background: 'var(--color-white)',
-              padding: 'var(--spacing-lg)',
-              borderRadius: 'var(--radius-xl)',
-              boxShadow: 'var(--shadow-md)',
-              marginBottom: 'var(--spacing-lg)'
-            }}
+            style={{ marginBottom: 'var(--spacing-lg)' }}
           >
             <div style={{
               display: 'flex',
@@ -180,25 +167,20 @@ export default function CategoriesPage({ params }) {
                   color: 'var(--color-text-muted)',
                   background: 'var(--color-background-dark)',
                   padding: '2px var(--spacing-sm)',
-                  borderRadius: 'var(--radius-sm)'
+                  borderRadius: 'var(--radius-sm)',
+                  display: 'inline-block',
+                  marginTop: 'var(--spacing-xs)'
                 }}>
-                  {category.type}
+                  {CATEGORY_TYPE_LABELS[category.type] || category.type}
                 </span>
               </div>
-              <button
+              <Button
                 onClick={() => deleteCategory(category.id)}
-                style={{
-                  color: 'var(--color-danger)',
-                  background: 'var(--color-danger-light)',
-                  border: 'none',
-                  padding: 'var(--spacing-sm) var(--spacing-md)',
-                  borderRadius: 'var(--radius-sm)',
-                  cursor: 'pointer',
-                  fontSize: 'var(--font-size-sm)'
-                }}
+                variant="danger-light"
+                size="sm"
               >
                 Delete Category
-              </button>
+              </Button>
             </div>
 
             {/* Options */}
@@ -222,7 +204,8 @@ export default function CategoriesPage({ params }) {
                       background: 'none',
                       border: 'none',
                       cursor: 'pointer',
-                      fontSize: 'var(--font-size-sm)'
+                      fontSize: 'var(--font-size-lg)',
+                      padding: 'var(--spacing-xs)'
                     }}
                   >
                     ✕
@@ -244,41 +227,21 @@ export default function CategoriesPage({ params }) {
                   onKeyDown={(e) => e.key === 'Enter' && addOption(category.id)}
                   style={{ flex: 1 }}
                 />
-                <button
-                  onClick={() => addOption(category.id)}
-                  style={{
-                    padding: 'var(--spacing-sm) var(--spacing-lg)',
-                    background: 'var(--color-primary)',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: 'var(--radius-md)',
-                    cursor: 'pointer'
-                  }}
-                >
+                <Button onClick={() => addOption(category.id)} variant="primary" size="sm">
                   Add
-                </button>
+                </Button>
               </div>
             </div>
-          </div>
+          </Card>
         ))
       )}
 
       {/* Create Pool Button */}
       {categories.length > 0 && (
         <div style={{ textAlign: 'center', marginTop: 'var(--spacing-xl)' }}>
-          <Link
-            href={`/admin/pools/new?eventId=${eventId}`}
-            style={{
-              display: 'inline-block',
-              padding: 'var(--spacing-md) var(--spacing-xl)',
-              background: 'var(--color-primary)',
-              color: 'white',
-              borderRadius: 'var(--radius-md)',
-              fontWeight: 'bold'
-            }}
-          >
+          <Button href={`/admin/pools/new?eventId=${eventId}`} variant="primary">
             Create Pool for This Event →
-          </Link>
+          </Button>
         </div>
       )}
     </div>

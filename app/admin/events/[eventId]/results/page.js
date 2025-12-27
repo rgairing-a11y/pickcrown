@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '../../../../../lib/supabase'
-import Link from 'next/link'
+import { Card, PageHeader, Button, EmptyState, LoadingState, Alert } from '../../../../../components/ui'
+import { sortByOrderIndex } from '../../../../../lib/utils'
 
 export default function AdminResultsPage({ params }) {
   const [eventId, setEventId] = useState(null)
@@ -54,64 +55,56 @@ export default function AdminResultsPage({ params }) {
   }
 
   if (loading) {
-    return <div style={{ padding: 'var(--spacing-xl)' }}>Loading...</div>
+    return <LoadingState message="Loading event..." />
   }
 
   if (!event) {
-    return <div style={{ padding: 'var(--spacing-xl)' }}>Event not found</div>
+    return (
+      <div style={{ maxWidth: 500, margin: '0 auto' }}>
+        <PageHeader title="Event Not Found" />
+        <Card>
+          <EmptyState
+            icon="❌"
+            title="Event not found"
+            actionLabel="Back to Admin"
+            actionHref="/admin"
+          />
+        </Card>
+      </div>
+    )
   }
 
-  const categories = event.categories?.sort((a, b) => 
-    a.order_index - b.order_index
-  ) || []
+  const categories = sortByOrderIndex(event.categories || [])
 
   return (
-    <div>
-      <div style={{ marginBottom: 'var(--spacing-xl)' }}>
-        <Link href="/admin" style={{ color: 'var(--color-primary)' }}>
-          ← Back to Admin
-        </Link>
-      </div>
-
-      <h1>Enter Results</h1>
-      <h2 style={{ color: 'var(--color-text-light)', marginBottom: 'var(--spacing-xl)' }}>{event.name}</h2>
+    <div style={{ maxWidth: 700 }}>
+      <PageHeader 
+        title="Enter Results" 
+        subtitle={event.name}
+      />
 
       {saving && (
-        <div style={{ 
-          background: 'var(--color-primary-light)', 
-          padding: 'var(--spacing-sm)', 
-          borderRadius: 'var(--radius-sm)', 
-          marginBottom: 'var(--spacing-lg)' 
-        }}>
+        <Alert variant="info" style={{ marginBottom: 'var(--spacing-lg)' }}>
           Saving...
-        </div>
+        </Alert>
       )}
 
       {categories.length === 0 ? (
-        <div style={{
-          background: 'var(--color-white)',
-          padding: 'var(--spacing-xl)',
-          borderRadius: 'var(--radius-xl)',
-          textAlign: 'center'
-        }}>
-          <p style={{ color: 'var(--color-text-light)' }}>No categories yet.</p>
-          <Link 
-            href={`/admin/events/${eventId}/categories`}
-            style={{ color: 'var(--color-primary)', fontWeight: 'bold' }}
-          >
-            Add Categories →
-          </Link>
-        </div>
+        <Card>
+          <EmptyState
+            icon="📋"
+            title="No categories yet"
+            description="Add categories before entering results"
+            actionLabel="Add Categories"
+            actionHref={`/admin/events/${eventId}/categories`}
+          />
+        </Card>
       ) : (
         categories.map(category => (
-          <div key={category.id} style={{ 
-            marginBottom: 'var(--spacing-xl)',
-            padding: 'var(--spacing-lg)',
-            background: 'var(--color-white)',
-            borderRadius: 'var(--radius-xl)',
-            boxShadow: 'var(--shadow-md)'
-          }}>
-            <h3 style={{ marginTop: 0, marginBottom: 'var(--spacing-lg)' }}>{category.name}</h3>
+          <Card key={category.id} style={{ marginBottom: 'var(--spacing-lg)' }}>
+            <h3 style={{ marginTop: 0, marginBottom: 'var(--spacing-lg)' }}>
+              {category.name}
+            </h3>
             
             {category.options?.map(option => (
               <div key={option.id} style={{ marginBottom: 'var(--spacing-sm)' }}>
@@ -119,9 +112,10 @@ export default function AdminResultsPage({ params }) {
                   display: 'flex', 
                   alignItems: 'center', 
                   cursor: 'pointer',
-                  padding: 'var(--spacing-sm)',
+                  padding: 'var(--spacing-sm) var(--spacing-md)',
                   borderRadius: 'var(--radius-md)',
-                  background: option.is_correct ? 'var(--color-success-light)' : 'transparent'
+                  background: option.is_correct ? 'var(--color-success-light)' : 'transparent',
+                  transition: 'background 0.2s'
                 }}>
                   <input
                     type="radio"
@@ -141,7 +135,7 @@ export default function AdminResultsPage({ params }) {
                 </label>
               </div>
             ))}
-          </div>
+          </Card>
         ))
       )}
     </div>

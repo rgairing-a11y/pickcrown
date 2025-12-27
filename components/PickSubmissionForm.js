@@ -2,6 +2,9 @@
 
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { Button, Alert, FormField } from './ui'
+import { sortByOrderIndex, getErrorMessage } from '../lib/utils'
+import Link from 'next/link'
 
 export default function PickSubmissionForm({ pool }) {
   const [entryName, setEntryName] = useState('')
@@ -13,9 +16,7 @@ export default function PickSubmissionForm({ pool }) {
   const [error, setError] = useState('')
 
   const requiresTiebreaker = pool.config?.requires_tiebreaker || false
-  const categories = pool.event.categories.sort((a, b) =>
-    a.order_index - b.order_index
-  )
+  const categories = sortByOrderIndex(pool.event.categories || [])
 
   const handlePick = (categoryId, optionId) => {
     setPicks(prev => ({
@@ -50,11 +51,7 @@ export default function PickSubmissionForm({ pool }) {
         .single()
 
       if (entryError) {
-        if (entryError.code === '23505') {
-          setError('This email or entry name is already used in this pool')
-        } else {
-          setError(entryError.message)
-        }
+        setError(getErrorMessage(entryError))
         setSubmitting(false)
         return
       }
@@ -88,12 +85,31 @@ export default function PickSubmissionForm({ pool }) {
         padding: 'var(--spacing-xl)',
         background: 'var(--color-success-light)',
         borderRadius: 'var(--radius-lg)',
-        border: '1px solid var(--color-success)'
+        border: '1px solid var(--color-success)',
+        textAlign: 'center'
       }}>
-        <h3 style={{ marginTop: 0 }}>✅ Picks Submitted!</h3>
+        <div style={{ fontSize: 48, marginBottom: 'var(--spacing-md)' }}>
+          {'✅'}
+        </div>
+        <h3 style={{ marginTop: 0 }}>Picks Submitted!</h3>
         <p>Entry name: <strong>{entryName}</strong></p>
-        <p>We'll email results to: {email}</p>
-        <a href={`/pool/${pool.id}/standings`}>View Standings →</a>
+        <p style={{ color: 'var(--color-text-light)' }}>
+          We will email results to: {email}
+        </p>
+        <Link
+          href={'/pool/' + pool.id + '/standings'}
+          style={{
+            display: 'inline-block',
+            marginTop: 'var(--spacing-lg)',
+            padding: 'var(--spacing-md) var(--spacing-xl)',
+            background: 'var(--color-primary)',
+            color: 'white',
+            borderRadius: 'var(--radius-md)',
+            fontWeight: 'bold'
+          }}
+        >
+          View Standings
+        </Link>
       </div>
     )
   }
@@ -101,22 +117,12 @@ export default function PickSubmissionForm({ pool }) {
   return (
     <form onSubmit={handleSubmit}>
       {error && (
-        <div style={{
-          padding: 'var(--spacing-lg)',
-          marginBottom: 'var(--spacing-xl)',
-          background: 'var(--color-danger-light)',
-          border: '1px solid var(--color-danger)',
-          borderRadius: 'var(--radius-lg)',
-          color: 'var(--color-danger-dark)'
-        }}>
+        <Alert variant="danger" style={{ marginBottom: 'var(--spacing-lg)' }}>
           {error}
-        </div>
+        </Alert>
       )}
 
-      <div style={{ marginBottom: 'var(--spacing-lg)' }}>
-        <label style={{ display: 'block', marginBottom: 'var(--spacing-sm)', fontWeight: 'bold' }}>
-          Entry Name *
-        </label>
+      <FormField label="Entry Name" required hint="Cannot be changed after submission">
         <input
           type="text"
           value={entryName}
@@ -124,15 +130,9 @@ export default function PickSubmissionForm({ pool }) {
           placeholder="e.g., Rich's Picks"
           required
         />
-        <small style={{ color: 'var(--color-text-light)' }}>
-          Cannot be changed after submission
-        </small>
-      </div>
+      </FormField>
 
-      <div style={{ marginBottom: 'var(--spacing-lg)' }}>
-        <label style={{ display: 'block', marginBottom: 'var(--spacing-sm)', fontWeight: 'bold' }}>
-          Email *
-        </label>
+      <FormField label="Email" required>
         <input
           type="email"
           value={email}
@@ -140,63 +140,53 @@ export default function PickSubmissionForm({ pool }) {
           placeholder="your@email.com"
           required
         />
-      </div>
+      </FormField>
 
       {requiresTiebreaker && (
-        <div style={{ marginBottom: 'var(--spacing-lg)' }}>
-          <label style={{ display: 'block', marginBottom: 'var(--spacing-sm)', fontWeight: 'bold' }}>
-            {pool.config.tiebreaker_label || 'Tie-breaker'} *
-          </label>
+        <FormField label={pool.config.tiebreaker_label || 'Tie-breaker'} required>
           <input
             type="number"
             value={tieBreaker}
             onChange={(e) => setTieBreaker(e.target.value)}
             required
           />
-        </div>
+        </FormField>
       )}
 
-      <hr style={{ margin: 'var(--spacing-xl) 0', border: 'none', borderTop: '1px solid var(--color-border)' }} />
+      <hr style={{
+        margin: 'var(--spacing-xl) 0',
+        border: 'none',
+        borderTop: '1px solid var(--color-border)'
+      }} />
 
-      <h3>Make Your Picks</h3>
+      <h3 style={{ marginBottom: 'var(--spacing-lg)' }}>Make Your Picks</h3>
 
       {categories.map(category => (
-        <div key={category.id} style={{ marginBottom: 'var(--spacing-xl)' }}>
-          <label style={{ display: 'block', marginBottom: 'var(--spacing-sm)', fontWeight: 'bold' }}>
-            {category.name}
-          </label>
+        <FormField key={category.id} label={category.name} required>
           <select
             value={picks[category.id] || ''}
             onChange={(e) => handlePick(category.id, e.target.value)}
             required
           >
             <option value="">-- Select --</option>
-            {category.options.map(option => (
+            {category.options?.map(option => (
               <option key={option.id} value={option.id}>
                 {option.name}
               </option>
             ))}
           </select>
-        </div>
+        </FormField>
       ))}
 
-      <button
+      <Button
         type="submit"
-        disabled={!isComplete || submitting}
-        style={{
-          width: '100%',
-          padding: 'var(--spacing-lg)',
-          fontSize: 'var(--font-size-xl)',
-          fontWeight: 'bold',
-          background: isComplete ? 'var(--color-success)' : 'var(--color-border)',
-          color: 'white',
-          border: 'none',
-          borderRadius: 'var(--radius-lg)',
-          cursor: isComplete ? 'pointer' : 'not-allowed'
-        }}
+        variant={isComplete ? 'success' : 'secondary'}
+        loading={submitting}
+        disabled={!isComplete}
+        style={{ width: '100%', marginTop: 'var(--spacing-lg)' }}
       >
-        {submitting ? 'Submitting...' : 'Submit All Picks'}
-      </button>
+        Submit All Picks
+      </Button>
     </form>
   )
 }

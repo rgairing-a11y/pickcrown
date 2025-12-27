@@ -17,12 +17,16 @@ export default async function StandingsPage({ params }) {
 
   if (!pool) {
     return (
-      <div style={{ 
-        padding: 'var(--spacing-xl)', 
-        textAlign: 'center',
+      <div style={{
         maxWidth: 500,
-        margin: '48px auto'
+        margin: '48px auto',
+        background: 'var(--color-white)',
+        padding: 'var(--spacing-xxl)',
+        borderRadius: 'var(--radius-xl)',
+        boxShadow: 'var(--shadow-md)',
+        textAlign: 'center'
       }}>
+        <div style={{ fontSize: 48, marginBottom: 'var(--spacing-lg)' }}>❌</div>
         <h1>Pool Not Found</h1>
         <Link href="/" style={{ color: 'var(--color-primary)', fontWeight: 'bold' }}>
           ← Go Home
@@ -39,6 +43,7 @@ export default async function StandingsPage({ params }) {
         </Link>
       </div>
 
+      {/* Header */}
       <div style={{
         background: 'var(--color-white)',
         padding: 'var(--spacing-xl)',
@@ -47,14 +52,12 @@ export default async function StandingsPage({ params }) {
         marginBottom: 'var(--spacing-xl)'
       }}>
         <h1 style={{ margin: 0 }}>{pool.name}</h1>
-        <p style={{ 
-          color: 'var(--color-text-light)', 
-          margin: 'var(--spacing-sm) 0 0' 
-        }}>
+        <p style={{ color: 'var(--color-text-light)', margin: 'var(--spacing-sm) 0 0' }}>
           {pool.event.name} ({pool.event.year}) — Standings
         </p>
       </div>
 
+      {/* Standings Table */}
       <div style={{
         background: 'var(--color-white)',
         borderRadius: 'var(--radius-xl)',
@@ -81,11 +84,11 @@ export default async function StandingsPage({ params }) {
         {/* Table Body */}
         {standings?.length === 0 ? (
           <div style={{
-            padding: 'var(--spacing-xl)',
-            textAlign: 'center',
-            color: 'var(--color-text-muted)'
+            padding: 'var(--spacing-xxl)',
+            textAlign: 'center'
           }}>
-            No entries yet
+            <div style={{ fontSize: 48, marginBottom: 'var(--spacing-lg)' }}>📭</div>
+            <p style={{ color: 'var(--color-text-muted)' }}>No entries yet</p>
           </div>
         ) : (
           standings?.map((entry, idx) => (
@@ -100,20 +103,20 @@ export default async function StandingsPage({ params }) {
                 alignItems: 'center'
               }}
             >
-              <div style={{ 
+              <div style={{
                 fontWeight: entry.rank <= 3 ? 'bold' : 'normal',
                 fontSize: entry.rank === 1 ? 'var(--font-size-xl)' : 'var(--font-size-md)'
               }}>
                 {entry.rank === 1 && '👑 '}
                 #{entry.rank}
               </div>
-              <div style={{ 
+              <div style={{
                 fontWeight: entry.rank <= 3 ? 'bold' : 'normal',
                 color: entry.rank === 1 ? 'var(--color-gold)' : 'var(--color-text)'
               }}>
                 {entry.entry_name}
               </div>
-              <div style={{ 
+              <div style={{
                 textAlign: 'right',
                 fontWeight: 'bold',
                 fontSize: 'var(--font-size-lg)',

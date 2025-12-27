@@ -7,7 +7,6 @@ import Link from 'next/link'
 export default async function BracketPage({ params }) {
   const { eventId } = await params
 
-  // Fetch event
   const { data: event } = await supabase
     .from('events')
     .select('*')
@@ -16,14 +15,18 @@ export default async function BracketPage({ params }) {
 
   if (!event) {
     return (
-      <div style={{ 
-        padding: 'var(--spacing-xl)', 
-        textAlign: 'center',
+      <div style={{
         maxWidth: 500,
-        margin: '48px auto'
+        margin: '48px auto',
+        background: 'var(--color-white)',
+        padding: 'var(--spacing-xxl)',
+        borderRadius: 'var(--radius-xl)',
+        boxShadow: 'var(--shadow-md)',
+        textAlign: 'center'
       }}>
+        <div style={{ fontSize: 48, marginBottom: 'var(--spacing-lg)' }}>❌</div>
         <h1>Event Not Found</h1>
-        <p style={{ color: 'var(--color-text-light)' }}>
+        <p style={{ color: 'var(--color-text-light)', marginBottom: 'var(--spacing-lg)' }}>
           This event doesn't exist or the link is incorrect.
         </p>
         <Link href="/" style={{ color: 'var(--color-primary)', fontWeight: 'bold' }}>
@@ -33,20 +36,17 @@ export default async function BracketPage({ params }) {
     )
   }
 
-  // Fetch rounds
   const { data: rounds } = await supabase
     .from('rounds')
     .select('*')
     .eq('event_id', eventId)
     .order('round_order')
 
-  // Fetch matchups
   const { data: matchups } = await supabase
     .from('matchups')
     .select('*')
     .eq('event_id', eventId)
 
-  // Extract team IDs from matchups
   const teamIds = new Set()
   matchups?.forEach(m => {
     if (m.team_a_id) teamIds.add(m.team_a_id)
@@ -54,7 +54,6 @@ export default async function BracketPage({ params }) {
     if (m.winner_team_id) teamIds.add(m.winner_team_id)
   })
 
-  // Fetch teams
   let teams = []
   if (teamIds.size > 0) {
     const { data: teamsData } = await supabase
@@ -64,25 +63,25 @@ export default async function BracketPage({ params }) {
     teams = teamsData || []
   }
 
-  // Check if bracket has data
   if (!rounds?.length || !matchups?.length) {
     return (
-      <div style={{ 
-        padding: 'var(--spacing-xl)', 
-        textAlign: 'center',
+      <div style={{
         maxWidth: 500,
-        margin: '48px auto'
+        margin: '48px auto',
+        background: 'var(--color-white)',
+        padding: 'var(--spacing-xxl)',
+        borderRadius: 'var(--radius-xl)',
+        boxShadow: 'var(--shadow-md)',
+        textAlign: 'center'
       }}>
+        <div style={{ fontSize: 48, marginBottom: 'var(--spacing-lg)' }}>🏆</div>
         <h1>{event.name}</h1>
         <p style={{ color: 'var(--color-text-light)', marginBottom: 'var(--spacing-xl)' }}>
           This bracket hasn't been set up yet.
         </p>
-        <Link 
+        <Link
           href={`/admin/events/${eventId}/bracket`}
-          style={{ 
-            color: 'var(--color-primary)', 
-            fontWeight: 'bold' 
-          }}
+          style={{ color: 'var(--color-primary)', fontWeight: 'bold' }}
         >
           Set up bracket in Admin →
         </Link>
@@ -91,13 +90,11 @@ export default async function BracketPage({ params }) {
   }
 
   return (
-    <div>
-      <BracketView
-        event={event}
-        rounds={rounds}
-        matchups={matchups}
-        teams={teams}
-      />
-    </div>
+    <BracketView
+      event={event}
+      rounds={rounds}
+      matchups={matchups}
+      teams={teams}
+    />
   )
 }

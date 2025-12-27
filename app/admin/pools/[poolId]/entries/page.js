@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '../../../../../lib/supabase'
-import Link from 'next/link'
+import { Card, PageHeader, Button, EmptyState, LoadingState } from '../../../../../components/ui'
+import { sortByOrderIndex, getPoolUrl, copyToClipboard, createMap } from '../../../../../lib/utils'
 
 export default function PoolEntriesPage({ params }) {
   const [poolId, setPoolId] = useState(null)
@@ -67,22 +68,33 @@ export default function PoolEntriesPage({ params }) {
     loadData()
   }
 
-  function copyPoolLink() {
-    const url = `${window.location.origin}/pool/${poolId}`
-    navigator.clipboard.writeText(url)
-    alert('Link copied!')
+  function handleCopyPoolLink() {
+    copyToClipboard(getPoolUrl(poolId), () => alert('Link copied!'))
   }
 
   if (loading) {
-    return <div style={{ padding: 'var(--spacing-xl)' }}>Loading...</div>
+    return <LoadingState message="Loading entries..." />
   }
 
   if (!pool) {
-    return <div style={{ padding: 'var(--spacing-xl)' }}>Pool not found</div>
+    return (
+      <div style={{ maxWidth: 500, margin: '0 auto' }}>
+        <PageHeader title="Pool Not Found" />
+        <Card>
+          <EmptyState
+            icon="❌"
+            title="Pool not found"
+            actionLabel="Back to Admin"
+            actionHref="/admin"
+          />
+        </Card>
+      </div>
+    )
   }
 
-  const categories = pool.event?.categories?.sort((a, b) => a.order_index - b.order_index) || []
+  const categories = sortByOrderIndex(pool.event?.categories || [])
 
+  // Build lookup maps
   const optionMap = {}
   categories.forEach(cat => {
     cat.options?.forEach(opt => {
@@ -90,86 +102,60 @@ export default function PoolEntriesPage({ params }) {
     })
   })
 
-  const categoryMap = {}
-  categories.forEach(cat => {
-    categoryMap[cat.id] = cat
-  })
+  const categoryMap = createMap(categories)
 
   return (
-    <div>
-      <div style={{ marginBottom: 'var(--spacing-xl)' }}>
-        <Link href="/admin" style={{ color: 'var(--color-primary)' }}>
-          ← Back to Admin
-        </Link>
-      </div>
-
-      {/* Pool Header */}
-      <div style={{
-        background: 'var(--color-white)',
-        padding: 'var(--spacing-xl)',
-        borderRadius: 'var(--radius-xl)',
-        boxShadow: 'var(--shadow-md)',
-        marginBottom: 'var(--spacing-xl)'
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 'var(--spacing-lg)' }}>
-          <div>
-            <h1 style={{ margin: 0 }}>{pool.name}</h1>
-            <p style={{ color: 'var(--color-text-light)', margin: 'var(--spacing-sm) 0 0' }}>{pool.event?.name}</p>
-          </div>
-          <button
-            onClick={copyPoolLink}
-            style={{
-              padding: 'var(--spacing-sm) var(--spacing-lg)',
-              background: 'var(--color-primary)',
-              color: 'white',
-              border: 'none',
-              borderRadius: 'var(--radius-md)',
-              cursor: 'pointer',
-              fontWeight: 'bold'
-            }}
-          >
+    <div style={{ maxWidth: 800 }}>
+      <PageHeader
+        title={pool.name}
+        subtitle={pool.event?.name}
+        actions={
+          <Button onClick={handleCopyPoolLink} variant="primary">
             📋 Copy Pool Link
-          </button>
-        </div>
+          </Button>
+        }
+      />
 
-        <div style={{ 
-          display: 'flex', 
-          gap: 'var(--spacing-xl)', 
-          marginTop: 'var(--spacing-lg)',
-          fontSize: 'var(--font-size-sm)',
-          color: 'var(--color-text-light)'
+      {/* Stats */}
+      <Card style={{ marginBottom: 'var(--spacing-xl)' }}>
+        <div style={{
+          display: 'flex',
+          gap: 'var(--spacing-xl)',
+          fontSize: 'var(--font-size-md)'
         }}>
-          <span><strong>{entries.length}</strong> entries</span>
-          <span><strong>{categories.length}</strong> categories</span>
+          <div>
+            <strong style={{ fontSize: 'var(--font-size-xxl)' }}>{entries.length}</strong>
+            <span style={{ color: 'var(--color-text-light)', marginLeft: 'var(--spacing-sm)' }}>
+              entries
+            </span>
+          </div>
+          <div>
+            <strong style={{ fontSize: 'var(--font-size-xxl)' }}>{categories.length}</strong>
+            <span style={{ color: 'var(--color-text-light)', marginLeft: 'var(--spacing-sm)' }}>
+              categories
+            </span>
+          </div>
         </div>
-      </div>
+      </Card>
 
       {/* Entries */}
       {entries.length === 0 ? (
-        <div style={{
-          background: 'var(--color-white)',
-          padding: 'var(--spacing-xl)',
-          borderRadius: 'var(--radius-xl)',
-          textAlign: 'center',
-          color: 'var(--color-text-muted)'
-        }}>
-          No entries yet. Share the pool link to get started!
-        </div>
+        <Card>
+          <EmptyState
+            icon="📭"
+            title="No entries yet"
+            description="Share the pool link to get started!"
+          />
+        </Card>
       ) : (
         entries.map(entry => {
           const isExpanded = expandedEntries[entry.id]
           const pickCount = entry.picks?.length || 0
 
           return (
-            <div
+            <Card
               key={entry.id}
-              style={{
-                background: 'var(--color-white)',
-                borderRadius: 'var(--radius-xl)',
-                boxShadow: 'var(--shadow-md)',
-                marginBottom: 'var(--spacing-md)',
-                overflow: 'hidden'
-              }}
+              style={{ marginBottom: 'var(--spacing-md)', padding: 0 }}
             >
               {/* Entry Header */}
               <div
@@ -206,30 +192,23 @@ export default function PoolEntriesPage({ params }) {
                   }}>
                     {pickCount}/{categories.length} picks
                   </span>
-                  <button
+                  <Button
                     onClick={(e) => {
                       e.stopPropagation()
                       deleteEntry(entry.id)
                     }}
-                    style={{
-                      color: 'var(--color-danger)',
-                      background: 'var(--color-danger-light)',
-                      border: 'none',
-                      padding: 'var(--spacing-sm) var(--spacing-md)',
-                      borderRadius: 'var(--radius-sm)',
-                      cursor: 'pointer',
-                      fontSize: 'var(--font-size-sm)'
-                    }}
+                    variant="danger-light"
+                    size="sm"
                   >
                     Delete
-                  </button>
+                  </Button>
                 </div>
               </div>
 
               {/* Entry Picks */}
               {isExpanded && (
-                <div style={{ 
-                  padding: 'var(--spacing-lg)', 
+                <div style={{
+                  padding: 'var(--spacing-lg)',
                   background: 'var(--color-background)',
                   borderTop: '1px solid var(--color-border-light)'
                 }}>
@@ -250,12 +229,15 @@ export default function PoolEntriesPage({ params }) {
                           borderBottom: '1px solid var(--color-border-light)'
                         }}
                       >
-                        <span style={{ color: 'var(--color-text-light)', fontSize: 'var(--font-size-sm)' }}>
+                        <span style={{
+                          color: 'var(--color-text-light)',
+                          fontSize: 'var(--font-size-sm)'
+                        }}>
                           {category.name}
                         </span>
                         <span style={{
                           fontWeight: 'bold',
-                          color: correctOption 
+                          color: correctOption
                             ? (isCorrect ? 'var(--color-success)' : 'var(--color-danger)')
                             : 'var(--color-text)'
                         }}>
@@ -267,7 +249,7 @@ export default function PoolEntriesPage({ params }) {
                   })}
                 </div>
               )}
-            </div>
+            </Card>
           )
         })
       )}

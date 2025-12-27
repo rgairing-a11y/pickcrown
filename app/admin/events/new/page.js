@@ -3,7 +3,8 @@
 import { useState } from 'react'
 import { supabase } from '../../../../lib/supabase'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
+import { Card, PageHeader, Button, Alert, FormField } from '../../../../components/ui'
+import { EVENT_TYPES, EVENT_TYPE_LABELS } from '../../../../lib/constants'
 
 export default function NewEventPage() {
   const router = useRouter()
@@ -12,7 +13,7 @@ export default function NewEventPage() {
 
   const [name, setName] = useState('')
   const [year, setYear] = useState(new Date().getFullYear())
-  const [eventType, setEventType] = useState('pick_one')
+  const [eventType, setEventType] = useState(EVENT_TYPES.PICK_ONE)
   const [startTime, setStartTime] = useState('')
 
   async function handleSubmit(e) {
@@ -43,102 +44,69 @@ export default function NewEventPage() {
 
   return (
     <div style={{ maxWidth: 500 }}>
-      <div style={{ marginBottom: 'var(--spacing-xl)' }}>
-        <Link href="/admin" style={{ color: 'var(--color-primary)' }}>
-          ← Back to Admin
-        </Link>
-      </div>
+      <PageHeader title="Create New Event" />
 
-      <h1>Create New Event</h1>
+      <Card>
+        <form onSubmit={handleSubmit}>
+          {error && (
+            <Alert variant="danger" style={{ marginBottom: 'var(--spacing-lg)' }}>
+              {error}
+            </Alert>
+          )}
 
-      <form onSubmit={handleSubmit} style={{
-        background: 'var(--color-white)',
-        padding: 'var(--spacing-xl)',
-        borderRadius: 'var(--radius-xl)',
-        boxShadow: 'var(--shadow-md)',
-        marginTop: 'var(--spacing-xl)'
-      }}>
-        {error && (
-          <div style={{
-            background: 'var(--color-danger-light)',
-            color: 'var(--color-danger-dark)',
-            padding: 'var(--spacing-md)',
-            borderRadius: 'var(--radius-md)',
-            marginBottom: 'var(--spacing-lg)'
-          }}>
-            {error}
-          </div>
-        )}
+          <FormField label="Event Name" required>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g., Academy Awards, NFL Playoffs, WrestleMania"
+              required
+            />
+          </FormField>
 
-        <div style={{ marginBottom: 'var(--spacing-lg)' }}>
-          <label style={{ display: 'block', marginBottom: 'var(--spacing-sm)', fontWeight: 'bold' }}>
-            Event Name *
-          </label>
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="e.g., Academy Awards, NFL Playoffs, WrestleMania"
+          <FormField label="Year" required>
+            <input
+              type="number"
+              value={year}
+              onChange={(e) => setYear(e.target.value)}
+              required
+            />
+          </FormField>
+
+          <FormField label="Event Type" required>
+            <select
+              value={eventType}
+              onChange={(e) => setEventType(e.target.value)}
+            >
+              {Object.entries(EVENT_TYPE_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+          </FormField>
+
+          <FormField 
+            label="Start Time" 
             required
-          />
-        </div>
-
-        <div style={{ marginBottom: 'var(--spacing-lg)' }}>
-          <label style={{ display: 'block', marginBottom: 'var(--spacing-sm)', fontWeight: 'bold' }}>
-            Year *
-          </label>
-          <input
-            type="number"
-            value={year}
-            onChange={(e) => setYear(e.target.value)}
-            required
-          />
-        </div>
-
-        <div style={{ marginBottom: 'var(--spacing-lg)' }}>
-          <label style={{ display: 'block', marginBottom: 'var(--spacing-sm)', fontWeight: 'bold' }}>
-            Event Type *
-          </label>
-          <select
-            value={eventType}
-            onChange={(e) => setEventType(e.target.value)}
+            hint="Picks will lock at this time"
           >
-            <option value="pick_one">Pick One (Oscars style)</option>
-            <option value="bracket">Bracket (NFL Playoffs style)</option>
-            <option value="hybrid">Hybrid (WrestleMania style)</option>
-          </select>
-        </div>
+            <input
+              type="datetime-local"
+              value={startTime}
+              onChange={(e) => setStartTime(e.target.value)}
+              required
+            />
+          </FormField>
 
-        <div style={{ marginBottom: 'var(--spacing-xl)' }}>
-          <label style={{ display: 'block', marginBottom: 'var(--spacing-sm)', fontWeight: 'bold' }}>
-            Start Time (picks lock at this time) *
-          </label>
-          <input
-            type="datetime-local"
-            value={startTime}
-            onChange={(e) => setStartTime(e.target.value)}
-            required
-          />
-        </div>
-
-        <button
-          type="submit"
-          disabled={saving}
-          style={{
-            width: '100%',
-            padding: 'var(--spacing-md)',
-            fontSize: 'var(--font-size-lg)',
-            fontWeight: 'bold',
-            background: saving ? 'var(--color-border)' : 'var(--color-success)',
-            color: 'white',
-            border: 'none',
-            borderRadius: 'var(--radius-md)',
-            cursor: saving ? 'not-allowed' : 'pointer'
-          }}
-        >
-          {saving ? 'Creating...' : 'Create Event'}
-        </button>
-      </form>
+          <Button 
+            type="submit" 
+            variant="success" 
+            loading={saving}
+            style={{ width: '100%' }}
+          >
+            Create Event
+          </Button>
+        </form>
+      </Card>
     </div>
   )
 }

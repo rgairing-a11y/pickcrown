@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../../../lib/supabase'
 import { useRouter, useSearchParams } from 'next/navigation'
-import Link from 'next/link'
+import { Card, PageHeader, Button, Alert, FormField, LoadingState, EmptyState } from '../../../../components/ui'
 
 export default function NewPoolPage() {
   const router = useRouter()
@@ -65,129 +65,95 @@ export default function NewPoolPage() {
   }
 
   if (loading) {
-    return <div style={{ padding: 'var(--spacing-xl)' }}>Loading...</div>
+    return <LoadingState message="Loading events..." />
   }
 
   return (
     <div style={{ maxWidth: 500 }}>
-      <div style={{ marginBottom: 'var(--spacing-xl)' }}>
-        <Link href="/admin" style={{ color: 'var(--color-primary)' }}>
-          ← Back to Admin
-        </Link>
-      </div>
-
-      <h1>Create New Pool</h1>
+      <PageHeader title="Create New Pool" />
 
       {events.length === 0 ? (
-        <div style={{
-          background: 'var(--color-warning-light)',
-          padding: 'var(--spacing-xl)',
-          borderRadius: 'var(--radius-xl)',
-          marginTop: 'var(--spacing-xl)'
-        }}>
-          <p style={{ margin: 0 }}>No events exist yet.</p>
-          <Link 
-            href="/admin/events/new"
-            style={{ color: 'var(--color-primary)', fontWeight: 'bold' }}
-          >
-            Create an event first →
-          </Link>
-        </div>
+        <Card>
+          <EmptyState
+            icon="📅"
+            title="No events exist yet"
+            description="You need to create an event before creating a pool"
+            actionLabel="Create Event"
+            actionHref="/admin/events/new"
+          />
+        </Card>
       ) : (
-        <form onSubmit={handleSubmit} style={{
-          background: 'var(--color-white)',
-          padding: 'var(--spacing-xl)',
-          borderRadius: 'var(--radius-xl)',
-          boxShadow: 'var(--shadow-md)',
-          marginTop: 'var(--spacing-xl)'
-        }}>
-          {error && (
-            <div style={{
-              background: 'var(--color-danger-light)',
-              color: 'var(--color-danger-dark)',
-              padding: 'var(--spacing-md)',
-              borderRadius: 'var(--radius-md)',
-              marginBottom: 'var(--spacing-lg)'
-            }}>
-              {error}
-            </div>
-          )}
+        <Card>
+          <form onSubmit={handleSubmit}>
+            {error && (
+              <Alert variant="danger" style={{ marginBottom: 'var(--spacing-lg)' }}>
+                {error}
+              </Alert>
+            )}
 
-          <div style={{ marginBottom: 'var(--spacing-lg)' }}>
-            <label style={{ display: 'block', marginBottom: 'var(--spacing-sm)', fontWeight: 'bold' }}>
-              Event *
-            </label>
-            <select
-              value={eventId}
-              onChange={(e) => setEventId(e.target.value)}
-              required
-            >
-              <option value="">-- Select Event --</option>
-              {events.map(event => (
-                <option key={event.id} value={event.id}>
-                  {event.name} ({event.year})
-                </option>
-              ))}
-            </select>
-          </div>
+            <FormField label="Event" required>
+              <select
+                value={eventId}
+                onChange={(e) => setEventId(e.target.value)}
+                required
+              >
+                <option value="">-- Select Event --</option>
+                {events.map(event => (
+                  <option key={event.id} value={event.id}>
+                    {event.name} ({event.year})
+                  </option>
+                ))}
+              </select>
+            </FormField>
 
-          <div style={{ marginBottom: 'var(--spacing-lg)' }}>
-            <label style={{ display: 'block', marginBottom: 'var(--spacing-sm)', fontWeight: 'bold' }}>
-              Pool Name *
-            </label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g., Smith Family Oscars Pool"
-              required
-            />
-          </div>
-
-          <div style={{ marginBottom: 'var(--spacing-lg)' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', cursor: 'pointer' }}>
-              <input
-                type="checkbox"
-                checked={requiresTiebreaker}
-                onChange={(e) => setRequiresTiebreaker(e.target.checked)}
-                style={{ width: 'auto' }}
-              />
-              <span>Require tie-breaker question</span>
-            </label>
-          </div>
-
-          {requiresTiebreaker && (
-            <div style={{ marginBottom: 'var(--spacing-lg)' }}>
-              <label style={{ display: 'block', marginBottom: 'var(--spacing-sm)', fontWeight: 'bold' }}>
-                Tie-breaker Label
-              </label>
+            <FormField label="Pool Name" required>
               <input
                 type="text"
-                value={tiebreakerLabel}
-                onChange={(e) => setTiebreakerLabel(e.target.value)}
-                placeholder="e.g., Total combined score"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g., Smith Family Oscars Pool"
+                required
               />
-            </div>
-          )}
+            </FormField>
 
-          <button
-            type="submit"
-            disabled={saving}
-            style={{
-              width: '100%',
-              padding: 'var(--spacing-md)',
-              fontSize: 'var(--font-size-lg)',
-              fontWeight: 'bold',
-              background: saving ? 'var(--color-border)' : 'var(--color-success)',
-              color: 'white',
-              border: 'none',
-              borderRadius: 'var(--radius-md)',
-              cursor: saving ? 'not-allowed' : 'pointer'
-            }}
-          >
-            {saving ? 'Creating...' : 'Create Pool'}
-          </button>
-        </form>
+            <FormField>
+              <label style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: 'var(--spacing-sm)', 
+                cursor: 'pointer' 
+              }}>
+                <input
+                  type="checkbox"
+                  checked={requiresTiebreaker}
+                  onChange={(e) => setRequiresTiebreaker(e.target.checked)}
+                  style={{ width: 'auto' }}
+                />
+                <span>Require tie-breaker question</span>
+              </label>
+            </FormField>
+
+            {requiresTiebreaker && (
+              <FormField label="Tie-breaker Label">
+                <input
+                  type="text"
+                  value={tiebreakerLabel}
+                  onChange={(e) => setTiebreakerLabel(e.target.value)}
+                  placeholder="e.g., Total combined score"
+                />
+              </FormField>
+            )}
+
+            <Button
+              type="submit"
+              variant="success"
+              loading={saving}
+              style={{ width: '100%' }}
+            >
+              Create Pool
+            </Button>
+          </form>
+        </Card>
       )}
     </div>
   )
