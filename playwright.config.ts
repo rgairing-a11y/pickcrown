@@ -1,4 +1,8 @@
 import { defineConfig, devices } from '@playwright/test'
+import dotenv from 'dotenv'
+
+// Load .env.local (quiet mode to suppress logs)
+dotenv.config({ path: '.env.local', quiet: true })
 
 export default defineConfig({
   testDir: './tests',
