@@ -17,16 +17,12 @@ export default function NewPoolPage() {
 
   const [name, setName] = useState('')
   const [eventId, setEventId] = useState(preselectedEventId || '')
+  const [requiresTiebreaker, setRequiresTiebreaker] = useState(false)
+  const [tiebreakerLabel, setTiebreakerLabel] = useState('')
 
   useEffect(() => {
     loadEvents()
   }, [])
-
-  useEffect(() => {
-    if (preselectedEventId) {
-      setEventId(preselectedEventId)
-    }
-  }, [preselectedEventId])
 
   async function loadEvents() {
     const { data } = await supabase
@@ -40,16 +36,21 @@ export default function NewPoolPage() {
 
   async function handleSubmit(e) {
     e.preventDefault()
-    if (!name.trim() || !eventId) return
-
     setSaving(true)
     setError('')
+
+    const config = {}
+    if (requiresTiebreaker) {
+      config.requires_tiebreaker = true
+      config.tiebreaker_label = tiebreakerLabel || 'Tie-breaker'
+    }
 
     const { data, error: insertError } = await supabase
       .from('pools')
       .insert({
-        name: name.trim(),
-        event_id: eventId
+        event_id: eventId,
+        name,
+        config
       })
       .select()
       .single()
@@ -60,18 +61,17 @@ export default function NewPoolPage() {
       return
     }
 
-    // Redirect to admin with success
     router.push('/admin')
   }
 
   if (loading) {
-    return <div>Loading...</div>
+    return <div style={{ padding: 'var(--spacing-xl)' }}>Loading...</div>
   }
 
   return (
     <div style={{ maxWidth: 500 }}>
-      <div style={{ marginBottom: 24 }}>
-        <Link href="/admin" style={{ color: '#0070f3' }}>
+      <div style={{ marginBottom: 'var(--spacing-xl)' }}>
+        <Link href="/admin" style={{ color: 'var(--color-primary)' }}>
           ← Back to Admin
         </Link>
       </div>
@@ -80,84 +80,49 @@ export default function NewPoolPage() {
 
       {events.length === 0 ? (
         <div style={{
-          background: '#fff3cd',
-          padding: 16,
-          borderRadius: 8,
-          marginTop: 24
+          background: 'var(--color-warning-light)',
+          padding: 'var(--spacing-xl)',
+          borderRadius: 'var(--radius-xl)',
+          marginTop: 'var(--spacing-xl)'
         }}>
-          <p style={{ margin: 0 }}>
-            You need to create an event first before creating a pool.
-          </p>
+          <p style={{ margin: 0 }}>No events exist yet.</p>
           <Link 
             href="/admin/events/new"
-            style={{ 
-              display: 'inline-block',
-              marginTop: 12,
-              color: '#0070f3',
-              fontWeight: 'bold'
-            }}
+            style={{ color: 'var(--color-primary)', fontWeight: 'bold' }}
           >
-            Create an Event →
+            Create an event first →
           </Link>
         </div>
       ) : (
         <form onSubmit={handleSubmit} style={{
-          background: 'white',
-          padding: 24,
-          borderRadius: 12,
-          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-          marginTop: 24
+          background: 'var(--color-white)',
+          padding: 'var(--spacing-xl)',
+          borderRadius: 'var(--radius-xl)',
+          boxShadow: 'var(--shadow-md)',
+          marginTop: 'var(--spacing-xl)'
         }}>
           {error && (
             <div style={{
-              background: '#f8d7da',
-              color: '#721c24',
-              padding: 12,
-              borderRadius: 6,
-              marginBottom: 16
+              background: 'var(--color-danger-light)',
+              color: 'var(--color-danger-dark)',
+              padding: 'var(--spacing-md)',
+              borderRadius: 'var(--radius-md)',
+              marginBottom: 'var(--spacing-lg)'
             }}>
               {error}
             </div>
           )}
 
-          <div style={{ marginBottom: 16 }}>
-            <label style={{ display: 'block', marginBottom: 8, fontWeight: 'bold' }}>
-              Pool Name *
-            </label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g., Family Oscar Pool, Office WrestleMania"
-              required
-              style={{
-                width: '100%',
-                padding: 12,
-                fontSize: 16,
-                border: '1px solid #ccc',
-                borderRadius: 6,
-                boxSizing: 'border-box'
-              }}
-            />
-          </div>
-
-          <div style={{ marginBottom: 24 }}>
-            <label style={{ display: 'block', marginBottom: 8, fontWeight: 'bold' }}>
+          <div style={{ marginBottom: 'var(--spacing-lg)' }}>
+            <label style={{ display: 'block', marginBottom: 'var(--spacing-sm)', fontWeight: 'bold' }}>
               Event *
             </label>
             <select
               value={eventId}
               onChange={(e) => setEventId(e.target.value)}
               required
-              style={{
-                width: '100%',
-                padding: 12,
-                fontSize: 16,
-                border: '1px solid #ccc',
-                borderRadius: 6
-              }}
             >
-              <option value="">-- Select an Event --</option>
+              <option value="">-- Select Event --</option>
               {events.map(event => (
                 <option key={event.id} value={event.id}>
                   {event.name} ({event.year})
@@ -166,19 +131,58 @@ export default function NewPoolPage() {
             </select>
           </div>
 
+          <div style={{ marginBottom: 'var(--spacing-lg)' }}>
+            <label style={{ display: 'block', marginBottom: 'var(--spacing-sm)', fontWeight: 'bold' }}>
+              Pool Name *
+            </label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g., Smith Family Oscars Pool"
+              required
+            />
+          </div>
+
+          <div style={{ marginBottom: 'var(--spacing-lg)' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={requiresTiebreaker}
+                onChange={(e) => setRequiresTiebreaker(e.target.checked)}
+                style={{ width: 'auto' }}
+              />
+              <span>Require tie-breaker question</span>
+            </label>
+          </div>
+
+          {requiresTiebreaker && (
+            <div style={{ marginBottom: 'var(--spacing-lg)' }}>
+              <label style={{ display: 'block', marginBottom: 'var(--spacing-sm)', fontWeight: 'bold' }}>
+                Tie-breaker Label
+              </label>
+              <input
+                type="text"
+                value={tiebreakerLabel}
+                onChange={(e) => setTiebreakerLabel(e.target.value)}
+                placeholder="e.g., Total combined score"
+              />
+            </div>
+          )}
+
           <button
             type="submit"
-            disabled={saving || !name.trim() || !eventId}
+            disabled={saving}
             style={{
               width: '100%',
-              padding: 14,
-              fontSize: 16,
+              padding: 'var(--spacing-md)',
+              fontSize: 'var(--font-size-lg)',
               fontWeight: 'bold',
-              background: (saving || !name.trim() || !eventId) ? '#ccc' : '#0070f3',
+              background: saving ? 'var(--color-border)' : 'var(--color-success)',
               color: 'white',
               border: 'none',
-              borderRadius: 6,
-              cursor: (saving || !name.trim() || !eventId) ? 'not-allowed' : 'pointer'
+              borderRadius: 'var(--radius-md)',
+              cursor: saving ? 'not-allowed' : 'pointer'
             }}
           >
             {saving ? 'Creating...' : 'Create Pool'}

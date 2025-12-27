@@ -3,12 +3,13 @@
 import { useState } from 'react'
 import { supabase } from '../../../../lib/supabase'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 
 export default function NewEventPage() {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  
+
   const [name, setName] = useState('')
   const [year, setYear] = useState(new Date().getFullYear())
   const [eventType, setEventType] = useState('pick_one')
@@ -37,56 +38,53 @@ export default function NewEventPage() {
       return
     }
 
-    // Redirect to add categories
     router.push(`/admin/events/${data.id}/categories`)
   }
 
   return (
     <div style={{ maxWidth: 500 }}>
+      <div style={{ marginBottom: 'var(--spacing-xl)' }}>
+        <Link href="/admin" style={{ color: 'var(--color-primary)' }}>
+          ← Back to Admin
+        </Link>
+      </div>
+
       <h1>Create New Event</h1>
-      
+
       <form onSubmit={handleSubmit} style={{
-        background: 'white',
-        padding: 24,
-        borderRadius: 12,
-        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-        marginTop: 24
+        background: 'var(--color-white)',
+        padding: 'var(--spacing-xl)',
+        borderRadius: 'var(--radius-xl)',
+        boxShadow: 'var(--shadow-md)',
+        marginTop: 'var(--spacing-xl)'
       }}>
         {error && (
           <div style={{
-            background: '#f8d7da',
-            color: '#721c24',
-            padding: 12,
-            borderRadius: 6,
-            marginBottom: 16
+            background: 'var(--color-danger-light)',
+            color: 'var(--color-danger-dark)',
+            padding: 'var(--spacing-md)',
+            borderRadius: 'var(--radius-md)',
+            marginBottom: 'var(--spacing-lg)'
           }}>
             {error}
           </div>
         )}
 
-        <div style={{ marginBottom: 16 }}>
-          <label style={{ display: 'block', marginBottom: 8, fontWeight: 'bold' }}>
+        <div style={{ marginBottom: 'var(--spacing-lg)' }}>
+          <label style={{ display: 'block', marginBottom: 'var(--spacing-sm)', fontWeight: 'bold' }}>
             Event Name *
           </label>
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="e.g., Academy Awards, WrestleMania 41"
+            placeholder="e.g., Academy Awards, NFL Playoffs, WrestleMania"
             required
-            style={{
-              width: '100%',
-              padding: 12,
-              fontSize: 16,
-              border: '1px solid #ccc',
-              borderRadius: 6,
-              boxSizing: 'border-box'
-            }}
           />
         </div>
 
-        <div style={{ marginBottom: 16 }}>
-          <label style={{ display: 'block', marginBottom: 8, fontWeight: 'bold' }}>
+        <div style={{ marginBottom: 'var(--spacing-lg)' }}>
+          <label style={{ display: 'block', marginBottom: 'var(--spacing-sm)', fontWeight: 'bold' }}>
             Year *
           </label>
           <input
@@ -94,31 +92,16 @@ export default function NewEventPage() {
             value={year}
             onChange={(e) => setYear(e.target.value)}
             required
-            style={{
-              width: '100%',
-              padding: 12,
-              fontSize: 16,
-              border: '1px solid #ccc',
-              borderRadius: 6,
-              boxSizing: 'border-box'
-            }}
           />
         </div>
 
-        <div style={{ marginBottom: 16 }}>
-          <label style={{ display: 'block', marginBottom: 8, fontWeight: 'bold' }}>
+        <div style={{ marginBottom: 'var(--spacing-lg)' }}>
+          <label style={{ display: 'block', marginBottom: 'var(--spacing-sm)', fontWeight: 'bold' }}>
             Event Type *
           </label>
           <select
             value={eventType}
             onChange={(e) => setEventType(e.target.value)}
-            style={{
-              width: '100%',
-              padding: 12,
-              fontSize: 16,
-              border: '1px solid #ccc',
-              borderRadius: 6
-            }}
           >
             <option value="pick_one">Pick One (Oscars style)</option>
             <option value="bracket">Bracket (NFL Playoffs style)</option>
@@ -126,8 +109,8 @@ export default function NewEventPage() {
           </select>
         </div>
 
-        <div style={{ marginBottom: 24 }}>
-          <label style={{ display: 'block', marginBottom: 8, fontWeight: 'bold' }}>
+        <div style={{ marginBottom: 'var(--spacing-xl)' }}>
+          <label style={{ display: 'block', marginBottom: 'var(--spacing-sm)', fontWeight: 'bold' }}>
             Start Time (picks lock at this time) *
           </label>
           <input
@@ -135,14 +118,6 @@ export default function NewEventPage() {
             value={startTime}
             onChange={(e) => setStartTime(e.target.value)}
             required
-            style={{
-              width: '100%',
-              padding: 12,
-              fontSize: 16,
-              border: '1px solid #ccc',
-              borderRadius: 6,
-              boxSizing: 'border-box'
-            }}
           />
         </div>
 
@@ -151,17 +126,17 @@ export default function NewEventPage() {
           disabled={saving}
           style={{
             width: '100%',
-            padding: 14,
-            fontSize: 16,
+            padding: 'var(--spacing-md)',
+            fontSize: 'var(--font-size-lg)',
             fontWeight: 'bold',
-            background: saving ? '#ccc' : '#28a745',
+            background: saving ? 'var(--color-border)' : 'var(--color-success)',
             color: 'white',
             border: 'none',
-            borderRadius: 6,
+            borderRadius: 'var(--radius-md)',
             cursor: saving ? 'not-allowed' : 'pointer'
           }}
         >
-          {saving ? 'Creating...' : 'Create Event & Add Categories'}
+          {saving ? 'Creating...' : 'Create Event'}
         </button>
       </form>
     </div>

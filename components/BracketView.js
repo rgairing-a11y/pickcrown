@@ -1,16 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
 
-export default function BracketView({ event, rounds, matchups, teams, conferences }) {
-const [activeConference, setActiveConference] = useState('ALL')
-  
-  // Build team lookup
+export default function BracketView({ event, rounds, matchups, teams }) {
+  const conferences = [...new Set(teams.map(t => t.conference).filter(Boolean))]
+  const [activeConference, setActiveConference] = useState('ALL')
+
   const teamMap = {}
   teams.forEach(t => teamMap[t.id] = t)
 
-  // Attach teams to matchups
   const matchupsWithTeams = matchups.map(m => ({
     ...m,
     team_a: teamMap[m.team_a_id],
@@ -18,206 +16,174 @@ const [activeConference, setActiveConference] = useState('ALL')
     winner: teamMap[m.winner_team_id]
   }))
 
-  // Group matchups by round and sort by bracket position
   const roundsWithMatchups = rounds.map(round => ({
     ...round,
     matchups: matchupsWithTeams
       .filter(m => m.round_id === round.id)
       .sort((a, b) => {
-        // Sort by bracket_position if set, otherwise by seed
         const posA = a.bracket_position || a.team_a?.seed || 99
         const posB = b.bracket_position || b.team_a?.seed || 99
         return posA - posB
       })
   }))
-  // Filter by conference (for display)
-  const getConferenceMatchups = (round) => {
-    if (activeConference === 'ALL' || round.round_order === rounds.length) {
-      return round.matchups
-    }
-    return round.matchups.filter(m => 
-      m.team_a?.conference === activeConference || 
-      m.team_b?.conference === activeConference
-    )
-  }
 
-  // Find bye teams (not in first round)
-  const firstRoundTeamIds = new Set()
-  const firstRound = roundsWithMatchups.find(r => r.round_order === 1)
-  firstRound?.matchups.forEach(m => {
-    if (m.team_a_id) firstRoundTeamIds.add(m.team_a_id)
-    if (m.team_b_id) firstRoundTeamIds.add(m.team_b_id)
-  })
-  const byeTeams = teams.filter(t => 
-    !firstRoundTeamIds.has(t.id) && 
-    (activeConference === 'ALL' || t.conference === activeConference)
-  )
-
-  // Conference colors (table-driven)
   const conferenceColors = {
-    'AFC': { bg: '#d32f2f', light: '#ffebee' },
-    'NFC': { bg: '#1565c0', light: '#e3f2fd' },
-    'East': { bg: '#1565c0', light: '#e3f2fd' },
-    'West': { bg: '#d32f2f', light: '#ffebee' },
-    'South': { bg: '#2e7d32', light: '#e8f5e9' },
-    'Midwest': { bg: '#f57c00', light: '#fff3e0' },
-    'default': { bg: '#666', light: '#f5f5f5' }
+    'AFC': { primary: 'var(--color-afc)', light: 'var(--color-afc-light)' },
+    'NFC': { primary: 'var(--color-nfc)', light: 'var(--color-nfc-light)' },
+    'East': { primary: 'var(--color-east)', light: 'var(--color-east-light)' },
+    'West': { primary: 'var(--color-west)', light: 'var(--color-west-light)' },
+    'South': { primary: 'var(--color-south)', light: 'var(--color-south-light)' },
+    'Midwest': { primary: 'var(--color-midwest)', light: 'var(--color-midwest-light)' }
   }
 
-  const getColor = (conf) => conferenceColors[conf] || conferenceColors.default
+  const getConferenceColor = (conf) => conferenceColors[conf] || { primary: 'var(--color-text-light)', light: 'var(--color-background-dark)' }
+
+  const filteredRounds = roundsWithMatchups.map(round => {
+    const isChampionship = round.round_order === rounds.length
+    return {
+      ...round,
+      matchups: round.matchups.filter(m => {
+        if (activeConference === 'ALL') return true
+        if (isChampionship) return true
+        const teamConf = m.team_a?.conference
+        return teamConf === activeConference
+      })
+    }
+  })
 
   return (
     <div>
-      <div style={{ marginBottom: 24 }}>
-        <Link href="/" style={{ color: '#0070f3' }}>← Home</Link>
+      {/* Event Header */}
+      <div style={{
+        background: 'var(--color-white)',
+        padding: 'var(--spacing-xl)',
+        borderRadius: 'var(--radius-xl)',
+        boxShadow: 'var(--shadow-md)',
+        marginBottom: 'var(--spacing-xl)',
+        textAlign: 'center'
+      }}>
+        <h1 style={{ margin: 0 }}>{event.name}</h1>
+        <p style={{ color: 'var(--color-text-light)', margin: 'var(--spacing-sm) 0 0' }}>
+          {event.year}
+        </p>
       </div>
 
-      <h1 style={{ textAlign: 'center', marginBottom: 8 }}>{event.name}</h1>
-      
-     {/* Conference Tabs */}
+      {/* Conference Tabs */}
       {conferences.length > 1 && (
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'center', 
-          gap: 8, 
-          marginBottom: 24,
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          gap: 'var(--spacing-sm)',
+          marginBottom: 'var(--spacing-xl)',
           flexWrap: 'wrap'
         }}>
           <button
             onClick={() => setActiveConference('ALL')}
             style={{
-              padding: '10px 20px',
+              padding: 'var(--spacing-md) var(--spacing-lg)',
               border: 'none',
-              borderRadius: 8,
+              borderRadius: 'var(--radius-lg)',
               fontWeight: 'bold',
               cursor: 'pointer',
-              background: activeConference === 'ALL' ? '#333' : '#eee',
-              color: activeConference === 'ALL' ? 'white' : '#333',
+              background: activeConference === 'ALL' ? 'var(--color-text)' : 'var(--color-border-light)',
+              color: activeConference === 'ALL' ? 'white' : 'var(--color-text)',
               transition: 'all 0.2s'
             }}
           >
             ALL
           </button>
-          {conferences.map(conf => (
-            <button
-              key={conf}
-              onClick={() => setActiveConference(conf)}
-              style={{
-                padding: '10px 20px',
-                border: 'none',
-                borderRadius: 8,
-                fontWeight: 'bold',
-                cursor: 'pointer',
-                background: activeConference === conf ? getColor(conf).bg : '#eee',
-                color: activeConference === conf ? 'white' : '#333',
-                transition: 'all 0.2s'
-              }}
-            >
-              {conf}
-            </button>
-          ))}
+          {conferences.map(conf => {
+            const colors = getConferenceColor(conf)
+            const isActive = activeConference === conf
+            return (
+              <button
+                key={conf}
+                onClick={() => setActiveConference(conf)}
+                style={{
+                  padding: 'var(--spacing-md) var(--spacing-lg)',
+                  border: 'none',
+                  borderRadius: 'var(--radius-lg)',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  background: isActive ? colors.primary : colors.light,
+                  color: isActive ? 'white' : colors.primary,
+                  transition: 'all 0.2s'
+                }}
+              >
+                {conf}
+              </button>
+            )
+          })}
         </div>
       )}
 
-      {/* Bracket Container - Horizontal Scroll on Mobile */}
-      <div style={{ 
-        overflowX: 'auto',
-        paddingBottom: 20
+      {/* Bracket Container */}
+      <div style={{
+        background: 'var(--color-white)',
+        borderRadius: 'var(--radius-xl)',
+        boxShadow: 'var(--shadow-md)',
+        padding: 'var(--spacing-xl)',
+        overflowX: 'auto'
       }}>
-        <div style={{ 
+        <div style={{
           display: 'flex',
-          gap: 0,
-          minWidth: 'max-content',
-          padding: '0 20px'
+          gap: 'var(--spacing-xxl)',
+          minWidth: 'fit-content',
+          paddingBottom: 'var(--spacing-lg)'
         }}>
-          {/* Bye Teams Column (if any) */}
-          {byeTeams.length > 0 && (
-            <div style={{ 
-              display: 'flex', 
-              flexDirection: 'column',
-              marginRight: 20
-            }}>
-              <div style={{ 
-                textAlign: 'center', 
-                padding: '12px 16px',
-                fontWeight: 'bold',
-                fontSize: 14,
-                color: '#666',
-                textTransform: 'uppercase',
-                minWidth: 180
-              }}>
-                Bye
-              </div>
-              <div style={{ 
-                display: 'flex', 
-                flexDirection: 'column',
-                justifyContent: 'center',
-                flex: 1,
-                gap: 20
-              }}>
-                {byeTeams.map(team => (
-                  <div key={team.id} style={{
-                    background: getColor(team.conference).light,
-                    padding: 12,
-                    borderRadius: 8,
-                    fontWeight: 'bold',
-                    border: `2px solid ${getColor(team.conference).bg}`,
-                    minWidth: 160
-                  }}>
-                    #{team.seed} {team.name} 👑
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Round Columns */}
-          {roundsWithMatchups.map((round, roundIndex) => {
-            const conferenceMatchups = getConferenceMatchups(round)
-            if (conferenceMatchups.length === 0) return null
-
+          {filteredRounds.map((round, roundIndex) => {
             const isChampionship = round.round_order === rounds.length
-            
+            const gap = Math.pow(2, roundIndex) * 20
+            const padding = Math.pow(2, roundIndex) * 10
+
             return (
-              <div 
-                key={round.id} 
-                style={{ 
-                  display: 'flex', 
+              <div
+                key={round.id}
+                style={{
+                  display: 'flex',
                   flexDirection: 'column',
-                  position: 'relative'
+                  minWidth: 200
                 }}
               >
                 {/* Round Header */}
-                <div style={{ 
-                  textAlign: 'center', 
-                  padding: '12px 16px',
+                <div style={{
+                  textAlign: 'center',
+                  marginBottom: 'var(--spacing-lg)',
+                  padding: 'var(--spacing-sm) var(--spacing-md)',
+                  background: isChampionship ? 'var(--color-gold-light)' : 'var(--color-background)',
+                  borderRadius: 'var(--radius-md)',
                   fontWeight: 'bold',
-                  fontSize: 14,
-                  color: isChampionship ? '#d4af37' : '#666',
+                  fontSize: 'var(--font-size-sm)',
+                  color: isChampionship ? 'var(--color-gold)' : 'var(--color-text-light)',
                   textTransform: 'uppercase',
-                  minWidth: 180
+                  letterSpacing: '0.5px'
                 }}>
-                  {isChampionship && '🏆 '}{round.name}
-                  <div style={{ fontSize: 11, fontWeight: 'normal' }}>
+                  {round.name}
+                  <span style={{
+                    marginLeft: 'var(--spacing-sm)',
+                    fontWeight: 'normal',
+                    opacity: 0.7
+                  }}>
                     ({round.points} pts)
-                  </div>
+                  </span>
                 </div>
 
                 {/* Matchups */}
-                <div style={{ 
-                  display: 'flex', 
+                <div style={{
+                  display: 'flex',
                   flexDirection: 'column',
-                  justifyContent: 'space-around',
+                  gap: gap,
+                  paddingTop: padding,
+                  paddingBottom: padding,
                   flex: 1,
-                  gap: Math.pow(2, roundIndex) * 20,
-                  padding: `${Math.pow(2, roundIndex) * 10}px 0`
+                  justifyContent: 'space-around'
                 }}>
-                  {conferenceMatchups.map(matchup => (
-                    <MatchupCard 
-                      key={matchup.id} 
+                  {round.matchups.map((matchup, matchupIndex) => (
+                    <MatchupCard
+                      key={matchup.id}
                       matchup={matchup}
                       isChampionship={isChampionship}
-                      showConnector={roundIndex < roundsWithMatchups.length - 1}
+                      showConnector={roundIndex < rounds.length - 1}
                     />
                   ))}
                 </div>
@@ -225,19 +191,6 @@ const [activeConference, setActiveConference] = useState('ALL')
             )
           })}
         </div>
-      </div>
-
-      {/* Legend */}
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        gap: 24, 
-        marginTop: 24,
-        fontSize: 14,
-        color: '#666'
-      }}>
-        <span>✓ = Winner</span>
-        <span style={{ color: '#28a745' }}>Green = Won</span>
       </div>
     </div>
   )
@@ -250,32 +203,32 @@ function MatchupCard({ matchup, isChampionship, showConnector }) {
   const isByeGame = !teamB
 
   return (
-    <div style={{ 
+    <div style={{
       position: 'relative',
       display: 'flex',
       alignItems: 'center'
     }}>
       <div style={{
-        border: isChampionship ? '3px solid #d4af37' : '1px solid #ddd',
-        borderRadius: 8,
+        border: isChampionship ? '3px solid var(--color-gold)' : '1px solid var(--color-border)',
+        borderRadius: 'var(--radius-lg)',
         overflow: 'hidden',
         minWidth: 180,
-        boxShadow: isChampionship 
-          ? '0 4px 12px rgba(212, 175, 55, 0.3)' 
-          : '0 2px 4px rgba(0,0,0,0.1)',
-        background: 'white',
+        boxShadow: isChampionship
+          ? '0 4px 12px rgba(212, 175, 55, 0.3)'
+          : 'var(--shadow-sm)',
+        background: 'var(--color-white)',
         opacity: isByeGame ? 0.8 : 1
       }}>
         <TeamRow team={teamB} isWinner={winner?.id === teamB?.id} isBye={isByeGame} />
         <TeamRow team={teamA} isWinner={winner?.id === teamA?.id} isBottom />
-        
+
         {isChampionship && winner && (
           <div style={{
-            padding: 10,
-            background: 'linear-gradient(135deg, #d4af37, #f4d03f)',
+            padding: 'var(--spacing-md)',
+            background: 'linear-gradient(135deg, var(--color-gold), #f4d03f)',
             textAlign: 'center',
             fontWeight: 'bold',
-            fontSize: 13
+            fontSize: 'var(--font-size-sm)'
           }}>
             🏆 CHAMPION
           </div>
@@ -286,7 +239,7 @@ function MatchupCard({ matchup, isChampionship, showConnector }) {
         <div style={{
           width: 30,
           height: 2,
-          background: '#ddd'
+          background: 'var(--color-border)'
         }} />
       )}
     </div>
@@ -296,23 +249,23 @@ function MatchupCard({ matchup, isChampionship, showConnector }) {
 function TeamRow({ team, isWinner, isBottom = false, isBye = false }) {
   return (
     <div style={{
-      padding: '10px 12px',
-      background: isBye ? '#f5f5f5' : (isWinner ? '#d4edda' : 'white'),
+      padding: 'var(--spacing-md)',
+      background: isBye ? 'var(--color-background-dark)' : (isWinner ? 'var(--color-success-light)' : 'var(--color-white)'),
       display: 'flex',
       justifyContent: 'space-between',
       alignItems: 'center',
-      borderBottom: isBottom ? 'none' : '1px solid #eee',
+      borderBottom: isBottom ? 'none' : '1px solid var(--color-border-light)',
       minHeight: 38
     }}>
-      <span style={{ 
+      <span style={{
         fontWeight: isWinner ? 'bold' : 'normal',
-        fontSize: 14,
-        color: isBye ? '#999' : (isWinner ? '#155724' : (team ? '#333' : '#999')),
+        fontSize: 'var(--font-size-md)',
+        color: isBye ? 'var(--color-text-muted)' : (isWinner ? 'var(--color-success-dark)' : (team ? 'var(--color-text)' : 'var(--color-text-muted)')),
         fontStyle: isBye ? 'italic' : 'normal'
       }}>
         {isBye ? 'BYE' : (team ? `#${team.seed} ${team.name}` : 'TBD')}
       </span>
-      {isWinner && !isBye && <span style={{ color: '#28a745' }}>✓</span>}
+      {isWinner && !isBye && <span style={{ color: 'var(--color-success)' }}>✓</span>}
     </div>
   )
 }

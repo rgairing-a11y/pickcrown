@@ -1,76 +1,129 @@
-import { supabase } from '../../../../lib/supabase'
-
 export const dynamic = 'force-dynamic'
+
+import { supabase } from '../../../../lib/supabase'
+import Link from 'next/link'
 
 export default async function StandingsPage({ params }) {
   const { poolId } = await params
 
-  // Fetch pool info
   const { data: pool } = await supabase
     .from('pools')
-    .select('*, event:events(name)')
+    .select('*, event:events(name, year)')
     .eq('id', poolId)
     .single()
 
-  if (!pool) {
-    return <div style={{ padding: 24 }}>Pool not found</div>
-  }
-
-  // Fetch standings
-  const { data: standings, error } = await supabase
+  const { data: standings } = await supabase
     .rpc('calculate_standings', { p_pool_id: poolId })
 
-  return (
-    <div style={{ padding: 24, maxWidth: 600, margin: '0 auto' }}>
-      <h1>{pool.name}</h1>
-      <h2>{pool.event.name} — Standings</h2>
-
-      <table style={{ 
-        width: '100%', 
-        borderCollapse: 'collapse', 
-        marginTop: 24 
+  if (!pool) {
+    return (
+      <div style={{ 
+        padding: 'var(--spacing-xl)', 
+        textAlign: 'center',
+        maxWidth: 500,
+        margin: '48px auto'
       }}>
-        <thead>
-          <tr style={{ background: '#f0f0f0' }}>
-            <th style={{ padding: 12, textAlign: 'left' }}>Rank</th>
-            <th style={{ padding: 12, textAlign: 'left' }}>Entry</th>
-            <th style={{ padding: 12, textAlign: 'right' }}>Points</th>
-          </tr>
-        </thead>
-        <tbody>
-          {standings?.map((entry, idx) => (
-            <tr 
+        <h1>Pool Not Found</h1>
+        <Link href="/" style={{ color: 'var(--color-primary)', fontWeight: 'bold' }}>
+          ← Go Home
+        </Link>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ maxWidth: 700, margin: '0 auto' }}>
+      <div style={{ marginBottom: 'var(--spacing-xl)' }}>
+        <Link href={`/pool/${poolId}`} style={{ color: 'var(--color-primary)' }}>
+          ← Back to Pool
+        </Link>
+      </div>
+
+      <div style={{
+        background: 'var(--color-white)',
+        padding: 'var(--spacing-xl)',
+        borderRadius: 'var(--radius-xl)',
+        boxShadow: 'var(--shadow-md)',
+        marginBottom: 'var(--spacing-xl)'
+      }}>
+        <h1 style={{ margin: 0 }}>{pool.name}</h1>
+        <p style={{ 
+          color: 'var(--color-text-light)', 
+          margin: 'var(--spacing-sm) 0 0' 
+        }}>
+          {pool.event.name} ({pool.event.year}) — Standings
+        </p>
+      </div>
+
+      <div style={{
+        background: 'var(--color-white)',
+        borderRadius: 'var(--radius-xl)',
+        boxShadow: 'var(--shadow-md)',
+        overflow: 'hidden'
+      }}>
+        {/* Table Header */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: '60px 1fr 80px',
+          padding: 'var(--spacing-lg)',
+          background: 'var(--color-background-dark)',
+          fontWeight: 'bold',
+          fontSize: 'var(--font-size-sm)',
+          color: 'var(--color-text-light)',
+          textTransform: 'uppercase',
+          letterSpacing: '0.5px'
+        }}>
+          <div>Rank</div>
+          <div>Entry</div>
+          <div style={{ textAlign: 'right' }}>Points</div>
+        </div>
+
+        {/* Table Body */}
+        {standings?.length === 0 ? (
+          <div style={{
+            padding: 'var(--spacing-xl)',
+            textAlign: 'center',
+            color: 'var(--color-text-muted)'
+          }}>
+            No entries yet
+          </div>
+        ) : (
+          standings?.map((entry, idx) => (
+            <div
               key={entry.entry_id}
               style={{
-                borderBottom: '1px solid #ddd',
-                background: idx % 2 === 0 ? 'white' : '#f9f9f9'
+                display: 'grid',
+                gridTemplateColumns: '60px 1fr 80px',
+                padding: 'var(--spacing-lg)',
+                borderBottom: '1px solid var(--color-border-light)',
+                background: idx % 2 === 0 ? 'var(--color-white)' : 'var(--color-background)',
+                alignItems: 'center'
               }}
             >
-              <td style={{ padding: 12 }}>
-                {entry.rank === 1 ? '👑 ' : ''}#{entry.rank}
-              </td>
-              <td style={{ 
-                padding: 12, 
-                fontWeight: entry.rank <= 3 ? 'bold' : 'normal' 
+              <div style={{ 
+                fontWeight: entry.rank <= 3 ? 'bold' : 'normal',
+                fontSize: entry.rank === 1 ? 'var(--font-size-xl)' : 'var(--font-size-md)'
+              }}>
+                {entry.rank === 1 && '👑 '}
+                #{entry.rank}
+              </div>
+              <div style={{ 
+                fontWeight: entry.rank <= 3 ? 'bold' : 'normal',
+                color: entry.rank === 1 ? 'var(--color-gold)' : 'var(--color-text)'
               }}>
                 {entry.entry_name}
-              </td>
-              <td style={{ padding: 12, textAlign: 'right' }}>
+              </div>
+              <div style={{ 
+                textAlign: 'right',
+                fontWeight: 'bold',
+                fontSize: 'var(--font-size-lg)',
+                color: entry.total_points > 0 ? 'var(--color-success)' : 'var(--color-text-muted)'
+              }}>
                 {entry.total_points}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-
-      {(!standings || standings.length === 0) && (
-        <p style={{ textAlign: 'center', marginTop: 24, color: '#666' }}>
-          No entries yet
-        </p>
-      )}
-
-      <div style={{ marginTop: 24 }}>
-        <a href={`/pool/${poolId}`}>← Back to pool</a>
+              </div>
+            </div>
+          ))
+        )}
       </div>
     </div>
   )

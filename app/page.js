@@ -1,94 +1,154 @@
+export const dynamic = 'force-dynamic'
+
 import { supabase } from '../lib/supabase'
 import Link from 'next/link'
 
-export const dynamic = 'force-dynamic'
-
-export default async function Home() {
-  // Fetch all pools with their events
+export default async function HomePage() {
   const { data: pools } = await supabase
     .from('pools')
     .select(`
       *,
-      event:events (*)
+      event:events (name, year, start_time)
     `)
     .order('created_at', { ascending: false })
 
   return (
-    <div>
+    <div style={{ maxWidth: 800, margin: '0 auto' }}>
       <div style={{
         textAlign: 'center',
-        padding: '48px 0'
+        marginBottom: 'var(--spacing-xxl)'
       }}>
-        <h1 style={{ fontSize: 48, marginBottom: 16 }}>👑 PickCrown</h1>
-        <p style={{ fontSize: 20, color: '#666' }}>
+        <h1 style={{ 
+          fontSize: 'var(--font-size-hero)', 
+          marginBottom: 'var(--spacing-sm)' 
+        }}>
+          👑 PickCrown
+        </h1>
+        <p style={{ 
+          color: 'var(--color-text-light)', 
+          fontSize: 'var(--font-size-lg)' 
+        }}>
           Prediction pools for sports and entertainment
         </p>
       </div>
 
-      <h2 style={{ marginBottom: 16 }}>Active Pools</h2>
-      
-      {pools && pools.length > 0 ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {pools.map(pool => {
-            const isLocked = new Date(pool.event?.start_time) < new Date()
-            return (
-              <div 
-                key={pool.id}
-                style={{
-                  background: 'white',
-                  borderRadius: 12,
-                  padding: 24,
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-                }}
-              >
-                <h3 style={{ marginBottom: 8 }}>{pool.name}</h3>
-                <p style={{ color: '#666', marginBottom: 16 }}>
-                  {pool.event?.name}
-                  {isLocked && (
-                    <span style={{ 
-                      marginLeft: 8, 
-                      background: '#fff3cd', 
-                      padding: '2px 8px', 
-                      borderRadius: 4,
-                      fontSize: 14 
-                    }}>
-                      Locked
-                    </span>
-                  )}
-                </p>
-                <div style={{ display: 'flex', gap: 16 }}>
-                  <Link 
-                    href={`/pool/${pool.id}`}
-                    style={{
-                      background: isLocked ? '#6c757d' : '#28a745',
-                      color: 'white',
-                      padding: '8px 16px',
-                      borderRadius: 6,
-                      fontWeight: 'bold'
-                    }}
-                  >
-                    {isLocked ? 'View Pool' : 'Make Picks'}
-                  </Link>
-                  <Link 
-                    href={`/pool/${pool.id}/standings`}
-                    style={{
-                      background: '#0070f3',
-                      color: 'white',
-                      padding: '8px 16px',
-                      borderRadius: 6,
-                      fontWeight: 'bold'
-                    }}
-                  >
-                    Standings
-                  </Link>
-                </div>
-              </div>
-            )
-          })}
+      <div style={{
+        background: 'var(--color-white)',
+        borderRadius: 'var(--radius-xl)',
+        boxShadow: 'var(--shadow-md)',
+        overflow: 'hidden'
+      }}>
+        <div style={{
+          padding: 'var(--spacing-lg)',
+          background: 'var(--color-background-dark)',
+          borderBottom: '1px solid var(--color-border-light)'
+        }}>
+          <h2 style={{ margin: 0, fontSize: 'var(--font-size-lg)' }}>Active Pools</h2>
         </div>
-      ) : (
-        <p style={{ color: '#666' }}>No pools yet.</p>
-      )}
+
+        {pools?.length === 0 ? (
+          <div style={{
+            padding: 'var(--spacing-xxl)',
+            textAlign: 'center',
+            color: 'var(--color-text-muted)'
+          }}>
+            <p>No pools available yet.</p>
+            <Link 
+              href="/admin" 
+              style={{ 
+                color: 'var(--color-primary)', 
+                fontWeight: 'bold' 
+              }}
+            >
+              Create one in Admin →
+            </Link>
+          </div>
+        ) : (
+          <div>
+            {pools?.map((pool, idx) => {
+              const isLocked = new Date(pool.event?.start_time) < new Date()
+              
+              return (
+                <div
+                  key={pool.id}
+                  style={{
+                    padding: 'var(--spacing-lg)',
+                    borderBottom: idx < pools.length - 1 ? '1px solid var(--color-border-light)' : 'none',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
+                    gap: 'var(--spacing-md)'
+                  }}
+                >
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: 'var(--font-size-lg)' }}>
+                      {pool.name}
+                    </h3>
+                    <p style={{ 
+                      margin: 'var(--spacing-xs) 0 0', 
+                      color: 'var(--color-text-light)',
+                      fontSize: 'var(--font-size-sm)'
+                    }}>
+                      {pool.event?.name} ({pool.event?.year})
+                      {isLocked && (
+                        <span style={{ 
+                          marginLeft: 'var(--spacing-sm)', 
+                          color: 'var(--color-danger)' 
+                        }}>
+                          🔒 Locked
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                  
+                  <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
+                    <Link
+                      href={`/pool/${pool.id}`}
+                      style={{
+                        padding: 'var(--spacing-sm) var(--spacing-lg)',
+                        background: isLocked ? 'var(--color-background-dark)' : 'var(--color-primary)',
+                        color: isLocked ? 'var(--color-text-light)' : 'white',
+                        borderRadius: 'var(--radius-md)',
+                        fontWeight: 'bold',
+                        fontSize: 'var(--font-size-sm)'
+                      }}
+                    >
+                      {isLocked ? 'View' : 'Enter Picks'}
+                    </Link>
+                    <Link
+                      href={`/pool/${pool.id}/standings`}
+                      style={{
+                        padding: 'var(--spacing-sm) var(--spacing-lg)',
+                        background: 'var(--color-success-light)',
+                        color: 'var(--color-success-dark)',
+                        borderRadius: 'var(--radius-md)',
+                        fontWeight: 'bold',
+                        fontSize: 'var(--font-size-sm)'
+                      }}
+                    >
+                      Standings
+                    </Link>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Quick Links */}
+      <div style={{
+        marginTop: 'var(--spacing-xxl)',
+        textAlign: 'center'
+      }}>
+        <p style={{ 
+          color: 'var(--color-text-muted)', 
+          fontSize: 'var(--font-size-sm)' 
+        }}>
+          Have a pool link? Paste it in your browser to join.
+        </p>
+      </div>
     </div>
   )
 }

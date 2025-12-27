@@ -3,9 +3,9 @@ import Link from 'next/link'
 export default function Header() {
   return (
     <header style={{
-      background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
-      padding: '16px 24px',
-      marginBottom: 32
+      background: 'linear-gradient(135deg, var(--color-header-start) 0%, var(--color-header-end) 100%)',
+      padding: 'var(--spacing-lg) var(--spacing-xl)',
+      marginBottom: 'var(--spacing-xxl)'
     }}>
       <div style={{
         maxWidth: 1200,
@@ -21,12 +21,12 @@ export default function Header() {
             textDecoration: 'none',
             display: 'flex',
             alignItems: 'center',
-            gap: 8
+            gap: 'var(--spacing-sm)'
           }}
         >
-          <span style={{ fontSize: 28 }}>👑</span>
+          <span style={{ fontSize: 'var(--font-size-hero)' }}>👑</span>
           <span style={{ 
-            fontSize: 24, 
+            fontSize: 'var(--font-size-xxl)', 
             fontWeight: 'bold',
             letterSpacing: '-0.5px'
           }}>
@@ -34,15 +34,15 @@ export default function Header() {
           </span>
         </Link>
 
-        <nav style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+        <nav style={{ display: 'flex', gap: 'var(--spacing-lg)', alignItems: 'center' }}>
           <Link 
             href="/"
             style={{ 
               color: 'rgba(255,255,255,0.8)', 
               textDecoration: 'none',
-              fontSize: 14,
-              padding: '8px 12px',
-              borderRadius: 6
+              fontSize: 'var(--font-size-md)',
+              padding: 'var(--spacing-sm) var(--spacing-md)',
+              borderRadius: 'var(--radius-md)'
             }}
           >
             Pools
@@ -52,9 +52,9 @@ export default function Header() {
             style={{ 
               color: 'rgba(255,255,255,0.6)', 
               textDecoration: 'none',
-              fontSize: 14,
-              padding: '8px 12px',
-              borderRadius: 6,
+              fontSize: 'var(--font-size-md)',
+              padding: 'var(--spacing-sm) var(--spacing-md)',
+              borderRadius: 'var(--radius-md)',
               border: '1px solid rgba(255,255,255,0.2)'
             }}
           >

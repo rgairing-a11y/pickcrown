@@ -1,13 +1,13 @@
+export const dynamic = 'force-dynamic'
+
 import { supabase } from '../../../lib/supabase'
 import PickSubmissionForm from '../../../components/PickSubmissionForm'
-
-export const dynamic = 'force-dynamic'
+import Link from 'next/link'
 
 export default async function PoolPage({ params }) {
   const { poolId } = await params
 
-  // Fetch pool with event and categories
-  const { data: pool, error } = await supabase
+  const { data: pool } = await supabase
     .from('pools')
     .select(`
       *,
@@ -22,35 +22,80 @@ export default async function PoolPage({ params }) {
     .eq('id', poolId)
     .single()
 
-  if (error || !pool) {
+  if (!pool) {
     return (
-      <div style={{ padding: 24 }}>
-        <h1>Pool not found</h1>
-        <p>This pool doesn't exist or the link is incorrect.</p>
+      <div style={{ 
+        padding: 'var(--spacing-xl)', 
+        textAlign: 'center',
+        maxWidth: 500,
+        margin: '48px auto'
+      }}>
+        <h1>Pool Not Found</h1>
+        <p style={{ color: 'var(--color-text-light)' }}>
+          This pool doesn't exist or the link is incorrect.
+        </p>
+        <Link href="/" style={{ color: 'var(--color-primary)', fontWeight: 'bold' }}>
+          ← Go Home
+        </Link>
       </div>
     )
   }
 
-  // Check if event has started (picks locked)
   const isLocked = new Date(pool.event.start_time) < new Date()
 
   return (
-    <div style={{ padding: 24, maxWidth: 600, margin: '0 auto' }}>
-      <h1>{pool.name}</h1>
-      <h2>{pool.event.name}</h2>
-      
-      {isLocked ? (
-        <div style={{ 
-          background: '#fff3cd', 
-          padding: 16, 
-          borderRadius: 8, 
-          marginBottom: 24 
+    <div style={{ maxWidth: 600, margin: '0 auto' }}>
+      <div style={{
+        background: 'var(--color-white)',
+        padding: 'var(--spacing-xl)',
+        borderRadius: 'var(--radius-xl)',
+        boxShadow: 'var(--shadow-md)',
+        marginBottom: 'var(--spacing-xl)'
+      }}>
+        <h1 style={{ margin: 0 }}>{pool.name}</h1>
+        <p style={{ 
+          color: 'var(--color-text-light)', 
+          margin: 'var(--spacing-sm) 0 0',
+          fontSize: 'var(--font-size-lg)'
         }}>
-          <p><strong>Picks are now locked.</strong> The event has started.</p>
-          <a href={`/pool/${poolId}/standings`}>View Standings →</a>
+          {pool.event.name} ({pool.event.year})
+        </p>
+      </div>
+
+      {isLocked ? (
+        <div style={{
+          background: 'var(--color-warning-light)',
+          padding: 'var(--spacing-xl)',
+          borderRadius: 'var(--radius-xl)',
+          textAlign: 'center'
+        }}>
+          <h2 style={{ margin: '0 0 var(--spacing-md)' }}>🔒 Picks Are Locked</h2>
+          <p style={{ color: 'var(--color-text-light)', marginBottom: 'var(--spacing-lg)' }}>
+            The event has started. No more submissions allowed.
+          </p>
+          <Link
+            href={`/pool/${poolId}/standings`}
+            style={{
+              display: 'inline-block',
+              padding: 'var(--spacing-md) var(--spacing-xl)',
+              background: 'var(--color-primary)',
+              color: 'white',
+              borderRadius: 'var(--radius-md)',
+              fontWeight: 'bold'
+            }}
+          >
+            View Standings →
+          </Link>
         </div>
       ) : (
-        <PickSubmissionForm pool={pool} />
+        <div style={{
+          background: 'var(--color-white)',
+          padding: 'var(--spacing-xl)',
+          borderRadius: 'var(--radius-xl)',
+          boxShadow: 'var(--shadow-md)'
+        }}>
+          <PickSubmissionForm pool={pool} />
+        </div>
       )}
     </div>
   )

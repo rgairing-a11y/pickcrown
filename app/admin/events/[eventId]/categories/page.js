@@ -8,30 +8,18 @@ export default function CategoriesPage({ params }) {
   const [eventId, setEventId] = useState(null)
   const [event, setEvent] = useState(null)
   const [loading, setLoading] = useState(true)
-  
-  // New category form
-  const [newCategoryName, setNewCategoryName] = useState('')
-  const [newCategoryType, setNewCategoryType] = useState('single_select')
-  const [addingCategory, setAddingCategory] = useState(false)
-  
-  // New option form
-  const [newOptions, setNewOptions] = useState({}) // categoryId -> option name
-  const [addingOption, setAddingOption] = useState(null)
+  const [newCategory, setNewCategory] = useState({ name: '', type: 'single_select' })
+  const [newOptions, setNewOptions] = useState({})
 
   useEffect(() => {
-    params.then(p => {
-      setEventId(p.eventId)
-    })
+    params.then(p => setEventId(p.eventId))
   }, [params])
 
   useEffect(() => {
-    if (eventId) {
-      loadEvent()
-    }
+    if (eventId) loadEvent()
   }, [eventId])
 
   async function loadEvent() {
-    setLoading(true)
     const { data } = await supabase
       .from('events')
       .select(`
@@ -44,245 +32,197 @@ export default function CategoriesPage({ params }) {
       .eq('id', eventId)
       .single()
 
-    if (data) {
-      setEvent(data)
-    }
+    setEvent(data)
     setLoading(false)
   }
 
-  async function handleAddCategory(e) {
-    e.preventDefault()
-    if (!newCategoryName.trim()) return
-    
-    setAddingCategory(true)
-    
-    // Get next order_index
-    const maxOrder = event.categories?.reduce((max, c) => 
-      Math.max(max, c.order_index), 0) || 0
+  async function addCategory() {
+    if (!newCategory.name.trim()) return
 
-    await supabase
-      .from('categories')
-      .insert({
-        event_id: eventId,
-        name: newCategoryName.trim(),
-        type: newCategoryType,
-        order_index: maxOrder + 1
-      })
+    const nextOrder = (event?.categories?.length || 0) + 1
 
-    setNewCategoryName('')
-    setAddingCategory(false)
+    await supabase.from('categories').insert({
+      event_id: eventId,
+      name: newCategory.name.trim(),
+      type: newCategory.type,
+      order_index: nextOrder
+    })
+
+    setNewCategory({ name: '', type: 'single_select' })
     loadEvent()
   }
 
-  async function handleAddOption(categoryId) {
-    const optionName = newOptions[categoryId]
-    if (!optionName?.trim()) return
-    
-    setAddingOption(categoryId)
+  async function deleteCategory(categoryId) {
+    if (!confirm('Delete this category and all its options?')) return
+    await supabase.from('categories').delete().eq('id', categoryId)
+    loadEvent()
+  }
 
-    await supabase
-      .from('category_options')
-      .insert({
-        category_id: categoryId,
-        name: optionName.trim()
-      })
+  async function addOption(categoryId) {
+    const optionName = newOptions[categoryId]?.trim()
+    if (!optionName) return
+
+    await supabase.from('category_options').insert({
+      category_id: categoryId,
+      name: optionName
+    })
 
     setNewOptions(prev => ({ ...prev, [categoryId]: '' }))
-    setAddingOption(null)
     loadEvent()
   }
 
-  async function handleDeleteCategory(categoryId) {
-    if (!confirm('Delete this category and all its options?')) return
-    
-    await supabase
-      .from('categories')
-      .delete()
-      .eq('id', categoryId)
-
-    loadEvent()
-  }
-
-  async function handleDeleteOption(optionId) {
-    await supabase
-      .from('category_options')
-      .delete()
-      .eq('id', optionId)
-
+  async function deleteOption(optionId) {
+    if (!confirm('Delete this option?')) return
+    await supabase.from('category_options').delete().eq('id', optionId)
     loadEvent()
   }
 
   if (loading) {
-    return <div style={{ padding: 24 }}>Loading...</div>
+    return <div style={{ padding: 'var(--spacing-xl)' }}>Loading...</div>
   }
 
   if (!event) {
-    return <div style={{ padding: 24 }}>Event not found</div>
+    return <div style={{ padding: 'var(--spacing-xl)' }}>Event not found</div>
   }
 
-  const categories = event.categories?.sort((a, b) => 
-    a.order_index - b.order_index) || []
+  const categories = event.categories?.sort((a, b) => a.order_index - b.order_index) || []
 
   return (
     <div>
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center',
-        marginBottom: 24
-      }}>
-        <div>
-          <h1 style={{ marginBottom: 4 }}>{event.name}</h1>
-          <p style={{ color: '#666', margin: 0 }}>Manage categories & options</p>
-        </div>
-        <Link 
-          href="/admin"
-          style={{ color: '#0070f3' }}
-        >
+      <div style={{ marginBottom: 'var(--spacing-xl)' }}>
+        <Link href="/admin" style={{ color: 'var(--color-primary)' }}>
           ← Back to Admin
         </Link>
       </div>
 
+      <h1>Categories</h1>
+      <h2 style={{ color: 'var(--color-text-light)', marginBottom: 'var(--spacing-xl)' }}>{event.name}</h2>
+
       {/* Add Category Form */}
-      <form 
-        onSubmit={handleAddCategory}
-        style={{
-          background: 'white',
-          padding: 20,
-          borderRadius: 12,
-          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-          marginBottom: 24,
-          display: 'flex',
-          gap: 12,
-          alignItems: 'flex-end'
-        }}
-      >
-        <div style={{ flex: 1 }}>
-          <label style={{ display: 'block', marginBottom: 6, fontWeight: 'bold', fontSize: 14 }}>
-            New Category
-          </label>
+      <div style={{
+        background: 'var(--color-white)',
+        padding: 'var(--spacing-lg)',
+        borderRadius: 'var(--radius-xl)',
+        boxShadow: 'var(--shadow-md)',
+        marginBottom: 'var(--spacing-xl)'
+      }}>
+        <h3 style={{ marginTop: 0, marginBottom: 'var(--spacing-lg)' }}>Add Category</h3>
+        <div style={{ display: 'flex', gap: 'var(--spacing-md)', flexWrap: 'wrap' }}>
           <input
             type="text"
-            value={newCategoryName}
-            onChange={(e) => setNewCategoryName(e.target.value)}
-            placeholder="e.g., Best Picture, Who wins Main Event?"
-            style={{
-              width: '100%',
-              padding: 10,
-              fontSize: 14,
-              border: '1px solid #ccc',
-              borderRadius: 6,
-              boxSizing: 'border-box'
-            }}
+            placeholder="Category name (e.g., Best Picture)"
+            value={newCategory.name}
+            onChange={(e) => setNewCategory({ ...newCategory, name: e.target.value })}
+            onKeyDown={(e) => e.key === 'Enter' && addCategory()}
+            style={{ flex: 1, minWidth: 200 }}
           />
-        </div>
-        <div>
-          <label style={{ display: 'block', marginBottom: 6, fontWeight: 'bold', fontSize: 14 }}>
-            Type
-          </label>
           <select
-            value={newCategoryType}
-            onChange={(e) => setNewCategoryType(e.target.value)}
-            style={{
-              padding: 10,
-              fontSize: 14,
-              border: '1px solid #ccc',
-              borderRadius: 6
-            }}
+            value={newCategory.type}
+            onChange={(e) => setNewCategory({ ...newCategory, type: e.target.value })}
+            style={{ width: 180 }}
           >
             <option value="single_select">Single Select</option>
             <option value="yes_no">Yes / No</option>
             <option value="match_prediction">Match Prediction</option>
           </select>
+          <button
+            onClick={addCategory}
+            style={{
+              padding: 'var(--spacing-md) var(--spacing-xl)',
+              background: 'var(--color-success)',
+              color: 'white',
+              border: 'none',
+              borderRadius: 'var(--radius-md)',
+              cursor: 'pointer',
+              fontWeight: 'bold'
+            }}
+          >
+            Add
+          </button>
         </div>
-        <button
-          type="submit"
-          disabled={addingCategory || !newCategoryName.trim()}
-          style={{
-            padding: '10px 20px',
-            fontSize: 14,
-            fontWeight: 'bold',
-            background: '#28a745',
-            color: 'white',
-            border: 'none',
-            borderRadius: 6,
-            cursor: 'pointer'
-          }}
-        >
-          + Add
-        </button>
-      </form>
+      </div>
 
       {/* Categories List */}
       {categories.length === 0 ? (
-        <p style={{ color: '#666', textAlign: 'center', padding: 48 }}>
-          No categories yet. Add your first one above!
-        </p>
+        <div style={{
+          background: 'var(--color-white)',
+          padding: 'var(--spacing-xl)',
+          borderRadius: 'var(--radius-xl)',
+          textAlign: 'center',
+          color: 'var(--color-text-muted)'
+        }}>
+          No categories yet. Add your first category above.
+        </div>
       ) : (
         categories.map((category, idx) => (
-          <div 
+          <div
             key={category.id}
             style={{
-              background: 'white',
-              padding: 20,
-              borderRadius: 12,
-              boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-              marginBottom: 16
+              background: 'var(--color-white)',
+              padding: 'var(--spacing-lg)',
+              borderRadius: 'var(--radius-xl)',
+              boxShadow: 'var(--shadow-md)',
+              marginBottom: 'var(--spacing-lg)'
             }}
           >
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
               alignItems: 'center',
-              marginBottom: 12
+              marginBottom: 'var(--spacing-lg)'
             }}>
-              <h3 style={{ margin: 0 }}>
-                {idx + 1}. {category.name}
-                <span style={{ 
-                  marginLeft: 8, 
-                  fontSize: 12, 
-                  color: '#666',
-                  fontWeight: 'normal'
+              <div>
+                <h3 style={{ margin: 0 }}>
+                  {idx + 1}. {category.name}
+                </h3>
+                <span style={{
+                  fontSize: 'var(--font-size-sm)',
+                  color: 'var(--color-text-muted)',
+                  background: 'var(--color-background-dark)',
+                  padding: '2px var(--spacing-sm)',
+                  borderRadius: 'var(--radius-sm)'
                 }}>
-                  ({category.type})
+                  {category.type}
                 </span>
-              </h3>
+              </div>
               <button
-                onClick={() => handleDeleteCategory(category.id)}
+                onClick={() => deleteCategory(category.id)}
                 style={{
-                  background: 'none',
+                  color: 'var(--color-danger)',
+                  background: 'var(--color-danger-light)',
                   border: 'none',
-                  color: '#dc3545',
+                  padding: 'var(--spacing-sm) var(--spacing-md)',
+                  borderRadius: 'var(--radius-sm)',
                   cursor: 'pointer',
-                  fontSize: 14
+                  fontSize: 'var(--font-size-sm)'
                 }}
               >
-                Delete
+                Delete Category
               </button>
             </div>
 
             {/* Options */}
-            <div style={{ marginLeft: 16 }}>
+            <div style={{ marginLeft: 'var(--spacing-lg)' }}>
               {category.options?.map(option => (
-                <div 
+                <div
                   key={option.id}
                   style={{
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
-                    padding: '6px 0',
-                    borderBottom: '1px solid #eee'
+                    padding: 'var(--spacing-sm) 0',
+                    borderBottom: '1px solid var(--color-border-light)'
                   }}
                 >
-                  <span>• {option.name}</span>
+                  <span>{option.name}</span>
                   <button
-                    onClick={() => handleDeleteOption(option.id)}
+                    onClick={() => deleteOption(option.id)}
                     style={{
+                      color: 'var(--color-danger)',
                       background: 'none',
                       border: 'none',
-                      color: '#999',
                       cursor: 'pointer',
-                      fontSize: 12
+                      fontSize: 'var(--font-size-sm)'
                     }}
                   >
                     ✕
@@ -291,43 +231,27 @@ export default function CategoriesPage({ params }) {
               ))}
 
               {/* Add Option */}
-              <div style={{ 
-                display: 'flex', 
-                gap: 8, 
-                marginTop: 12 
+              <div style={{
+                display: 'flex',
+                gap: 'var(--spacing-sm)',
+                marginTop: 'var(--spacing-md)'
               }}>
                 <input
                   type="text"
-                  value={newOptions[category.id] || ''}
-                  onChange={(e) => setNewOptions(prev => ({
-                    ...prev,
-                    [category.id]: e.target.value
-                  }))}
                   placeholder="Add option..."
-                  style={{
-                    flex: 1,
-                    padding: 8,
-                    fontSize: 14,
-                    border: '1px solid #ddd',
-                    borderRadius: 4
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault()
-                      handleAddOption(category.id)
-                    }
-                  }}
+                  value={newOptions[category.id] || ''}
+                  onChange={(e) => setNewOptions({ ...newOptions, [category.id]: e.target.value })}
+                  onKeyDown={(e) => e.key === 'Enter' && addOption(category.id)}
+                  style={{ flex: 1 }}
                 />
                 <button
-                  onClick={() => handleAddOption(category.id)}
-                  disabled={addingOption === category.id}
+                  onClick={() => addOption(category.id)}
                   style={{
-                    padding: '8px 12px',
-                    fontSize: 14,
-                    background: '#0070f3',
+                    padding: 'var(--spacing-sm) var(--spacing-lg)',
+                    background: 'var(--color-primary)',
                     color: 'white',
                     border: 'none',
-                    borderRadius: 4,
+                    borderRadius: 'var(--radius-md)',
                     cursor: 'pointer'
                   }}
                 >
@@ -339,24 +263,18 @@ export default function CategoriesPage({ params }) {
         ))
       )}
 
-      {/* Done Button */}
+      {/* Create Pool Button */}
       {categories.length > 0 && (
-        <div style={{ 
-          marginTop: 24, 
-          display: 'flex', 
-          gap: 12,
-          justifyContent: 'center' 
-        }}>
+        <div style={{ textAlign: 'center', marginTop: 'var(--spacing-xl)' }}>
           <Link
             href={`/admin/pools/new?eventId=${eventId}`}
             style={{
-              padding: '12px 24px',
-              fontSize: 16,
-              fontWeight: 'bold',
-              background: '#28a745',
+              display: 'inline-block',
+              padding: 'var(--spacing-md) var(--spacing-xl)',
+              background: 'var(--color-primary)',
               color: 'white',
-              borderRadius: 8,
-              textDecoration: 'none'
+              borderRadius: 'var(--radius-md)',
+              fontWeight: 'bold'
             }}
           >
             Create Pool for This Event →

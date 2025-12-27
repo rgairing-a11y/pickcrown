@@ -1,3 +1,80 @@
+:root {
+  /* Brand Colors */
+  --color-primary: #0070f3;
+  --color-primary-light: #f0f7ff;
+  --color-primary-dark: #0051a8;
+  
+  --color-success: #28a745;
+  --color-success-light: #d4edda;
+  --color-success-dark: #155724;
+  
+  --color-danger: #dc3545;
+  --color-danger-light: #fff5f5;
+  --color-danger-dark: #721c24;
+  
+  --color-warning: #f57c00;
+  --color-warning-light: #fff3e0;
+  
+  --color-gold: #d4af37;
+  --color-gold-light: #fdf6e3;
+  
+  /* Neutrals */
+  --color-text: #333;
+  --color-text-light: #666;
+  --color-text-muted: #999;
+  --color-border: #ddd;
+  --color-border-light: #eee;
+  --color-background: #f9f9f9;
+  --color-background-dark: #f5f5f5;
+  --color-white: #ffffff;
+  
+  /* Header */
+  --color-header-start: #1a1a2e;
+  --color-header-end: #16213e;
+  
+  /* Conferences */
+  --color-afc: #d32f2f;
+  --color-afc-light: #ffebee;
+  --color-nfc: #1565c0;
+  --color-nfc-light: #e3f2fd;
+  --color-east: #1565c0;
+  --color-east-light: #e3f2fd;
+  --color-west: #d32f2f;
+  --color-west-light: #ffebee;
+  --color-south: #2e7d32;
+  --color-south-light: #e8f5e9;
+  --color-midwest: #f57c00;
+  --color-midwest-light: #fff3e0;
+  
+  /* Spacing */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 12px;
+  --spacing-lg: 16px;
+  --spacing-xl: 24px;
+  --spacing-xxl: 32px;
+  
+  /* Border Radius */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  
+  /* Shadows */
+  --shadow-sm: 0 2px 4px rgba(0,0,0,0.1);
+  --shadow-md: 0 2px 8px rgba(0,0,0,0.1);
+  --shadow-lg: 0 4px 12px rgba(0,0,0,0.15);
+  
+  /* Typography */
+  --font-size-xs: 11px;
+  --font-size-sm: 13px;
+  --font-size-md: 14px;
+  --font-size-lg: 16px;
+  --font-size-xl: 18px;
+  --font-size-xxl: 24px;
+  --font-size-hero: 28px;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -6,16 +83,74 @@
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-  background: #f5f5f5;
-  color: #333;
-  line-height: 1.6;
+  background: var(--color-background);
+  color: var(--color-text);
+  line-height: 1.5;
 }
 
 a {
-  color: #0070f3;
+  color: var(--color-primary);
   text-decoration: none;
 }
 
 a:hover {
   text-decoration: underline;
+}
+
+/* Common button styles */
+.btn {
+  padding: var(--spacing-md) var(--spacing-lg);
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-md);
+  font-weight: bold;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.btn:hover {
+  opacity: 0.9;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--color-primary);
+  color: white;
+}
+
+.btn-success {
+  background: var(--color-success);
+  color: white;
+}
+
+.btn-danger {
+  background: var(--color-danger);
+  color: white;
+}
+
+/* Common card style */
+.card {
+  background: var(--color-white);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-md);
+  padding: var(--spacing-xl);
+}
+
+/* Form inputs */
+input, select, textarea {
+  padding: var(--spacing-md);
+  font-size: var(--font-size-lg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--color-primary);
 }

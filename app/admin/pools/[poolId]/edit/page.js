@@ -8,35 +8,31 @@ import Link from 'next/link'
 export default function EditPoolPage({ params }) {
   const router = useRouter()
   const [poolId, setPoolId] = useState(null)
+  const [pool, setPool] = useState(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
   const [name, setName] = useState('')
-  const [eventName, setEventName] = useState('')
 
   useEffect(() => {
-    params.then(p => {
-      setPoolId(p.poolId)
-    })
+    params.then(p => setPoolId(p.poolId))
   }, [params])
 
   useEffect(() => {
-    if (poolId) {
-      loadPool()
-    }
+    if (poolId) loadPool()
   }, [poolId])
 
   async function loadPool() {
     const { data } = await supabase
       .from('pools')
-      .select('*, event:events(name, year)')
+      .select('*, event:events(name)')
       .eq('id', poolId)
       .single()
 
     if (data) {
+      setPool(data)
       setName(data.name)
-      setEventName(`${data.event?.name} (${data.event?.year})`)
     }
     setLoading(false)
   }
@@ -61,13 +57,17 @@ export default function EditPoolPage({ params }) {
   }
 
   if (loading) {
-    return <div style={{ padding: 24 }}>Loading...</div>
+    return <div style={{ padding: 'var(--spacing-xl)' }}>Loading...</div>
+  }
+
+  if (!pool) {
+    return <div style={{ padding: 'var(--spacing-xl)' }}>Pool not found</div>
   }
 
   return (
     <div style={{ maxWidth: 500 }}>
-      <div style={{ marginBottom: 24 }}>
-        <Link href="/admin" style={{ color: '#0070f3' }}>
+      <div style={{ marginBottom: 'var(--spacing-xl)' }}>
+        <Link href="/admin" style={{ color: 'var(--color-primary)' }}>
           ← Back to Admin
         </Link>
       </div>
@@ -75,41 +75,42 @@ export default function EditPoolPage({ params }) {
       <h1>Edit Pool</h1>
 
       <form onSubmit={handleSubmit} style={{
-        background: 'white',
-        padding: 24,
-        borderRadius: 12,
-        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-        marginTop: 24
+        background: 'var(--color-white)',
+        padding: 'var(--spacing-xl)',
+        borderRadius: 'var(--radius-xl)',
+        boxShadow: 'var(--shadow-md)',
+        marginTop: 'var(--spacing-xl)'
       }}>
         {error && (
           <div style={{
-            background: '#f8d7da',
-            color: '#721c24',
-            padding: 12,
-            borderRadius: 6,
-            marginBottom: 16
+            background: 'var(--color-danger-light)',
+            color: 'var(--color-danger-dark)',
+            padding: 'var(--spacing-md)',
+            borderRadius: 'var(--radius-md)',
+            marginBottom: 'var(--spacing-lg)'
           }}>
             {error}
           </div>
         )}
 
-        <div style={{ marginBottom: 16 }}>
-          <label style={{ display: 'block', marginBottom: 8, fontWeight: 'bold' }}>
+        <div style={{ marginBottom: 'var(--spacing-lg)' }}>
+          <label style={{ display: 'block', marginBottom: 'var(--spacing-sm)', fontWeight: 'bold' }}>
             Event
           </label>
-          <div style={{
-            padding: 12,
-            background: '#f5f5f5',
-            borderRadius: 6,
-            color: '#666'
-          }}>
-            {eventName}
-          </div>
-          <small style={{ color: '#999' }}>Event cannot be changed</small>
+          <input
+            type="text"
+            value={pool.event?.name || 'Unknown'}
+            disabled
+            style={{ 
+              background: 'var(--color-background-dark)', 
+              color: 'var(--color-text-light)' 
+            }}
+          />
+          <small style={{ color: 'var(--color-text-muted)' }}>Event cannot be changed</small>
         </div>
 
-        <div style={{ marginBottom: 24 }}>
-          <label style={{ display: 'block', marginBottom: 8, fontWeight: 'bold' }}>
+        <div style={{ marginBottom: 'var(--spacing-xl)' }}>
+          <label style={{ display: 'block', marginBottom: 'var(--spacing-sm)', fontWeight: 'bold' }}>
             Pool Name *
           </label>
           <input
@@ -117,30 +118,22 @@ export default function EditPoolPage({ params }) {
             value={name}
             onChange={(e) => setName(e.target.value)}
             required
-            style={{
-              width: '100%',
-              padding: 12,
-              fontSize: 16,
-              border: '1px solid #ccc',
-              borderRadius: 6,
-              boxSizing: 'border-box'
-            }}
           />
         </div>
 
-        <div style={{ display: 'flex', gap: 12 }}>
+        <div style={{ display: 'flex', gap: 'var(--spacing-md)' }}>
           <button
             type="submit"
             disabled={saving}
             style={{
               flex: 1,
-              padding: 14,
-              fontSize: 16,
+              padding: 'var(--spacing-md)',
+              fontSize: 'var(--font-size-lg)',
               fontWeight: 'bold',
-              background: saving ? '#ccc' : '#0070f3',
+              background: saving ? 'var(--color-border)' : 'var(--color-success)',
               color: 'white',
               border: 'none',
-              borderRadius: 6,
+              borderRadius: 'var(--radius-md)',
               cursor: saving ? 'not-allowed' : 'pointer'
             }}
           >
@@ -149,12 +142,11 @@ export default function EditPoolPage({ params }) {
           <Link
             href="/admin"
             style={{
-              padding: 14,
-              fontSize: 16,
-              color: '#666',
-              textDecoration: 'none',
-              borderRadius: 6,
-              border: '1px solid #ccc',
+              padding: 'var(--spacing-md)',
+              fontSize: 'var(--font-size-lg)',
+              color: 'var(--color-text-light)',
+              borderRadius: 'var(--radius-md)',
+              border: '1px solid var(--color-border)',
               textAlign: 'center'
             }}
           >

@@ -6,15 +6,16 @@ import { supabase } from '../lib/supabase'
 export default function PickSubmissionForm({ pool }) {
   const [entryName, setEntryName] = useState('')
   const [email, setEmail] = useState('')
+  const [tieBreaker, setTieBreaker] = useState('')
   const [picks, setPicks] = useState({})
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState('')
 
-  // Sort categories by order_index
-  const categories = pool.event.categories?.sort((a, b) => 
+  const requiresTiebreaker = pool.config?.requires_tiebreaker || false
+  const categories = pool.event.categories.sort((a, b) =>
     a.order_index - b.order_index
-  ) || []
+  )
 
   const handlePick = (categoryId, optionId) => {
     setPicks(prev => ({
@@ -23,10 +24,10 @@ export default function PickSubmissionForm({ pool }) {
     }))
   }
 
-  // Check if form is complete
-  const isComplete = 
-    entryName.trim() && 
-    email.trim() && 
+  const isComplete =
+    entryName.trim() &&
+    email.trim() &&
+    (!requiresTiebreaker || tieBreaker) &&
     Object.keys(picks).length === categories.length
 
   const handleSubmit = async (e) => {
@@ -37,13 +38,13 @@ export default function PickSubmissionForm({ pool }) {
     setError('')
 
     try {
-      // 1. Create the pool entry
       const { data: entry, error: entryError } = await supabase
         .from('pool_entries')
         .insert({
           pool_id: pool.id,
           entry_name: entryName.trim(),
-          email: email.toLowerCase().trim()
+          email: email.toLowerCase().trim(),
+          tie_breaker_value: requiresTiebreaker ? parseInt(tieBreaker) : null
         })
         .select()
         .single()
@@ -58,7 +59,6 @@ export default function PickSubmissionForm({ pool }) {
         return
       }
 
-      // 2. Insert all picks
       const pickInserts = Object.entries(picks).map(([categoryId, optionId]) => ({
         pool_entry_id: entry.id,
         category_id: categoryId,
@@ -76,21 +76,19 @@ export default function PickSubmissionForm({ pool }) {
       }
 
       setSubmitted(true)
-
     } catch (err) {
       setError('Unexpected error: ' + err.message)
       setSubmitting(false)
     }
   }
 
-  // Success screen
   if (submitted) {
     return (
       <div style={{
-        padding: 24,
-        background: '#d4edda',
-        borderRadius: 8,
-        border: '1px solid #c3e6cb'
+        padding: 'var(--spacing-xl)',
+        background: 'var(--color-success-light)',
+        borderRadius: 'var(--radius-lg)',
+        border: '1px solid var(--color-success)'
       }}>
         <h3 style={{ marginTop: 0 }}>✅ Picks Submitted!</h3>
         <p>Entry name: <strong>{entryName}</strong></p>
@@ -100,24 +98,23 @@ export default function PickSubmissionForm({ pool }) {
     )
   }
 
-  // Form
   return (
     <form onSubmit={handleSubmit}>
       {error && (
         <div style={{
-          padding: 16,
-          marginBottom: 24,
-          background: '#f8d7da',
-          border: '1px solid #f5c6cb',
-          borderRadius: 8,
-          color: '#721c24'
+          padding: 'var(--spacing-lg)',
+          marginBottom: 'var(--spacing-xl)',
+          background: 'var(--color-danger-light)',
+          border: '1px solid var(--color-danger)',
+          borderRadius: 'var(--radius-lg)',
+          color: 'var(--color-danger-dark)'
         }}>
           {error}
         </div>
       )}
 
-      <div style={{ marginBottom: 16 }}>
-        <label style={{ display: 'block', marginBottom: 8, fontWeight: 'bold' }}>
+      <div style={{ marginBottom: 'var(--spacing-lg)' }}>
+        <label style={{ display: 'block', marginBottom: 'var(--spacing-sm)', fontWeight: 'bold' }}>
           Entry Name *
         </label>
         <input
@@ -126,22 +123,14 @@ export default function PickSubmissionForm({ pool }) {
           onChange={(e) => setEntryName(e.target.value)}
           placeholder="e.g., Rich's Picks"
           required
-          style={{
-            width: '100%',
-            padding: 12,
-            fontSize: 16,
-            border: '1px solid #ccc',
-            borderRadius: 4,
-            boxSizing: 'border-box'
-          }}
         />
-        <small style={{ color: '#666' }}>
+        <small style={{ color: 'var(--color-text-light)' }}>
           Cannot be changed after submission
         </small>
       </div>
 
-      <div style={{ marginBottom: 16 }}>
-        <label style={{ display: 'block', marginBottom: 8, fontWeight: 'bold' }}>
+      <div style={{ marginBottom: 'var(--spacing-lg)' }}>
+        <label style={{ display: 'block', marginBottom: 'var(--spacing-sm)', fontWeight: 'bold' }}>
           Email *
         </label>
         <input
@@ -150,40 +139,39 @@ export default function PickSubmissionForm({ pool }) {
           onChange={(e) => setEmail(e.target.value)}
           placeholder="your@email.com"
           required
-          style={{
-            width: '100%',
-            padding: 12,
-            fontSize: 16,
-            border: '1px solid #ccc',
-            borderRadius: 4,
-            boxSizing: 'border-box'
-          }}
         />
       </div>
 
-      <hr style={{ margin: '24px 0' }} />
+      {requiresTiebreaker && (
+        <div style={{ marginBottom: 'var(--spacing-lg)' }}>
+          <label style={{ display: 'block', marginBottom: 'var(--spacing-sm)', fontWeight: 'bold' }}>
+            {pool.config.tiebreaker_label || 'Tie-breaker'} *
+          </label>
+          <input
+            type="number"
+            value={tieBreaker}
+            onChange={(e) => setTieBreaker(e.target.value)}
+            required
+          />
+        </div>
+      )}
+
+      <hr style={{ margin: 'var(--spacing-xl) 0', border: 'none', borderTop: '1px solid var(--color-border)' }} />
 
       <h3>Make Your Picks</h3>
 
       {categories.map(category => (
-        <div key={category.id} style={{ marginBottom: 24 }}>
-          <label style={{ display: 'block', marginBottom: 8, fontWeight: 'bold' }}>
+        <div key={category.id} style={{ marginBottom: 'var(--spacing-xl)' }}>
+          <label style={{ display: 'block', marginBottom: 'var(--spacing-sm)', fontWeight: 'bold' }}>
             {category.name}
           </label>
           <select
             value={picks[category.id] || ''}
             onChange={(e) => handlePick(category.id, e.target.value)}
             required
-            style={{
-              width: '100%',
-              padding: 12,
-              fontSize: 16,
-              border: '1px solid #ccc',
-              borderRadius: 4
-            }}
           >
             <option value="">-- Select --</option>
-            {category.options?.map(option => (
+            {category.options.map(option => (
               <option key={option.id} value={option.id}>
                 {option.name}
               </option>
@@ -197,13 +185,13 @@ export default function PickSubmissionForm({ pool }) {
         disabled={!isComplete || submitting}
         style={{
           width: '100%',
-          padding: 16,
-          fontSize: 18,
+          padding: 'var(--spacing-lg)',
+          fontSize: 'var(--font-size-xl)',
           fontWeight: 'bold',
-          background: isComplete ? '#28a745' : '#ccc',
+          background: isComplete ? 'var(--color-success)' : 'var(--color-border)',
           color: 'white',
           border: 'none',
-          borderRadius: 8,
+          borderRadius: 'var(--radius-lg)',
           cursor: isComplete ? 'pointer' : 'not-allowed'
         }}
       >

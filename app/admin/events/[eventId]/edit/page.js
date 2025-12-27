@@ -18,19 +18,15 @@ export default function EditEventPage({ params }) {
   const [startTime, setStartTime] = useState('')
 
   useEffect(() => {
-    params.then(p => {
-      setEventId(p.eventId)
-    })
+    params.then(p => setEventId(p.eventId))
   }, [params])
 
   useEffect(() => {
-    if (eventId) {
-      loadEvent()
-    }
+    if (eventId) loadEvent()
   }, [eventId])
 
   async function loadEvent() {
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('events')
       .select('*')
       .eq('id', eventId)
@@ -40,10 +36,8 @@ export default function EditEventPage({ params }) {
       setName(data.name)
       setYear(data.year)
       setEventType(data.event_type || 'pick_one')
-      // Convert to datetime-local format
       const dt = new Date(data.start_time)
-      const localDateTime = dt.toISOString().slice(0, 16)
-      setStartTime(localDateTime)
+      setStartTime(dt.toISOString().slice(0, 16))
     }
     setLoading(false)
   }
@@ -73,13 +67,13 @@ export default function EditEventPage({ params }) {
   }
 
   if (loading) {
-    return <div style={{ padding: 24 }}>Loading...</div>
+    return <div style={{ padding: 'var(--spacing-xl)' }}>Loading...</div>
   }
 
   return (
     <div style={{ maxWidth: 500 }}>
-      <div style={{ marginBottom: 24 }}>
-        <Link href="/admin" style={{ color: '#0070f3' }}>
+      <div style={{ marginBottom: 'var(--spacing-xl)' }}>
+        <Link href="/admin" style={{ color: 'var(--color-primary)' }}>
           ← Back to Admin
         </Link>
       </div>
@@ -87,26 +81,26 @@ export default function EditEventPage({ params }) {
       <h1>Edit Event</h1>
 
       <form onSubmit={handleSubmit} style={{
-        background: 'white',
-        padding: 24,
-        borderRadius: 12,
-        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-        marginTop: 24
+        background: 'var(--color-white)',
+        padding: 'var(--spacing-xl)',
+        borderRadius: 'var(--radius-xl)',
+        boxShadow: 'var(--shadow-md)',
+        marginTop: 'var(--spacing-xl)'
       }}>
         {error && (
           <div style={{
-            background: '#f8d7da',
-            color: '#721c24',
-            padding: 12,
-            borderRadius: 6,
-            marginBottom: 16
+            background: 'var(--color-danger-light)',
+            color: 'var(--color-danger-dark)',
+            padding: 'var(--spacing-md)',
+            borderRadius: 'var(--radius-md)',
+            marginBottom: 'var(--spacing-lg)'
           }}>
             {error}
           </div>
         )}
 
-        <div style={{ marginBottom: 16 }}>
-          <label style={{ display: 'block', marginBottom: 8, fontWeight: 'bold' }}>
+        <div style={{ marginBottom: 'var(--spacing-lg)' }}>
+          <label style={{ display: 'block', marginBottom: 'var(--spacing-sm)', fontWeight: 'bold' }}>
             Event Name *
           </label>
           <input
@@ -114,19 +108,11 @@ export default function EditEventPage({ params }) {
             value={name}
             onChange={(e) => setName(e.target.value)}
             required
-            style={{
-              width: '100%',
-              padding: 12,
-              fontSize: 16,
-              border: '1px solid #ccc',
-              borderRadius: 6,
-              boxSizing: 'border-box'
-            }}
           />
         </div>
 
-        <div style={{ marginBottom: 16 }}>
-          <label style={{ display: 'block', marginBottom: 8, fontWeight: 'bold' }}>
+        <div style={{ marginBottom: 'var(--spacing-lg)' }}>
+          <label style={{ display: 'block', marginBottom: 'var(--spacing-sm)', fontWeight: 'bold' }}>
             Year *
           </label>
           <input
@@ -134,31 +120,16 @@ export default function EditEventPage({ params }) {
             value={year}
             onChange={(e) => setYear(e.target.value)}
             required
-            style={{
-              width: '100%',
-              padding: 12,
-              fontSize: 16,
-              border: '1px solid #ccc',
-              borderRadius: 6,
-              boxSizing: 'border-box'
-            }}
           />
         </div>
 
-        <div style={{ marginBottom: 16 }}>
-          <label style={{ display: 'block', marginBottom: 8, fontWeight: 'bold' }}>
+        <div style={{ marginBottom: 'var(--spacing-lg)' }}>
+          <label style={{ display: 'block', marginBottom: 'var(--spacing-sm)', fontWeight: 'bold' }}>
             Event Type *
           </label>
           <select
             value={eventType}
             onChange={(e) => setEventType(e.target.value)}
-            style={{
-              width: '100%',
-              padding: 12,
-              fontSize: 16,
-              border: '1px solid #ccc',
-              borderRadius: 6
-            }}
           >
             <option value="pick_one">Pick One (Oscars style)</option>
             <option value="bracket">Bracket (NFL Playoffs style)</option>
@@ -166,8 +137,8 @@ export default function EditEventPage({ params }) {
           </select>
         </div>
 
-        <div style={{ marginBottom: 24 }}>
-          <label style={{ display: 'block', marginBottom: 8, fontWeight: 'bold' }}>
+        <div style={{ marginBottom: 'var(--spacing-xl)' }}>
+          <label style={{ display: 'block', marginBottom: 'var(--spacing-sm)', fontWeight: 'bold' }}>
             Start Time (picks lock at this time) *
           </label>
           <input
@@ -175,30 +146,22 @@ export default function EditEventPage({ params }) {
             value={startTime}
             onChange={(e) => setStartTime(e.target.value)}
             required
-            style={{
-              width: '100%',
-              padding: 12,
-              fontSize: 16,
-              border: '1px solid #ccc',
-              borderRadius: 6,
-              boxSizing: 'border-box'
-            }}
           />
         </div>
 
-        <div style={{ display: 'flex', gap: 12 }}>
+        <div style={{ display: 'flex', gap: 'var(--spacing-md)' }}>
           <button
             type="submit"
             disabled={saving}
             style={{
               flex: 1,
-              padding: 14,
-              fontSize: 16,
+              padding: 'var(--spacing-md)',
+              fontSize: 'var(--font-size-lg)',
               fontWeight: 'bold',
-              background: saving ? '#ccc' : '#28a745',
+              background: saving ? 'var(--color-border)' : 'var(--color-success)',
               color: 'white',
               border: 'none',
-              borderRadius: 6,
+              borderRadius: 'var(--radius-md)',
               cursor: saving ? 'not-allowed' : 'pointer'
             }}
           >
@@ -207,12 +170,11 @@ export default function EditEventPage({ params }) {
           <Link
             href="/admin"
             style={{
-              padding: 14,
-              fontSize: 16,
-              color: '#666',
-              textDecoration: 'none',
-              borderRadius: 6,
-              border: '1px solid #ccc',
+              padding: 'var(--spacing-md)',
+              fontSize: 'var(--font-size-lg)',
+              color: 'var(--color-text-light)',
+              borderRadius: 'var(--radius-md)',
+              border: '1px solid var(--color-border)',
               textAlign: 'center'
             }}
           >

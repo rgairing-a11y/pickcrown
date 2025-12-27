@@ -11,15 +11,11 @@ export default function AdminResultsPage({ params }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    params.then(p => {
-      setEventId(p.eventId)
-    })
+    params.then(p => setEventId(p.eventId))
   }, [params])
 
   useEffect(() => {
-    if (eventId) {
-      loadEvent()
-    }
+    if (eventId) loadEvent()
   }, [eventId])
 
   async function loadEvent() {
@@ -36,9 +32,7 @@ export default function AdminResultsPage({ params }) {
       .eq('id', eventId)
       .single()
 
-    if (data) {
-      setEvent(data)
-    }
+    if (data) setEvent(data)
     setLoading(false)
   }
 
@@ -60,11 +54,11 @@ export default function AdminResultsPage({ params }) {
   }
 
   if (loading) {
-    return <div style={{ padding: 24 }}>Loading...</div>
+    return <div style={{ padding: 'var(--spacing-xl)' }}>Loading...</div>
   }
 
   if (!event) {
-    return <div style={{ padding: 24 }}>Event not found</div>
+    return <div style={{ padding: 'var(--spacing-xl)' }}>Event not found</div>
   }
 
   const categories = event.categories?.sort((a, b) => 
@@ -73,66 +67,83 @@ export default function AdminResultsPage({ params }) {
 
   return (
     <div>
-      <div style={{ marginBottom: 24 }}>
-        <Link href="/admin" style={{ color: '#0070f3' }}>
+      <div style={{ marginBottom: 'var(--spacing-xl)' }}>
+        <Link href="/admin" style={{ color: 'var(--color-primary)' }}>
           ← Back to Admin
         </Link>
       </div>
 
       <h1>Enter Results</h1>
-      <h2 style={{ color: '#666', marginBottom: 24 }}>{event.name}</h2>
+      <h2 style={{ color: 'var(--color-text-light)', marginBottom: 'var(--spacing-xl)' }}>{event.name}</h2>
 
       {saving && (
         <div style={{ 
-          background: '#cce5ff', 
-          padding: 8, 
-          borderRadius: 4, 
-          marginBottom: 16 
+          background: 'var(--color-primary-light)', 
+          padding: 'var(--spacing-sm)', 
+          borderRadius: 'var(--radius-sm)', 
+          marginBottom: 'var(--spacing-lg)' 
         }}>
           Saving...
         </div>
       )}
 
-      {categories.map(category => (
-        <div key={category.id} style={{ 
-          marginBottom: 24,
-          padding: 20,
-          background: 'white',
-          borderRadius: 12,
-          boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+      {categories.length === 0 ? (
+        <div style={{
+          background: 'var(--color-white)',
+          padding: 'var(--spacing-xl)',
+          borderRadius: 'var(--radius-xl)',
+          textAlign: 'center'
         }}>
-          <h3 style={{ marginTop: 0, marginBottom: 16 }}>{category.name}</h3>
-          
-          {category.options?.map(option => (
-            <div key={option.id} style={{ marginBottom: 8 }}>
-              <label style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                cursor: 'pointer',
-                padding: 8,
-                borderRadius: 6,
-                background: option.is_correct ? '#d4edda' : 'transparent'
-              }}>
-                <input
-                  type="radio"
-                  name={`category_${category.id}`}
-                  checked={option.is_correct || false}
-                  onChange={() => handleSetCorrect(option.id, category.id)}
-                  disabled={saving}
-                  style={{ marginRight: 12 }}
-                />
-                <span style={{ 
-                  fontWeight: option.is_correct ? 'bold' : 'normal',
-                  color: option.is_correct ? '#155724' : 'inherit'
-                }}>
-                  {option.name}
-                  {option.is_correct && ' ✓'}
-                </span>
-              </label>
-            </div>
-          ))}
+          <p style={{ color: 'var(--color-text-light)' }}>No categories yet.</p>
+          <Link 
+            href={`/admin/events/${eventId}/categories`}
+            style={{ color: 'var(--color-primary)', fontWeight: 'bold' }}
+          >
+            Add Categories →
+          </Link>
         </div>
-      ))}
+      ) : (
+        categories.map(category => (
+          <div key={category.id} style={{ 
+            marginBottom: 'var(--spacing-xl)',
+            padding: 'var(--spacing-lg)',
+            background: 'var(--color-white)',
+            borderRadius: 'var(--radius-xl)',
+            boxShadow: 'var(--shadow-md)'
+          }}>
+            <h3 style={{ marginTop: 0, marginBottom: 'var(--spacing-lg)' }}>{category.name}</h3>
+            
+            {category.options?.map(option => (
+              <div key={option.id} style={{ marginBottom: 'var(--spacing-sm)' }}>
+                <label style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  cursor: 'pointer',
+                  padding: 'var(--spacing-sm)',
+                  borderRadius: 'var(--radius-md)',
+                  background: option.is_correct ? 'var(--color-success-light)' : 'transparent'
+                }}>
+                  <input
+                    type="radio"
+                    name={`category_${category.id}`}
+                    checked={option.is_correct || false}
+                    onChange={() => handleSetCorrect(option.id, category.id)}
+                    disabled={saving}
+                    style={{ marginRight: 'var(--spacing-md)' }}
+                  />
+                  <span style={{ 
+                    fontWeight: option.is_correct ? 'bold' : 'normal',
+                    color: option.is_correct ? 'var(--color-success-dark)' : 'inherit'
+                  }}>
+                    {option.name}
+                    {option.is_correct && ' ✓'}
+                  </span>
+                </label>
+              </div>
+            ))}
+          </div>
+        ))
+      )}
     </div>
   )
 }
