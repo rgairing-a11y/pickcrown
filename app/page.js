@@ -15,14 +15,24 @@ export default async function HomePage() {
 
   return (
     <div style={{ maxWidth: 800, margin: '0 auto' }}>
-      <div style={{ textAlign: 'center', marginBottom: 'var(--spacing-xxl)' }}>
-        <h1 style={{ fontSize: 'var(--font-size-hero)', marginBottom: 'var(--spacing-sm)' }}>
-          👑 PickCrown
-        </h1>
-        <p style={{ color: 'var(--color-text-light)', fontSize: 'var(--font-size-lg)' }}>
-          Prediction pools for sports and entertainment
-        </p>
-      </div>
+      <div style={{ 
+  textAlign: 'center', 
+  marginBottom: 'var(--spacing-xxl)',
+  padding: 'var(--spacing-xl)',
+  background: 'var(--color-white)',
+  borderRadius: 'var(--radius-xl)',
+  boxShadow: 'var(--shadow-md)'
+}}>
+  <h1 style={{ fontSize: 'var(--font-size-hero)', marginBottom: 'var(--spacing-sm)' }}>
+    👑 PickCrown
+  </h1>
+  <p style={{ color: 'var(--color-text)', fontSize: 'var(--font-size-lg)', marginBottom: 'var(--spacing-md)' }}>
+    A simple, no-nonsense prediction pool for sharing picks with friends — no accounts, no clutter.
+  </p>
+  <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)' }}>
+    Built for playoffs, wrestling events, awards shows, and anything else worth arguing about.
+  </p>
+</div>
 
       <div style={{
         background: 'var(--color-white)',

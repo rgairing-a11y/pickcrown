@@ -54,6 +54,20 @@ export default function AdminResultsPage({ params }) {
     setSaving(false)
   }
 
+  async function handleMarkComplete() {
+    const confirmed = window.confirm('Mark this event as completed? This will finalize all standings.')
+    if (!confirmed) return
+    
+    setSaving(true)
+    await supabase
+      .from('events')
+      .update({ status: 'completed' })
+      .eq('id', eventId)
+    
+    await loadEvent()
+    setSaving(false)
+  }
+
   if (loading) {
     return <LoadingState message="Loading event..." />
   }
@@ -96,7 +110,7 @@ export default function AdminResultsPage({ params }) {
             title="No categories yet"
             description="Add categories before entering results"
             actionLabel="Add Categories"
-            actionHref={`/admin/events/${eventId}/categories`}
+            actionHref={'/admin/events/' + eventId + '/categories'}
           />
         </Card>
       ) : (
@@ -119,7 +133,7 @@ export default function AdminResultsPage({ params }) {
                 }}>
                   <input
                     type="radio"
-                    name={`category_${category.id}`}
+                    name={'category_' + category.id}
                     checked={option.is_correct || false}
                     onChange={() => handleSetCorrect(option.id, category.id)}
                     disabled={saving}
@@ -138,6 +152,36 @@ export default function AdminResultsPage({ params }) {
           </Card>
         ))
       )}
+
+      {/* Mark Complete Section */}
+      <Card style={{ 
+        marginTop: 'var(--spacing-xl)', 
+        textAlign: 'center',
+        background: event.status === 'completed' ? 'var(--color-success-light)' : 'var(--color-white)'
+      }}>
+        {event.status === 'completed' ? (
+          <div style={{ 
+            padding: 'var(--spacing-md)',
+            color: 'var(--color-success-dark)',
+            fontWeight: 'bold'
+          }}>
+            ✓ Event Completed
+          </div>
+        ) : (
+          <div>
+            <p style={{ color: 'var(--color-text-light)', marginBottom: 'var(--spacing-lg)' }}>
+              Once all results are entered, mark the event as complete to finalize standings.
+            </p>
+            <Button
+              onClick={handleMarkComplete}
+              disabled={saving}
+              variant="primary"
+            >
+              Mark Event Complete
+            </Button>
+          </div>
+        )}
+      </Card>
     </div>
   )
 }

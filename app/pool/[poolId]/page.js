@@ -7,6 +7,22 @@ import Link from 'next/link'
 import { isEventLocked } from '../../../lib/utils'
 import { EVENT_TYPES } from '../../../lib/constants'
 
+function getTimeRemaining(deadline) {
+  const now = new Date()
+  const end = new Date(deadline)
+  const diff = end - now
+  
+  if (diff <= 0) return null
+  
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
+  
+  if (days > 0) return `${days}d ${hours}h`
+  if (hours > 0) return `${hours}h ${minutes}m`
+  return `${minutes}m`
+}
+
 export default async function PoolPage({ params }) {
   const { poolId } = await params
 
@@ -56,6 +72,13 @@ export default async function PoolPage({ params }) {
 
   const locked = isEventLocked(pool.event.start_time)
   const eventType = pool.event.event_type || EVENT_TYPES.PICK_ONE
+  const timeRemaining = getTimeRemaining(pool.event.start_time)
+
+  // Get entry count
+  const { count: entryCount } = await supabase
+    .from('pool_entries')
+    .select('*', { count: 'exact', head: true })
+    .eq('pool_id', poolId)
 
   // For bracket events, fetch rounds, matchups, and teams
   let rounds = []
@@ -78,7 +101,6 @@ export default async function PoolPage({ params }) {
     
     matchups = matchupsData || []
 
-    // Get all team IDs from matchups
     const teamIds = new Set()
     matchups.forEach(m => {
       if (m.team_a_id) teamIds.add(m.team_a_id)
@@ -107,11 +129,33 @@ export default async function PoolPage({ params }) {
         <h1 style={{ margin: 0 }}>{pool.name}</h1>
         <p style={{
           color: 'var(--color-text-light)',
-          margin: 'var(--spacing-sm) 0 0',
+          margin: 'var(--spacing-sm) 0 var(--spacing-lg)',
           fontSize: 'var(--font-size-lg)'
         }}>
           {pool.event.name} ({pool.event.year})
         </p>
+        
+        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+          <div style={{ 
+            padding: '8px 16px', 
+            background: '#f0f9ff', 
+            borderRadius: 8,
+            fontSize: 14
+          }}>
+            <strong>{entryCount || 0}</strong> {entryCount === 1 ? 'entry' : 'entries'}
+          </div>
+          
+          {timeRemaining && !locked && (
+            <div style={{ 
+              padding: '8px 16px', 
+              background: '#fef3c7', 
+              borderRadius: 8,
+              fontSize: 14
+            }}>
+              🔒 Picks lock in <strong>{timeRemaining}</strong>
+            </div>
+          )}
+        </div>
       </div>
 
       {locked ? (
@@ -127,7 +171,7 @@ export default async function PoolPage({ params }) {
             The event has started. No more submissions allowed.
           </p>
           <Link
-            href={`/pool/${poolId}/standings`}
+            href={'/pool/' + poolId + '/standings'}
             style={{
               display: 'inline-block',
               padding: 'var(--spacing-md) var(--spacing-xl)',
@@ -150,7 +194,6 @@ export default async function PoolPage({ params }) {
               teams={teams}
             />
           ) : eventType === EVENT_TYPES.HYBRID ? (
-            // For hybrid, show both bracket and categories
             <div>
               <BracketPickForm 
                 pool={pool} 
@@ -158,7 +201,6 @@ export default async function PoolPage({ params }) {
                 matchups={matchups}
                 teams={teams}
               />
-              {/* TODO: Add category picks for hybrid */}
             </div>
           ) : (
             <div style={{
