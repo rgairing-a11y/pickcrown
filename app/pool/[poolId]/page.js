@@ -2,8 +2,10 @@ export const dynamic = 'force-dynamic'
 
 import { supabase } from '../../../lib/supabase'
 import PickSubmissionForm from '../../../components/PickSubmissionForm'
+import BracketPickForm from '../../../components/BracketPickForm'
 import Link from 'next/link'
 import { isEventLocked } from '../../../lib/utils'
+import { EVENT_TYPES } from '../../../lib/constants'
 
 export default async function PoolPage({ params }) {
   const { poolId } = await params
@@ -37,7 +39,7 @@ export default async function PoolPage({ params }) {
         <div style={{ fontSize: 48, marginBottom: 'var(--spacing-lg)' }}>❌</div>
         <h1 style={{ marginBottom: 'var(--spacing-sm)' }}>Pool Not Found</h1>
         <p style={{ color: 'var(--color-text-light)', marginBottom: 'var(--spacing-lg)' }}>
-          This pool doesn't exist or the link is incorrect.
+          This pool does not exist or the link is incorrect.
         </p>
         <Link
           href="/"
@@ -46,16 +48,54 @@ export default async function PoolPage({ params }) {
             fontWeight: 'bold'
           }}
         >
-          ← Go Home
+          Go Home
         </Link>
       </div>
     )
   }
 
   const locked = isEventLocked(pool.event.start_time)
+  const eventType = pool.event.event_type || EVENT_TYPES.PICK_ONE
+
+  // For bracket events, fetch rounds, matchups, and teams
+  let rounds = []
+  let matchups = []
+  let teams = []
+
+  if (eventType === EVENT_TYPES.BRACKET || eventType === EVENT_TYPES.HYBRID) {
+    const { data: roundsData } = await supabase
+      .from('rounds')
+      .select('*')
+      .eq('event_id', pool.event.id)
+      .order('round_order')
+    
+    rounds = roundsData || []
+
+    const { data: matchupsData } = await supabase
+      .from('matchups')
+      .select('*')
+      .eq('event_id', pool.event.id)
+    
+    matchups = matchupsData || []
+
+    // Get all team IDs from matchups
+    const teamIds = new Set()
+    matchups.forEach(m => {
+      if (m.team_a_id) teamIds.add(m.team_a_id)
+      if (m.team_b_id) teamIds.add(m.team_b_id)
+    })
+
+    if (teamIds.size > 0) {
+      const { data: teamsData } = await supabase
+        .from('teams')
+        .select('*')
+        .in('id', Array.from(teamIds))
+      teams = teamsData || []
+    }
+  }
 
   return (
-    <div style={{ maxWidth: 600, margin: '0 auto' }}>
+    <div style={{ maxWidth: eventType === EVENT_TYPES.BRACKET ? 1200 : 600, margin: '0 auto' }}>
       {/* Pool Header */}
       <div style={{
         background: 'var(--color-white)',
@@ -97,18 +137,40 @@ export default async function PoolPage({ params }) {
               fontWeight: 'bold'
             }}
           >
-            View Standings →
+            View Standings
           </Link>
         </div>
       ) : (
-        <div style={{
-          background: 'var(--color-white)',
-          padding: 'var(--spacing-xl)',
-          borderRadius: 'var(--radius-xl)',
-          boxShadow: 'var(--shadow-md)'
-        }}>
-          <PickSubmissionForm pool={pool} />
-        </div>
+        <>
+          {eventType === EVENT_TYPES.BRACKET ? (
+            <BracketPickForm 
+              pool={pool} 
+              rounds={rounds}
+              matchups={matchups}
+              teams={teams}
+            />
+          ) : eventType === EVENT_TYPES.HYBRID ? (
+            // For hybrid, show both bracket and categories
+            <div>
+              <BracketPickForm 
+                pool={pool} 
+                rounds={rounds}
+                matchups={matchups}
+                teams={teams}
+              />
+              {/* TODO: Add category picks for hybrid */}
+            </div>
+          ) : (
+            <div style={{
+              background: 'var(--color-white)',
+              padding: 'var(--spacing-xl)',
+              borderRadius: 'var(--radius-xl)',
+              boxShadow: 'var(--shadow-md)'
+            }}>
+              <PickSubmissionForm pool={pool} />
+            </div>
+          )}
+        </>
       )}
     </div>
   )
