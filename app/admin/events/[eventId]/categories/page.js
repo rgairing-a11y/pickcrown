@@ -22,6 +22,7 @@ export default function CategoriesPage({ params }) {
   }, [eventId])
 
   async function loadEvent() {
+    // SELECT still works with anon key
     const { data } = await supabase
       .from('events')
       .select(`
@@ -43,12 +44,23 @@ export default function CategoriesPage({ params }) {
 
     const nextOrder = (event?.categories?.length || 0) + 1
 
-    await supabase.from('categories').insert({
-      event_id: eventId,
-      name: newCategory.name.trim(),
-      type: newCategory.type,
-      order_index: nextOrder
+    // Use API route for INSERT
+    const res = await fetch('/api/categories', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        event_id: eventId,
+        name: newCategory.name.trim(),
+        type: newCategory.type,
+        order_index: nextOrder
+      })
     })
+
+    if (!res.ok) {
+      const err = await res.json()
+      alert('Error: ' + err.error)
+      return
+    }
 
     setNewCategory({ name: '', type: CATEGORY_TYPES.SINGLE_SELECT })
     loadEvent()
@@ -56,7 +68,18 @@ export default function CategoriesPage({ params }) {
 
   async function deleteCategory(categoryId) {
     if (!confirm('Delete this category and all its options?')) return
-    await supabase.from('categories').delete().eq('id', categoryId)
+    
+    // Use API route for DELETE
+    const res = await fetch('/api/categories?id=' + categoryId, {
+      method: 'DELETE'
+    })
+
+    if (!res.ok) {
+      const err = await res.json()
+      alert('Error: ' + err.error)
+      return
+    }
+
     loadEvent()
   }
 
@@ -64,10 +87,21 @@ export default function CategoriesPage({ params }) {
     const optionName = newOptions[categoryId]?.trim()
     if (!optionName) return
 
-    await supabase.from('category_options').insert({
-      category_id: categoryId,
-      name: optionName
+    // Use API route for INSERT
+    const res = await fetch('/api/category-options', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        category_id: categoryId,
+        name: optionName
+      })
     })
+
+    if (!res.ok) {
+      const err = await res.json()
+      alert('Error: ' + err.error)
+      return
+    }
 
     setNewOptions(prev => ({ ...prev, [categoryId]: '' }))
     loadEvent()
@@ -75,7 +109,18 @@ export default function CategoriesPage({ params }) {
 
   async function deleteOption(optionId) {
     if (!confirm('Delete this option?')) return
-    await supabase.from('category_options').delete().eq('id', optionId)
+    
+    // Use API route for DELETE
+    const res = await fetch('/api/category-options?id=' + optionId, {
+      method: 'DELETE'
+    })
+
+    if (!res.ok) {
+      const err = await res.json()
+      alert('Error: ' + err.error)
+      return
+    }
+
     loadEvent()
   }
 
@@ -239,8 +284,8 @@ export default function CategoriesPage({ params }) {
       {/* Create Pool Button */}
       {categories.length > 0 && (
         <div style={{ textAlign: 'center', marginTop: 'var(--spacing-xl)' }}>
-          <Button href={`/admin/pools/new?eventId=${eventId}`} variant="primary">
-            Create Pool for This Event →
+          <Button href={'/admin/pools/new?eventId=' + eventId} variant="primary">
+            Create Pool for This Event
           </Button>
         </div>
       )}

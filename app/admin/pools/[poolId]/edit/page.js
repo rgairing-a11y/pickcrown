@@ -24,6 +24,7 @@ export default function EditPoolPage({ params }) {
   }, [poolId])
 
   async function loadPool() {
+    // SELECT still works with anon key
     const { data } = await supabase
       .from('pools')
       .select('*, event:events(name)')
@@ -42,13 +43,19 @@ export default function EditPoolPage({ params }) {
     setSaving(true)
     setError('')
 
-    const { error: updateError } = await supabase
-      .from('pools')
-      .update({ name })
-      .eq('id', poolId)
+    // Use API route for UPDATE
+    const res = await fetch('/api/pools', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: poolId,
+        name
+      })
+    })
 
-    if (updateError) {
-      setError(updateError.message)
+    if (!res.ok) {
+      const err = await res.json()
+      setError(err.error)
       setSaving(false)
       return
     }

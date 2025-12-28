@@ -21,6 +21,7 @@ export default function AdminResultsPage({ params }) {
 
   async function loadEvent() {
     setLoading(true)
+    // SELECT still works with anon key
     const { data } = await supabase
       .from('events')
       .select(`
@@ -40,15 +41,17 @@ export default function AdminResultsPage({ params }) {
   async function handleSetCorrect(optionId, categoryId) {
     setSaving(true)
 
-    await supabase
-      .from('category_options')
-      .update({ is_correct: false })
-      .eq('category_id', categoryId)
+    // Use API route for UPDATE
+    const res = await fetch('/api/results', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ categoryId, optionId })
+    })
 
-    await supabase
-      .from('category_options')
-      .update({ is_correct: true })
-      .eq('id', optionId)
+    if (!res.ok) {
+      const err = await res.json()
+      alert('Error: ' + err.error)
+    }
 
     await loadEvent()
     setSaving(false)
@@ -59,10 +62,18 @@ export default function AdminResultsPage({ params }) {
     if (!confirmed) return
     
     setSaving(true)
-    await supabase
-      .from('events')
-      .update({ status: 'completed' })
-      .eq('id', eventId)
+    
+    // Use API route for UPDATE
+    const res = await fetch('/api/events', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: eventId, status: 'completed' })
+    })
+
+    if (!res.ok) {
+      const err = await res.json()
+      alert('Error: ' + err.error)
+    }
     
     await loadEvent()
     setSaving(false)

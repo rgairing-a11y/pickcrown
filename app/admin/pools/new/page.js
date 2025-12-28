@@ -25,6 +25,7 @@ export default function NewPoolPage() {
   }, [])
 
   async function loadEvents() {
+    // SELECT still works with anon key
     const { data } = await supabase
       .from('events')
       .select('*')
@@ -45,18 +46,20 @@ export default function NewPoolPage() {
       config.tiebreaker_label = tiebreakerLabel || 'Tie-breaker'
     }
 
-    const { data, error: insertError } = await supabase
-      .from('pools')
-      .insert({
+    // Use API route for INSERT
+    const res = await fetch('/api/pools', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
         event_id: eventId,
         name,
         config
       })
-      .select()
-      .single()
+    })
 
-    if (insertError) {
-      setError(insertError.message)
+    if (!res.ok) {
+      const err = await res.json()
+      setError(err.error)
       setSaving(false)
       return
     }

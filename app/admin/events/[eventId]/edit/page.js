@@ -28,6 +28,7 @@ export default function EditEventPage({ params }) {
   }, [eventId])
 
   async function loadEvent() {
+    // SELECT still works with anon key
     const { data } = await supabase
       .from('events')
       .select('*')
@@ -48,18 +49,22 @@ export default function EditEventPage({ params }) {
     setSaving(true)
     setError('')
 
-    const { error: updateError } = await supabase
-      .from('events')
-      .update({
+    // Use API route for UPDATE
+    const res = await fetch('/api/events', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: eventId,
         name,
         year: parseInt(year),
         event_type: eventType,
         start_time: new Date(startTime).toISOString()
       })
-      .eq('id', eventId)
+    })
 
-    if (updateError) {
-      setError(updateError.message)
+    if (!res.ok) {
+      const err = await res.json()
+      setError(err.error)
       setSaving(false)
       return
     }

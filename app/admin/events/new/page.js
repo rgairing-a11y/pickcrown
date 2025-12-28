@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { supabase } from '../../../../lib/supabase'
 import { useRouter } from 'next/navigation'
 import { Card, PageHeader, Button, Alert, FormField } from '../../../../components/ui'
 import { EVENT_TYPES, EVENT_TYPE_LABELS } from '../../../../lib/constants'
@@ -21,25 +20,28 @@ export default function NewEventPage() {
     setSaving(true)
     setError('')
 
-    const { data, error: insertError } = await supabase
-      .from('events')
-      .insert({
+    // Use API route for INSERT
+    const res = await fetch('/api/events', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
         name,
         year: parseInt(year),
         event_type: eventType,
         start_time: new Date(startTime).toISOString(),
         status: 'upcoming'
       })
-      .select()
-      .single()
+    })
 
-    if (insertError) {
-      setError(insertError.message)
+    if (!res.ok) {
+      const err = await res.json()
+      setError(err.error)
       setSaving(false)
       return
     }
 
-    router.push(`/admin/events/${data.id}/categories`)
+    const data = await res.json()
+    router.push('/admin/events/' + data.id + '/categories')
   }
 
   return (
