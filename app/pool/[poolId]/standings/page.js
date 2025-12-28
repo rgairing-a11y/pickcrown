@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { supabase } from '../../../../lib/supabase'
 import Link from 'next/link'
+import CopyLinkButton from '../../../../components/CopyLinkButton'
 
 export default async function StandingsPage({ params }) {
   const { poolId } = await params
@@ -20,75 +21,71 @@ export default async function StandingsPage({ params }) {
       <div style={{
         maxWidth: 500,
         margin: '48px auto',
-        background: 'var(--color-white)',
-        padding: 'var(--spacing-xxl)',
-        borderRadius: 'var(--radius-xl)',
-        boxShadow: 'var(--shadow-md)',
+        background: 'white',
+        padding: 32,
+        borderRadius: 16,
+        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
         textAlign: 'center'
       }}>
-        <div style={{ fontSize: 48, marginBottom: 'var(--spacing-lg)' }}>❌</div>
+        <div style={{ fontSize: 48, marginBottom: 16 }}>❌</div>
         <h1>Pool Not Found</h1>
-        <Link href="/" style={{ color: 'var(--color-primary)', fontWeight: 'bold' }}>
-          ← Go Home
+        <Link href="/" style={{ color: '#3b82f6', fontWeight: 'bold' }}>
+          Go Home
         </Link>
       </div>
     )
   }
 
+  const standingsUrl = 'https://pickcrown.vercel.app/pool/' + poolId + '/standings'
+
   return (
     <div style={{ maxWidth: 700, margin: '0 auto' }}>
-      <div style={{ marginBottom: 'var(--spacing-xl)' }}>
-        <Link href={`/pool/${poolId}`} style={{ color: 'var(--color-primary)' }}>
-          ← Back to Pool
+      <div style={{ marginBottom: 24 }}>
+        <Link href={'/pool/' + poolId} style={{ color: '#3b82f6' }}>
+          Back to Pool
         </Link>
       </div>
 
-      {/* Header */}
       <div style={{
-        background: 'var(--color-white)',
-        padding: 'var(--spacing-xl)',
-        borderRadius: 'var(--radius-xl)',
-        boxShadow: 'var(--shadow-md)',
-        marginBottom: 'var(--spacing-xl)'
+        background: 'white',
+        padding: 24,
+        borderRadius: 16,
+        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+        marginBottom: 24
       }}>
         <h1 style={{ margin: 0 }}>{pool.name}</h1>
-        <p style={{ color: 'var(--color-text-light)', margin: 'var(--spacing-sm) 0 0' }}>
-          {pool.event.name} ({pool.event.year}) — Standings
+        <p style={{ color: '#666', margin: '8px 0 16px' }}>
+          {pool.event.name} ({pool.event.year}) - Standings
         </p>
+        <CopyLinkButton url={standingsUrl} label="Share Standings" />
       </div>
 
-      {/* Standings Table */}
       <div style={{
-        background: 'var(--color-white)',
-        borderRadius: 'var(--radius-xl)',
-        boxShadow: 'var(--shadow-md)',
+        background: 'white',
+        borderRadius: 16,
+        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
         overflow: 'hidden'
       }}>
-        {/* Table Header */}
         <div style={{
           display: 'grid',
           gridTemplateColumns: '60px 1fr 80px',
-          padding: 'var(--spacing-lg)',
-          background: 'var(--color-background-dark)',
+          padding: 16,
+          background: '#f5f5f5',
           fontWeight: 'bold',
-          fontSize: 'var(--font-size-sm)',
-          color: 'var(--color-text-light)',
+          fontSize: 12,
+          color: '#666',
           textTransform: 'uppercase',
-          letterSpacing: '0.5px'
+          letterSpacing: 0.5
         }}>
           <div>Rank</div>
           <div>Entry</div>
           <div style={{ textAlign: 'right' }}>Points</div>
         </div>
 
-        {/* Table Body */}
         {standings?.length === 0 ? (
-          <div style={{
-            padding: 'var(--spacing-xxl)',
-            textAlign: 'center'
-          }}>
-            <div style={{ fontSize: 48, marginBottom: 'var(--spacing-lg)' }}>📭</div>
-            <p style={{ color: 'var(--color-text-muted)' }}>No entries yet</p>
+          <div style={{ padding: 48, textAlign: 'center' }}>
+            <div style={{ fontSize: 48, marginBottom: 16 }}>📭</div>
+            <p style={{ color: '#999' }}>No entries yet</p>
           </div>
         ) : (
           standings?.map((entry, idx) => (
@@ -97,30 +94,29 @@ export default async function StandingsPage({ params }) {
               style={{
                 display: 'grid',
                 gridTemplateColumns: '60px 1fr 80px',
-                padding: 'var(--spacing-lg)',
-                borderBottom: '1px solid var(--color-border-light)',
-                background: idx % 2 === 0 ? 'var(--color-white)' : 'var(--color-background)',
+                padding: 16,
+                borderBottom: '1px solid #eee',
+                background: idx % 2 === 0 ? 'white' : '#fafafa',
                 alignItems: 'center'
               }}
             >
               <div style={{
                 fontWeight: entry.rank <= 3 ? 'bold' : 'normal',
-                fontSize: entry.rank === 1 ? 'var(--font-size-xl)' : 'var(--font-size-md)'
+                fontSize: entry.rank === 1 ? 20 : 16
               }}>
-                {entry.rank === 1 && '👑 '}
-                #{entry.rank}
+                {entry.rank === 1 && '👑 '}#{entry.rank}
               </div>
               <div style={{
                 fontWeight: entry.rank <= 3 ? 'bold' : 'normal',
-                color: entry.rank === 1 ? 'var(--color-gold)' : 'var(--color-text)'
+                color: entry.rank === 1 ? '#d4af37' : '#333'
               }}>
                 {entry.entry_name}
               </div>
               <div style={{
                 textAlign: 'right',
                 fontWeight: 'bold',
-                fontSize: 'var(--font-size-lg)',
-                color: entry.total_points > 0 ? 'var(--color-success)' : 'var(--color-text-muted)'
+                fontSize: 18,
+                color: entry.total_points > 0 ? '#22c55e' : '#999'
               }}>
                 {entry.total_points}
               </div>

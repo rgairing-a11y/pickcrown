@@ -6,6 +6,7 @@ import BracketPickForm from '../../../components/BracketPickForm'
 import Link from 'next/link'
 import { isEventLocked } from '../../../lib/utils'
 import { EVENT_TYPES } from '../../../lib/constants'
+import CopyLinkButton from '../../../components/CopyLinkButton'
 
 function getTimeRemaining(deadline) {
   const now = new Date()
@@ -118,45 +119,53 @@ export default async function PoolPage({ params }) {
 
   return (
     <div style={{ maxWidth: eventType === EVENT_TYPES.BRACKET ? 1200 : 600, margin: '0 auto' }}>
-      {/* Pool Header */}
-      <div style={{
-        background: 'var(--color-white)',
-        padding: 'var(--spacing-xl)',
-        borderRadius: 'var(--radius-xl)',
-        boxShadow: 'var(--shadow-md)',
-        marginBottom: 'var(--spacing-xl)'
+     {/* Pool Header */}
+<div style={{
+  background: 'var(--color-white)',
+  padding: 'var(--spacing-xl)',
+  borderRadius: 'var(--radius-xl)',
+  boxShadow: 'var(--shadow-md)',
+  marginBottom: 'var(--spacing-xl)'
+}}>
+  <h1 style={{ margin: 0 }}>{pool.name}</h1>
+  <p style={{
+    color: 'var(--color-text-light)',
+    margin: 'var(--spacing-sm) 0 var(--spacing-lg)',
+    fontSize: 'var(--font-size-lg)'
+  }}>
+    {pool.event.name} ({pool.event.year})
+  </p>
+  
+  <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+    <div style={{ 
+      padding: '8px 16px', 
+      background: '#f0f9ff', 
+      borderRadius: 8,
+      fontSize: 14
+    }}>
+      <strong>{entryCount || 0}</strong> {entryCount === 1 ? 'entry' : 'entries'}
+    </div>
+    
+    {timeRemaining && !locked && (
+      <div style={{ 
+        padding: '8px 16px', 
+        background: '#fef3c7', 
+        borderRadius: 8,
+        fontSize: 14
       }}>
-        <h1 style={{ margin: 0 }}>{pool.name}</h1>
-        <p style={{
-          color: 'var(--color-text-light)',
-          margin: 'var(--spacing-sm) 0 var(--spacing-lg)',
-          fontSize: 'var(--font-size-lg)'
-        }}>
-          {pool.event.name} ({pool.event.year})
-        </p>
-        
-        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-          <div style={{ 
-            padding: '8px 16px', 
-            background: '#f0f9ff', 
-            borderRadius: 8,
-            fontSize: 14
-          }}>
-            <strong>{entryCount || 0}</strong> {entryCount === 1 ? 'entry' : 'entries'}
-          </div>
-          
-          {timeRemaining && !locked && (
-            <div style={{ 
-              padding: '8px 16px', 
-              background: '#fef3c7', 
-              borderRadius: 8,
-              fontSize: 14
-            }}>
-              🔒 Picks lock in <strong>{timeRemaining}</strong>
-            </div>
-          )}
-        </div>
+        🔒 Picks lock in <strong>{timeRemaining}</strong>
       </div>
+    )}
+  </div>
+
+  {/* ADD THIS */}
+  <div style={{ marginTop: 16 }}>
+    <CopyLinkButton 
+      url={'https://pickcrown.vercel.app/pool/' + poolId} 
+      label="Copy Pool Link"
+    />
+  </div>
+</div>
 
       {locked ? (
         <div style={{
