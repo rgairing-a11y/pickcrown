@@ -12,6 +12,7 @@
     "test:headed": "playwright test --headed"
   },
   "dependencies": {
+    "@sendgrid/mail": "^8.1.6",
     "@supabase/supabase-js": "^2.89.0",
     "next": "16.1.1",
     "react": "19.2.3",
