@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../../../../lib/supabase'
 import { useRouter } from 'next/navigation'
 import { Card, PageHeader, Button, Alert, FormField, LoadingState, EmptyState } from '../../../../../components/ui'
+import Link from 'next/link'
 
 export default function EditPoolPage({ params }) {
   const router = useRouter()
@@ -24,7 +25,6 @@ export default function EditPoolPage({ params }) {
   }, [poolId])
 
   async function loadPool() {
-    // SELECT still works with anon key
     const { data } = await supabase
       .from('pools')
       .select('*, event:events(name)')
@@ -43,7 +43,6 @@ export default function EditPoolPage({ params }) {
     setSaving(true)
     setError('')
 
-    // Use API route for UPDATE
     const res = await fetch('/api/pools', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -130,6 +129,32 @@ export default function EditPoolPage({ params }) {
             </Button>
           </div>
         </form>
+      </Card>
+
+      {/* Email Management */}
+      <Card style={{ marginTop: 'var(--spacing-lg)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <h3 style={{ margin: 0, fontSize: '1rem' }}>📧 Email Management</h3>
+            <p style={{ margin: '4px 0 0', fontSize: '0.875rem', color: 'var(--color-text-light)' }}>
+              Send reminders and results to participants
+            </p>
+          </div>
+          <Link
+            href={`/admin/pools/${poolId}/emails`}
+            style={{
+              background: 'var(--color-primary)',
+              color: 'white',
+              padding: '8px 16px',
+              borderRadius: 'var(--radius-md)',
+              textDecoration: 'none',
+              fontSize: '0.875rem',
+              fontWeight: 500
+            }}
+          >
+            Manage Emails →
+          </Link>
+        </div>
       </Card>
     </div>
   )
