@@ -85,4 +85,70 @@ export async function POST(request) {
       }
       // ============================================
 
-      // Check if alr
+      // Check if already sent
+      const { data: existing } = await supabaseAdmin
+        .from('email_log')
+        .select('id')
+        .eq('pool_id', poolId)
+        .eq('email_type', 'reminder')
+        .eq('recipient_email', entry.email)
+        .single()
+
+      if (existing) {
+        results.push({ email: entry.email, status: 'skipped', reason: 'already sent' })
+        continue
+      }
+
+      const template = reminderEmail({
+        poolName: pool.name,
+        eventName: pool.event.name,
+        deadline,
+        poolUrl
+      })
+
+      try {
+        await sgMail.send({
+          from: process.env.EMAIL_FROM || 'picks@pickcrown.com',
+          to: entry.email,
+          subject: template.subject,
+          html: template.html,
+          text: template.text
+        })
+
+        // Log success
+        await supabaseAdmin.from('email_log').insert({
+          pool_id: poolId,
+          email_type: 'reminder',
+          recipient_email: entry.email,
+          status: 'sent'
+        })
+
+        results.push({ email: entry.email, status: 'sent' })
+      } catch (emailError) {
+        // Log failure
+        await supabaseAdmin.from('email_log').insert({
+          pool_id: poolId,
+          email_type: 'reminder',
+          recipient_email: entry.email,
+          status: 'failed',
+          metadata: { error: emailError.message }
+        })
+
+        results.push({ email: entry.email, status: 'failed', error: emailError.message })
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      sent: results.filter(r => r.status === 'sent').length,
+      skipped: results.filter(r => r.status === 'skipped').length,
+      failed: results.filter(r => r.status === 'failed').length,
+      blocked: results.filter(r => r.status === 'blocked').length,
+      results
+    })
+
+  } catch (error) {
+    console.error('Send reminders error:', error)
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+}
