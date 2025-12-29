@@ -1,128 +1,94 @@
 export const dynamic = 'force-dynamic'
 
-import { supabase } from '../../../../lib/supabase'
+import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
-import CopyLinkButton from '../../../../components/CopyLinkButton'
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+)
 
 export default async function StandingsPage({ params }) {
   const { poolId } = await params
 
   const { data: pool } = await supabase
     .from('pools')
-    .select('*, event:events(name, year)')
+    .select('*, event:events(name, year, season_id, season:seasons(id, name))')
     .eq('id', poolId)
     .single()
+
+  if (!pool) {
+    return <div style={{ padding: 24 }}>Pool not found</div>
+  }
 
   const { data: standings } = await supabase
     .rpc('calculate_standings', { p_pool_id: poolId })
 
-  if (!pool) {
-    return (
-      <div style={{
-        maxWidth: 500,
-        margin: '48px auto',
-        background: 'white',
-        padding: 32,
-        borderRadius: 16,
-        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-        textAlign: 'center'
-      }}>
-        <div style={{ fontSize: 48, marginBottom: 16 }}>❌</div>
-        <h1>Pool Not Found</h1>
-        <Link href="/" style={{ color: '#3b82f6', fontWeight: 'bold' }}>
-          Go Home
-        </Link>
-      </div>
-    )
-  }
-
-  const standingsUrl = 'https://pickcrown.vercel.app/pool/' + poolId + '/standings'
+  const season = pool.event?.season
 
   return (
-    <div style={{ maxWidth: 700, margin: '0 auto' }}>
-      <div style={{ marginBottom: 24 }}>
-        <Link href={'/pool/' + poolId} style={{ color: '#3b82f6' }}>
-          Back to Pool
-        </Link>
-      </div>
+    <div style={{ padding: 24, maxWidth: 800, margin: '0 auto' }}>
+      <h1>{pool.name} — Standings</h1>
+      <h2>{pool.event?.name} {pool.event?.year}</h2>
 
-      <div style={{
-        background: 'white',
-        padding: 24,
-        borderRadius: 16,
-        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-        marginBottom: 24
-      }}>
-        <h1 style={{ margin: 0 }}>{pool.name}</h1>
-        <p style={{ color: '#666', margin: '8px 0 16px' }}>
-          {pool.event.name} ({pool.event.year}) - Standings
-        </p>
-        <CopyLinkButton url={standingsUrl} label="Share Standings" />
-      </div>
-
-      <div style={{
-        background: 'white',
-        borderRadius: 16,
-        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-        overflow: 'hidden'
-      }}>
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: '60px 1fr 80px',
-          padding: 16,
-          background: '#f5f5f5',
-          fontWeight: 'bold',
-          fontSize: 12,
-          color: '#666',
-          textTransform: 'uppercase',
-          letterSpacing: 0.5
-        }}>
-          <div>Rank</div>
-          <div>Entry</div>
-          <div style={{ textAlign: 'right' }}>Points</div>
+      {season && (
+        <div style={{ marginBottom: 24 }}>
+          <Link 
+            href={`/season/${season.id}/standings`}
+            style={{
+              display: 'inline-block',
+              padding: '12px 20px',
+              background: '#ffc107',
+              color: '#000',
+              borderRadius: 8,
+              textDecoration: 'none',
+              fontWeight: 'bold'
+            }}
+          >
+            🏆 View {season.name} Standings
+          </Link>
         </div>
+      )}
 
-        {standings?.length === 0 ? (
-          <div style={{ padding: 48, textAlign: 'center' }}>
-            <div style={{ fontSize: 48, marginBottom: 16 }}>📭</div>
-            <p style={{ color: '#999' }}>No entries yet</p>
-          </div>
-        ) : (
-          standings?.map((entry, idx) => (
-            <div
+      <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 24 }}>
+        <thead>
+          <tr style={{ background: '#f0f0f0' }}>
+            <th style={{ padding: 12, textAlign: 'left' }}>Rank</th>
+            <th style={{ padding: 12, textAlign: 'left' }}>Entry Name</th>
+            <th style={{ padding: 12, textAlign: 'right' }}>Points</th>
+          </tr>
+        </thead>
+        <tbody>
+          {standings?.map((entry, idx) => (
+            <tr
               key={entry.entry_id}
               style={{
-                display: 'grid',
-                gridTemplateColumns: '60px 1fr 80px',
-                padding: 16,
-                borderBottom: '1px solid #eee',
-                background: idx % 2 === 0 ? 'white' : '#fafafa',
-                alignItems: 'center'
+                borderBottom: '1px solid #ddd',
+                background: idx % 2 === 0 ? 'white' : '#f9f9f9'
               }}
             >
-              <div style={{
-                fontWeight: entry.rank <= 3 ? 'bold' : 'normal',
-                fontSize: entry.rank === 1 ? 20 : 16
-              }}>
-                {entry.rank === 1 && '👑 '}#{entry.rank}
-              </div>
-              <div style={{
-                fontWeight: entry.rank <= 3 ? 'bold' : 'normal',
-                color: entry.rank === 1 ? '#d4af37' : '#333'
-              }}>
+              <td style={{ padding: 12 }}>
+                {entry.rank === 1 ? '👑' : ''} #{entry.rank}
+              </td>
+              <td style={{ padding: 12, fontWeight: entry.rank <= 3 ? 'bold' : 'normal' }}>
                 {entry.entry_name}
-              </div>
-              <div style={{
-                textAlign: 'right',
-                fontWeight: 'bold',
-                fontSize: 18,
-                color: entry.total_points > 0 ? '#22c55e' : '#999'
-              }}>
+              </td>
+              <td style={{ padding: 12, textAlign: 'right' }}>
                 {entry.total_points}
-              </div>
-            </div>
-          ))
-        )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      {standings?.length === 0 && (
+        <p style={{ textAlign: 'center', marginTop: 24, color: '#666' }}>
+          No entries yet
+        </p>
+      )}
+
+      <div style={{ marginTop: 32 }}>
+        <Link href={`/pool/${poolId}`}>← Back to Pool</Link>
       </div>
     </div>
   )

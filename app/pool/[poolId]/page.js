@@ -27,21 +27,25 @@ function getTimeRemaining(deadline) {
 export default async function PoolPage({ params }) {
   const { poolId } = await params
 
+  // Fetch pool with event, phases, and categories
   const { data: pool } = await supabase
     .from('pools')
     .select(`
       *,
-      event:events (
+      event:events(
         *,
-        categories (
+        phases(*),
+        categories(
           *,
-          options:category_options (*)
+          phase_id,
+          options:category_options(*)
         )
       )
     `)
     .eq('id', poolId)
     .single()
 
+  // Pool not found
   if (!pool) {
     return (
       <div style={{
@@ -71,9 +75,38 @@ export default async function PoolPage({ params }) {
     )
   }
 
-  const locked = isEventLocked(pool.event.start_time)
+  // Extract event data
   const eventType = pool.event.event_type || EVENT_TYPES.PICK_ONE
-  const timeRemaining = getTimeRemaining(pool.event.start_time)
+  const phases = pool.event.phases || []
+  const hasPhases = phases.length > 0
+
+  // Determine lock status
+  let locked = isEventLocked(pool.event.start_time)
+
+  if (hasPhases) {
+    // For multi-phase events, check if ANY phase is still open
+    const now = new Date()
+    const anyPhaseOpen = phases.some(phase => {
+      const lockTime = new Date(phase.lock_time)
+      const isBeforeLock = now < lockTime
+      const isFirstPhase = phase.phase_order === 1
+      const prevPhaseCompleted = phases.find(p => p.phase_order === phase.phase_order - 1)?.status === 'completed'
+      return isBeforeLock && (isFirstPhase || prevPhaseCompleted)
+    })
+    locked = !anyPhaseOpen
+  }
+
+
+  // Calculate time remaining (use first open phase lock time for multi-phase)
+  let timeRemainingDeadline = pool.event.start_time
+  if (hasPhases) {
+    const sortedPhases = [...phases].sort((a, b) => a.phase_order - b.phase_order)
+    const firstOpenPhase = sortedPhases.find(p => new Date(p.lock_time) > new Date())
+    if (firstOpenPhase) {
+      timeRemainingDeadline = firstOpenPhase.lock_time
+    }
+  }
+  const timeRemaining = getTimeRemaining(timeRemainingDeadline)
 
   // Get entry count
   const { count: entryCount } = await supabase
@@ -119,53 +152,52 @@ export default async function PoolPage({ params }) {
 
   return (
     <div style={{ maxWidth: eventType === EVENT_TYPES.BRACKET ? 1200 : 600, margin: '0 auto' }}>
-     {/* Pool Header */}
-<div style={{
-  background: 'var(--color-white)',
-  padding: 'var(--spacing-xl)',
-  borderRadius: 'var(--radius-xl)',
-  boxShadow: 'var(--shadow-md)',
-  marginBottom: 'var(--spacing-xl)'
-}}>
-  <h1 style={{ margin: 0 }}>{pool.name}</h1>
-  <p style={{
-    color: 'var(--color-text-light)',
-    margin: 'var(--spacing-sm) 0 var(--spacing-lg)',
-    fontSize: 'var(--font-size-lg)'
-  }}>
-    {pool.event.name} ({pool.event.year})
-  </p>
-  
-  <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-    <div style={{ 
-      padding: '8px 16px', 
-      background: '#f0f9ff', 
-      borderRadius: 8,
-      fontSize: 14
-    }}>
-      <strong>{entryCount || 0}</strong> {entryCount === 1 ? 'entry' : 'entries'}
-    </div>
-    
-    {timeRemaining && !locked && (
-      <div style={{ 
-        padding: '8px 16px', 
-        background: '#fef3c7', 
-        borderRadius: 8,
-        fontSize: 14
+      {/* Pool Header */}
+      <div style={{
+        background: 'var(--color-white)',
+        padding: 'var(--spacing-xl)',
+        borderRadius: 'var(--radius-xl)',
+        boxShadow: 'var(--shadow-md)',
+        marginBottom: 'var(--spacing-xl)'
       }}>
-        🔒 Picks lock in <strong>{timeRemaining}</strong>
-      </div>
-    )}
-  </div>
+        <h1 style={{ margin: 0 }}>{pool.name}</h1>
+        <p style={{
+          color: 'var(--color-text-light)',
+          margin: 'var(--spacing-sm) 0 var(--spacing-lg)',
+          fontSize: 'var(--font-size-lg)'
+        }}>
+          {pool.event.name} ({pool.event.year})
+        </p>
+        
+        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+          <div style={{ 
+            padding: '8px 16px', 
+            background: '#f0f9ff', 
+            borderRadius: 8,
+            fontSize: 14
+          }}>
+            <strong>{entryCount || 0}</strong> {entryCount === 1 ? 'entry' : 'entries'}
+          </div>
+          
+          {timeRemaining && !locked && (
+            <div style={{ 
+              padding: '8px 16px', 
+              background: '#fef3c7', 
+              borderRadius: 8,
+              fontSize: 14
+            }}>
+              🔒 Picks lock in <strong>{timeRemaining}</strong>
+            </div>
+          )}
+        </div>
 
-  {/* ADD THIS */}
-  <div style={{ marginTop: 16 }}>
-    <CopyLinkButton 
-      url={'https://pickcrown.vercel.app/pool/' + poolId} 
-      label="Copy Pool Link"
-    />
-  </div>
-</div>
+        <div style={{ marginTop: 16 }}>
+          <CopyLinkButton 
+            url={'https://pickcrown.vercel.app/pool/' + poolId} 
+            label="Copy Pool Link"
+          />
+        </div>
+      </div>
 
       {locked ? (
         <div style={{

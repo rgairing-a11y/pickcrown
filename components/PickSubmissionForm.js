@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { Button, Alert, FormField } from './ui'
 import { sortByOrderIndex, getErrorMessage } from '../lib/utils'
+import { getPhaseStatus, isPhaseUnlocked } from '../lib/phases'
 import Link from 'next/link'
 
 export default function PickSubmissionForm({ pool }) {
@@ -16,7 +17,36 @@ export default function PickSubmissionForm({ pool }) {
   const [error, setError] = useState('')
 
   const requiresTiebreaker = pool.config?.requires_tiebreaker || false
-  const categories = sortByOrderIndex(pool.event.categories || [])
+  const phases = (pool.event.phases || []).sort((a, b) => a.phase_order - b.phase_order)
+  const hasPhases = phases.length > 0
+
+  // Get categories for a specific phase
+  const getCategoriesForPhase = (phaseId) => {
+    return sortByOrderIndex(
+      (pool.event.categories || []).filter(c => c.phase_id === phaseId)
+    )
+  }
+
+  // Categories without a phase (backward compatibility)
+  const standaloneCats = sortByOrderIndex(
+    (pool.event.categories || []).filter(c => !c.phase_id)
+  )
+
+  // Get all categories user can submit to right now
+  const getSubmittableCategories = () => {
+    if (!hasPhases) return standaloneCats
+
+    const openPhases = phases.filter(p => 
+      getPhaseStatus(p) === 'open' && isPhaseUnlocked(p, phases)
+    )
+    
+    return [
+      ...standaloneCats,
+      ...openPhases.flatMap(p => getCategoriesForPhase(p.id))
+    ]
+  }
+
+  const submittableCats = getSubmittableCategories()
 
   const handlePick = (categoryId, optionId) => {
     setPicks(prev => ({
@@ -29,7 +59,8 @@ export default function PickSubmissionForm({ pool }) {
     entryName.trim() &&
     email.trim() &&
     (!requiresTiebreaker || tieBreaker) &&
-    Object.keys(picks).length === categories.length
+    submittableCats.length > 0 &&
+    submittableCats.every(cat => picks[cat.id])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -77,6 +108,81 @@ export default function PickSubmissionForm({ pool }) {
       setError('Unexpected error: ' + err.message)
       setSubmitting(false)
     }
+  }
+
+  // Render a phase section
+  const renderPhaseSection = (phase) => {
+    const status = getPhaseStatus(phase)
+    const unlocked = isPhaseUnlocked(phase, phases)
+    const categories = getCategoriesForPhase(phase.id)
+
+    // Phase not yet unlocked (waiting for previous phase results)
+    if (!unlocked) {
+      return (
+        <div key={phase.id} style={{
+          marginBottom: 'var(--spacing-xl)',
+          padding: 'var(--spacing-lg)',
+          background: 'var(--color-background-alt)',
+          borderRadius: 'var(--radius-md)',
+          opacity: 0.7
+        }}>
+          <h4 style={{ margin: 0, color: 'var(--color-text-light)' }}>
+            🔒 {phase.name}
+          </h4>
+          <p style={{ color: 'var(--color-text-light)', marginBottom: 0, marginTop: 'var(--spacing-sm)' }}>
+            Waiting for previous phase results...
+          </p>
+        </div>
+      )
+    }
+
+    // Phase locked or completed
+    if (status === 'locked' || status === 'completed') {
+      return (
+        <div key={phase.id} style={{
+          marginBottom: 'var(--spacing-xl)',
+          padding: 'var(--spacing-lg)',
+          background: 'var(--color-background-alt)',
+          borderRadius: 'var(--radius-md)'
+        }}>
+          <h4 style={{ margin: 0 }}>
+            {status === 'completed' ? '✓' : '🔒'} {phase.name}
+          </h4>
+          <p style={{ color: 'var(--color-text-light)', marginBottom: 0, marginTop: 'var(--spacing-sm)' }}>
+            {status === 'completed' ? 'Results entered' : 'Picks locked'}
+          </p>
+        </div>
+      )
+    }
+
+    // Phase open - show picks
+    return (
+      <div key={phase.id} style={{ marginBottom: 'var(--spacing-xl)' }}>
+        <h4 style={{
+          borderBottom: '2px solid var(--color-primary)',
+          paddingBottom: 'var(--spacing-sm)',
+          marginBottom: 'var(--spacing-lg)'
+        }}>
+          {phase.name}
+        </h4>
+        {categories.map(category => (
+          <FormField key={category.id} label={category.name} required>
+            <select
+              value={picks[category.id] || ''}
+              onChange={(e) => handlePick(category.id, e.target.value)}
+              required
+            >
+              <option value="">-- Select --</option>
+              {category.options?.map(option => (
+                <option key={option.id} value={option.id}>
+                  {option.name}
+                </option>
+              ))}
+            </select>
+          </FormField>
+        ))}
+      </div>
+    )
   }
 
   if (submitted) {
@@ -161,7 +267,11 @@ export default function PickSubmissionForm({ pool }) {
 
       <h3 style={{ marginBottom: 'var(--spacing-lg)' }}>Make Your Picks</h3>
 
-      {categories.map(category => (
+      {/* Render phases if multi-phase event */}
+      {hasPhases && phases.map(phase => renderPhaseSection(phase))}
+
+      {/* Render standalone categories (no phase) */}
+      {standaloneCats.map(category => (
         <FormField key={category.id} label={category.name} required>
           <select
             value={picks[category.id] || ''}
@@ -178,15 +288,25 @@ export default function PickSubmissionForm({ pool }) {
         </FormField>
       ))}
 
-      <Button
-        type="submit"
-        variant={isComplete ? 'success' : 'secondary'}
-        loading={submitting}
-        disabled={!isComplete}
-        style={{ width: '100%', marginTop: 'var(--spacing-lg)' }}
-      >
-        Submit All Picks
-      </Button>
+      {/* No picks available message */}
+      {submittableCats.length === 0 && hasPhases && (
+        <Alert variant="warning" style={{ textAlign: 'center' }}>
+          No picks available right now. Check back when the next phase opens!
+        </Alert>
+      )}
+
+      {/* Submit button */}
+      {submittableCats.length > 0 && (
+        <Button
+          type="submit"
+          variant={isComplete ? 'success' : 'secondary'}
+          loading={submitting}
+          disabled={!isComplete}
+          style={{ width: '100%', marginTop: 'var(--spacing-lg)' }}
+        >
+          Submit All Picks
+        </Button>
+      )}
     </form>
   )
 }
