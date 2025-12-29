@@ -259,7 +259,7 @@ export default async function HomePage() {
           </div>
         </div>
       )}
-
+npm run dev
       <div style={{ marginTop: 'var(--spacing-xxl)', textAlign: 'center' }}>
         <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)' }}>
           Have a pool link? Paste it in your browser to join.
