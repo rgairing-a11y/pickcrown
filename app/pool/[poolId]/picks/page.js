@@ -48,37 +48,98 @@ export default async function PicksMatrixPage({ params }) {
     )
   }
 
-  // Get categories with options
-  const { data: categories } = await supabase
-    .from('categories')
-    .select(`
-      *,
-      options:category_options(*)
-    `)
-    .eq('event_id', pool.event.id)
-    .order('order_index')
+  const eventType = pool.event.event_type || 'bracket'
 
-  // Get all entries with their picks
+  // Get all entries
   const { data: entries } = await supabase
     .from('pool_entries')
-    .select(`
-      *,
-      picks:category_picks(
-        category_id,
-        option:category_options(id, name, is_correct)
-      )
-    `)
+    .select('*')
     .eq('pool_id', poolId)
     .order('entry_name')
 
-  // Build a lookup: entry_id -> category_id -> option
-  const picksByEntry = {}
-  entries?.forEach(entry => {
-    picksByEntry[entry.id] = {}
-    entry.picks?.forEach(pick => {
-      picksByEntry[entry.id][pick.category_id] = pick.option
+  let rows = []
+  let picksByEntry = {}
+
+  if (eventType === 'bracket') {
+    // BRACKET EVENT: Get matchups and bracket_picks
+    const { data: matchups } = await supabase
+      .from('matchups')
+      .select(`
+        *,
+        round:rounds(name, round_order),
+        team_a:teams!matchups_team_a_id_fkey(id, name, seed),
+        team_b:teams!matchups_team_b_id_fkey(id, name, seed),
+        winner:teams!matchups_winner_team_id_fkey(id, name)
+      `)
+      .eq('event_id', pool.event.id)
+      .order('round_id')
+
+    // Get bracket picks for all entries
+    const { data: bracketPicks } = await supabase
+      .from('bracket_picks')
+      .select(`
+        *,
+        team:teams(id, name)
+      `)
+      .in('pool_entry_id', entries?.map(e => e.id) || [])
+
+    // Build lookup: entry_id -> matchup_id -> team
+    entries?.forEach(entry => {
+      picksByEntry[entry.id] = {}
     })
-  })
+    bracketPicks?.forEach(pick => {
+      picksByEntry[pick.pool_entry_id][pick.matchup_id] = pick.team
+    })
+
+    // Build rows from matchups
+    rows = matchups?.map(m => ({
+      id: m.id,
+      name: `${m.round?.name}: ${m.team_a?.seed ? `(${m.team_a.seed}) ` : ''}${m.team_a?.name || 'TBD'} vs ${m.team_b?.seed ? `(${m.team_b.seed}) ` : ''}${m.team_b?.name || 'TBD'}`,
+      correctAnswer: m.winner?.name,
+      correctId: m.winner?.id,
+      options: [m.team_a, m.team_b].filter(Boolean)
+    })) || []
+
+  } else {
+    // PICK-ONE / HYBRID EVENT: Get categories and category_picks
+    const { data: categories } = await supabase
+      .from('categories')
+      .select(`
+        *,
+        options:category_options(*)
+      `)
+      .eq('event_id', pool.event.id)
+      .order('order_index')
+
+    // Get category picks for all entries
+    const { data: categoryPicks } = await supabase
+      .from('category_picks')
+      .select(`
+        *,
+        option:category_options(id, name, is_correct)
+      `)
+      .in('pool_entry_id', entries?.map(e => e.id) || [])
+
+    // Build lookup: entry_id -> category_id -> option
+    entries?.forEach(entry => {
+      picksByEntry[entry.id] = {}
+    })
+    categoryPicks?.forEach(pick => {
+      picksByEntry[pick.pool_entry_id][pick.category_id] = pick.option
+    })
+
+    // Build rows from categories
+    rows = categories?.map(c => {
+      const correctOption = c.options?.find(o => o.is_correct)
+      return {
+        id: c.id,
+        name: c.name,
+        correctAnswer: correctOption?.name,
+        correctId: correctOption?.id,
+        options: c.options
+      }
+    }) || []
+  }
 
   return (
     <div style={{ 
@@ -98,44 +159,44 @@ export default async function PicksMatrixPage({ params }) {
         {pool.event.name}
       </p>
 
-      <div style={{ overflowX: 'auto' }}>
-        <table style={{ 
-          borderCollapse: 'collapse', 
-          width: '100%',
-          minWidth: entries && entries.length > 3 ? `${300 + (entries.length * 100)}px` : '100%',
-          fontSize: '14px'
-        }}>
-          <thead>
-            <tr style={{ background: '#f3f4f6' }}>
-              <th style={{ 
-                padding: '12px 16px', 
-                textAlign: 'left', 
-                borderBottom: '2px solid #e5e7eb',
-                position: 'sticky',
-                left: 0,
-                background: '#f3f4f6',
-                minWidth: '200px'
-              }}>
-                Category
-              </th>
-              {entries?.map(entry => (
-                <th key={entry.id} style={{ 
+      {rows.length === 0 ? (
+        <p style={{ color: '#666' }}>No picks to display yet.</p>
+      ) : (
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ 
+            borderCollapse: 'collapse', 
+            width: '100%',
+            minWidth: entries && entries.length > 3 ? `${300 + (entries.length * 120)}px` : '100%',
+            fontSize: '14px'
+          }}>
+            <thead>
+              <tr style={{ background: '#f3f4f6' }}>
+                <th style={{ 
                   padding: '12px 16px', 
-                  textAlign: 'center',
+                  textAlign: 'left', 
                   borderBottom: '2px solid #e5e7eb',
-                  minWidth: '100px'
+                  position: 'sticky',
+                  left: 0,
+                  background: '#f3f4f6',
+                  minWidth: '200px'
                 }}>
-                  {entry.entry_name}
+                  {eventType === 'bracket' ? 'Matchup' : 'Category'}
                 </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {categories?.map((category, idx) => {
-              const correctOption = category.options?.find(o => o.is_correct)
-              
-              return (
-                <tr key={category.id} style={{ background: idx % 2 === 0 ? 'white' : '#f9fafb' }}>
+                {entries?.map(entry => (
+                  <th key={entry.id} style={{ 
+                    padding: '12px 16px', 
+                    textAlign: 'center',
+                    borderBottom: '2px solid #e5e7eb',
+                    minWidth: '120px'
+                  }}>
+                    {entry.entry_name}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, idx) => (
+                <tr key={row.id} style={{ background: idx % 2 === 0 ? 'white' : '#f9fafb' }}>
                   <td style={{ 
                     padding: '12px 16px', 
                     borderBottom: '1px solid #e5e7eb',
@@ -144,17 +205,20 @@ export default async function PicksMatrixPage({ params }) {
                     background: idx % 2 === 0 ? 'white' : '#f9fafb',
                     fontWeight: 500
                   }}>
-                    {category.name}
-                    {correctOption && (
+                    {row.name}
+                    {row.correctAnswer && (
                       <div style={{ fontSize: '12px', color: '#22c55e', marginTop: '4px' }}>
-                        ✓ {correctOption.name}
+                        ✓ {row.correctAnswer}
                       </div>
                     )}
                   </td>
                   {entries?.map(entry => {
-                    const pick = picksByEntry[entry.id]?.[category.id]
-                    const isCorrect = pick?.is_correct
-                    const hasResult = correctOption !== undefined
+                    const pick = picksByEntry[entry.id]?.[row.id]
+                    const pickName = pick?.name
+                    const isCorrect = eventType === 'bracket' 
+                      ? (pick?.id === row.correctId)
+                      : pick?.is_correct
+                    const hasResult = row.correctAnswer !== undefined
                     
                     return (
                       <td key={entry.id} style={{ 
@@ -165,14 +229,14 @@ export default async function PicksMatrixPage({ params }) {
                           ? (isCorrect ? '#dcfce7' : '#fee2e2')
                           : 'transparent'
                       }}>
-                        {pick ? (
+                        {pickName ? (
                           <span style={{ 
                             color: hasResult 
                               ? (isCorrect ? '#16a34a' : '#dc2626')
                               : '#333'
                           }}>
                             {isCorrect && '✓ '}
-                            {pick.name}
+                            {pickName}
                           </span>
                         ) : (
                           <span style={{ color: '#9ca3af' }}>—</span>
@@ -181,11 +245,11 @@ export default async function PicksMatrixPage({ params }) {
                     )
                   })}
                 </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       <div style={{ marginTop: '24px', padding: '16px', background: '#f3f4f6', borderRadius: '8px' }}>
         <h3 style={{ margin: '0 0 8px', fontSize: '14px' }}>Legend</h3>
