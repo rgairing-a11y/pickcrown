@@ -205,6 +205,48 @@ export default function ManagePoolPage({ params }) {
         </div>
       </div>
 
+{/* Send Reminder to Incomplete */}
+      {!isLocked && incompleteEntries.length > 0 && (
+        <div style={{ marginTop: 24 }}>
+          <button
+            onClick={async () => {
+              if (!confirm(`Send reminder to ${incompleteEntries.length} incomplete entries?`)) return
+              
+              try {
+                const res = await fetch('/api/email/send-reminder-incomplete', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ 
+                    poolId,
+                    emails: incompleteEntries.map(e => e.email)
+                  })
+                })
+                const data = await res.json()
+                if (data.success) {
+                  alert(`Sent ${data.sent} reminder(s)!`)
+                } else {
+                  alert('Error: ' + data.error)
+                }
+              } catch (err) {
+                alert('Error sending reminders')
+              }
+            }}
+            style={{
+              padding: '12px 24px',
+              background: '#f59e0b',
+              color: 'white',
+              border: 'none',
+              borderRadius: 8,
+              cursor: 'pointer',
+              fontWeight: 600,
+              fontSize: '14px'
+            }}
+          >
+            📧 Send Reminder to {incompleteEntries.length} Incomplete
+          </button>
+        </div>
+      )}
+
       {/* Entries Table */}
       <div style={{ marginTop: 32 }}>
         <h2 style={{ fontSize: '18px', marginBottom: 16 }}>👥 Entries ({entries.length})</h2>
