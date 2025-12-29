@@ -1,5 +1,4 @@
 export const dynamic = 'force-dynamic'
-
 import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
 
@@ -13,7 +12,7 @@ export default async function StandingsPage({ params }) {
 
   const { data: pool } = await supabase
     .from('pools')
-    .select('*, event:events(name, year, season_id, season:seasons(id, name))')
+    .select('*, event:events(name, year, start_time, season_id, season:seasons(id, name))')
     .eq('id', poolId)
     .single()
 
@@ -25,15 +24,16 @@ export default async function StandingsPage({ params }) {
     .rpc('calculate_standings', { p_pool_id: poolId })
 
   const season = pool.event?.season
+  const isLocked = new Date(pool.event.start_time) < new Date()
 
   return (
     <div style={{ padding: 24, maxWidth: 800, margin: '0 auto' }}>
       <h1>{pool.name} — Standings</h1>
       <h2>{pool.event?.name} {pool.event?.year}</h2>
 
-      {season && (
-        <div style={{ marginBottom: 24 }}>
-          <Link 
+      <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: 24 }}>
+        {season && (
+          <Link
             href={`/season/${season.id}/standings`}
             style={{
               display: 'inline-block',
@@ -47,8 +47,25 @@ export default async function StandingsPage({ params }) {
           >
             🏆 View {season.name} Standings
           </Link>
-        </div>
-      )}
+        )}
+
+        {isLocked && (
+          <Link
+            href={`/pool/${poolId}/picks`}
+            style={{
+              display: 'inline-block',
+              padding: '12px 20px',
+              background: '#3b82f6',
+              color: '#fff',
+              borderRadius: 8,
+              textDecoration: 'none',
+              fontWeight: 'bold'
+            }}
+          >
+            📊 View All Picks
+          </Link>
+        )}
+      </div>
 
       <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 24 }}>
         <thead>
@@ -88,7 +105,9 @@ export default async function StandingsPage({ params }) {
       )}
 
       <div style={{ marginTop: 32 }}>
-        <Link href={`/pool/${poolId}`}>← Back to Pool</Link>
+        <Link href={`/pool/${poolId}`} style={{ color: '#3b82f6' }}>
+          ← Back to Pool
+        </Link>
       </div>
     </div>
   )
