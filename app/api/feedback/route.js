@@ -11,8 +11,13 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Message required' }, { status: 400 })
     }
 
+    // Check if API key exists
+    if (!process.env.SENDGRID_API_KEY) {
+      return NextResponse.json({ error: 'SendGrid API key not configured' }, { status: 500 })
+    }
+
     await sgMail.send({
-      from: process.env.EMAIL_FROM || 'picks@pickcrown.com',
+      from: process.env.EMAIL_FROM || 'rgairing@gmail.com',
       to: 'rgairing@gmail.com',
       subject: '💡 PickCrown Feedback',
       html: `
@@ -30,6 +35,12 @@ export async function POST(request) {
 
   } catch (error) {
     console.error('Feedback error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    
+    // Return detailed error for debugging
+    return NextResponse.json({ 
+      error: error.message,
+      code: error.code,
+      details: error.response?.body || 'No details'
+    }, { status: 500 })
   }
 }

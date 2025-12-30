@@ -12,7 +12,7 @@ export default async function StandingsPage({ params }) {
 
   const { data: pool } = await supabase
     .from('pools')
-    .select('*, event:events(name, year, start_time, season_id, season:seasons(id, name))')
+    .select('*, event:events(id, name, year, start_time, season_id, event_type, season:seasons(id, name))')
     .eq('id', poolId)
     .single()
 
@@ -25,6 +25,65 @@ export default async function StandingsPage({ params }) {
 
   const season = pool.event?.season
   const isLocked = new Date(pool.event.start_time) < new Date()
+
+  // Get Popular Picks data (only if locked)
+  let popularPicks = []
+  if (isLocked && pool.event?.event_type !== 'bracket') {
+    // Get categories with options
+    const { data: categories } = await supabase
+      .from('categories')
+      .select(`
+        id,
+        name,
+        order_index,
+        options:category_options(id, name, is_correct)
+      `)
+      .eq('event_id', pool.event.id)
+      .order('order_index')
+
+    // Get all picks for this pool
+    const { data: entries } = await supabase
+      .from('pool_entries')
+      .select('id')
+      .eq('pool_id', poolId)
+
+    const entryIds = entries?.map(e => e.id) || []
+
+    if (entryIds.length > 0) {
+      const { data: picks } = await supabase
+        .from('category_picks')
+        .select('category_id, option_id')
+        .in('pool_entry_id', entryIds)
+
+      // Calculate distribution per category
+      popularPicks = (categories || []).map(category => {
+        const categoryPicks = picks?.filter(p => p.category_id === category.id) || []
+        const totalPicks = categoryPicks.length
+
+        const optionCounts = category.options.map(option => {
+          const count = categoryPicks.filter(p => p.option_id === option.id).length
+          const percentage = totalPicks > 0 ? Math.round((count / totalPicks) * 100) : 0
+          return {
+            id: option.id,
+            name: option.name,
+            count,
+            percentage,
+            isCorrect: option.is_correct
+          }
+        })
+
+        // Sort by percentage descending
+        optionCounts.sort((a, b) => b.percentage - a.percentage)
+
+        return {
+          id: category.id,
+          name: category.name,
+          totalPicks,
+          options: optionCounts
+        }
+      })
+    }
+  }
 
   return (
     <div style={{ padding: 24, maxWidth: 800, margin: '0 auto' }}>
@@ -67,6 +126,7 @@ export default async function StandingsPage({ params }) {
         )}
       </div>
 
+      {/* Standings Table */}
       <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 24 }}>
         <thead>
           <tr style={{ background: '#f0f0f0' }}>
@@ -102,6 +162,87 @@ export default async function StandingsPage({ params }) {
         <p style={{ textAlign: 'center', marginTop: 24, color: '#666' }}>
           No entries yet
         </p>
+      )}
+
+      {/* Popular Picks Section */}
+      {isLocked && popularPicks.length > 0 && (
+        <div style={{ marginTop: 48 }}>
+          <h2 style={{ fontSize: '20px', marginBottom: 24 }}>📊 Popular Picks</h2>
+          
+          {popularPicks.map(category => (
+            <div 
+              key={category.id} 
+              style={{ 
+                marginBottom: 32,
+                padding: 20,
+                background: '#f9fafb',
+                borderRadius: 8
+              }}
+            >
+              <h3 style={{ 
+                fontSize: '16px', 
+                fontWeight: 600, 
+                marginBottom: 16,
+                color: '#374151'
+              }}>
+                {category.name}
+              </h3>
+              
+              {category.options.map(option => (
+                <div key={option.id} style={{ marginBottom: 12 }}>
+                  <div style={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between',
+                    marginBottom: 4,
+                    fontSize: '14px'
+                  }}>
+                    <span style={{ 
+                      fontWeight: option.isCorrect ? 'bold' : 'normal',
+                      color: option.isCorrect ? '#16a34a' : '#374151'
+                    }}>
+                      {option.name}
+                      {option.isCorrect && ' ✓'}
+                    </span>
+                    <span style={{ 
+                      color: '#6b7280',
+                      fontWeight: option.percentage >= 50 ? 'bold' : 'normal'
+                    }}>
+                      {option.percentage}%
+                    </span>
+                  </div>
+                  
+                  {/* Progress Bar */}
+                  <div style={{ 
+                    height: 8,
+                    background: '#e5e7eb',
+                    borderRadius: 4,
+                    overflow: 'hidden'
+                  }}>
+                    <div style={{
+                      height: '100%',
+                      width: `${option.percentage}%`,
+                      background: option.isCorrect 
+                        ? '#22c55e' 
+                        : option.percentage >= 50 
+                          ? '#3b82f6' 
+                          : '#9ca3af',
+                      borderRadius: 4,
+                      transition: 'width 0.3s ease'
+                    }} />
+                  </div>
+                </div>
+              ))}
+              
+              <div style={{ 
+                marginTop: 12, 
+                fontSize: '12px', 
+                color: '#9ca3af' 
+              }}>
+                {category.totalPicks} pick{category.totalPicks !== 1 ? 's' : ''}
+              </div>
+            </div>
+          ))}
+        </div>
       )}
 
       <div style={{ marginTop: 32 }}>

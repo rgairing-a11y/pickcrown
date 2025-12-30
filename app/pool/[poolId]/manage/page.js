@@ -15,6 +15,11 @@ export default function ManagePoolPage({ params }) {
   const [totalQuestions, setTotalQuestions] = useState(0)
   const [loading, setLoading] = useState(true)
   const [poolId, setPoolId] = useState(null)
+  
+  // Reinvite feature state
+  const [otherPools, setOtherPools] = useState([])
+  const [selectedTargetPool, setSelectedTargetPool] = useState('')
+  const [sendingInvites, setSendingInvites] = useState(false)
 
   useEffect(() => {
     async function unwrapParams() {
@@ -48,6 +53,18 @@ export default function ManagePoolPage({ params }) {
     if (!poolData) {
       setLoading(false)
       return
+    }
+
+    // Get other pools by same owner (for reinvite feature)
+    if (poolData.owner_email) {
+      const { data: otherPoolsData } = await supabase
+        .from('pools')
+        .select('id, name, event:events(name, start_time)')
+        .eq('owner_email', poolData.owner_email)
+        .neq('id', poolId)
+        .order('created_at', { ascending: false })
+      
+      setOtherPools(otherPoolsData || [])
     }
 
     const eventType = poolData.event?.event_type || 'bracket'
@@ -99,6 +116,67 @@ export default function ManagePoolPage({ params }) {
 
     setEntries(entriesWithCounts)
     setLoading(false)
+  }
+
+  async function handleDeletePool() {
+    if (!confirm(`Are you sure you want to delete "${pool.name}"?\n\nThis will remove all ${entries.length} entries and cannot be undone.`)) return
+    if (!confirm('This is your last chance. Really delete this pool?')) return
+    
+    try {
+      const { error } = await supabase
+        .from('pools')
+        .delete()
+        .eq('id', poolId)
+      
+      if (error) {
+        alert('Error deleting pool: ' + error.message)
+      } else {
+        alert('Pool deleted successfully')
+        window.location.href = '/'
+      }
+    } catch (err) {
+      alert('Error: ' + err.message)
+    }
+  }
+
+  async function handleSendInvites() {
+    if (!selectedTargetPool) {
+      alert('Please select a pool to invite to')
+      return
+    }
+
+    if (entries.length === 0) {
+      alert('No entries to invite')
+      return
+    }
+
+    const targetPool = otherPools.find(p => p.id === selectedTargetPool)
+    if (!confirm(`Send invites to ${entries.length} people for "${targetPool?.name}"?`)) return
+
+    setSendingInvites(true)
+
+    try {
+      const res = await fetch('/api/email/send-invites', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          emails: entries.map(e => e.email),
+          targetPoolId: selectedTargetPool
+        })
+      })
+
+      const data = await res.json()
+
+      if (data.success) {
+        alert(`Sent ${data.sent} invite(s)!${data.skipped ? ` (${data.skipped} skipped in dev mode)` : ''}`)
+      } else {
+        alert('Error: ' + data.error)
+      }
+    } catch (err) {
+      alert('Error sending invites: ' + err.message)
+    }
+
+    setSendingInvites(false)
   }
 
   if (loading) {
@@ -205,7 +283,7 @@ export default function ManagePoolPage({ params }) {
         </div>
       </div>
 
-{/* Send Reminder to Incomplete */}
+      {/* Send Reminder to Incomplete */}
       {!isLocked && incompleteEntries.length > 0 && (
         <div style={{ marginTop: 24 }}>
           <button
@@ -342,6 +420,91 @@ export default function ManagePoolPage({ params }) {
             View All Picks
           </Link>
         )}
+      </div>
+
+      {/* Reinvite to Another Pool */}
+      {entries.length > 0 && otherPools.length > 0 && (
+        <div style={{ 
+          marginTop: 32, 
+          padding: 24, 
+          background: '#f0f9ff',
+          border: '1px solid #bae6fd',
+          borderRadius: 8 
+        }}>
+          <h3 style={{ margin: '0 0 8px', fontSize: '16px', color: '#0369a1' }}>
+            📨 Reinvite to Another Pool
+          </h3>
+          <p style={{ color: '#0c4a6e', fontSize: '14px', marginBottom: 16 }}>
+            Send invites to all {entries.length} participants for a different pool.
+          </p>
+          
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+            <select
+              value={selectedTargetPool}
+              onChange={(e) => setSelectedTargetPool(e.target.value)}
+              style={{
+                padding: '10px 12px',
+                border: '1px solid #d1d5db',
+                borderRadius: 6,
+                fontSize: '14px',
+                minWidth: 250
+              }}
+            >
+              <option value="">Select a pool...</option>
+              {otherPools.map(p => (
+                <option key={p.id} value={p.id}>
+                  {p.name} ({p.event?.name})
+                </option>
+              ))}
+            </select>
+            
+            <button
+              onClick={handleSendInvites}
+              disabled={!selectedTargetPool || sendingInvites}
+              style={{
+                padding: '10px 20px',
+                background: selectedTargetPool ? '#0ea5e9' : '#cbd5e1',
+                color: 'white',
+                border: 'none',
+                borderRadius: 6,
+                cursor: selectedTargetPool ? 'pointer' : 'not-allowed',
+                fontWeight: 600,
+                fontSize: '14px'
+              }}
+            >
+              {sendingInvites ? 'Sending...' : `Send ${entries.length} Invites`}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Danger Zone */}
+      <div style={{ 
+        marginTop: 48, 
+        padding: 24, 
+        border: '2px solid #fee2e2',
+        borderRadius: 8,
+        background: '#fef2f2'
+      }}>
+        <h3 style={{ margin: '0 0 8px', color: '#dc2626', fontSize: '16px' }}>⚠️ Danger Zone</h3>
+        <p style={{ color: '#991b1b', fontSize: '14px', marginBottom: 16 }}>
+          Deleting a pool removes all entries and picks permanently.
+        </p>
+        <button
+          onClick={handleDeletePool}
+          style={{
+            padding: '10px 20px',
+            background: '#dc2626',
+            color: 'white',
+            border: 'none',
+            borderRadius: 6,
+            cursor: 'pointer',
+            fontWeight: 600,
+            fontSize: '14px'
+          }}
+        >
+          🗑️ Delete Pool
+        </button>
       </div>
     </div>
   )

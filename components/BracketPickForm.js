@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 import { Button, Alert, FormField, Card } from './ui'
 import { createMap, getConferences, getErrorMessage } from '../lib/utils'
@@ -14,6 +14,14 @@ export default function BracketPickForm({ pool, rounds, matchups, teams }) {
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState('')
+
+  // Pre-fill email from localStorage
+  useEffect(() => {
+    const savedEmail = localStorage.getItem('pickcrown_email')
+    if (savedEmail) {
+      setEmail(savedEmail)
+    }
+  }, [])
 
   const requiresTiebreaker = pool.config?.requires_tiebreaker || false
   const teamMap = createMap(teams)
@@ -105,6 +113,9 @@ export default function BracketPickForm({ pool, rounds, matchups, teams }) {
         setSubmitting(false)
         return
       }
+
+      // Save email to localStorage (in case they entered a new one)
+      localStorage.setItem('pickcrown_email', email.toLowerCase().trim())
 
       setSubmitted(true)
     } catch (err) {

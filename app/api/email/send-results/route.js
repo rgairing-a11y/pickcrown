@@ -1,154 +1,294 @@
 import { NextResponse } from 'next/server'
-import sgMail from '@sendgrid/mail'
 import { createClient } from '@supabase/supabase-js'
-import { resultsEmail } from '@/lib/email-templates'
+import sgMail from '@sendgrid/mail'
 
-sgMail.setApiKey(process.env.SENDGRID_API_KEY)
-
-const supabaseAdmin = createClient(
+const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 )
 
-// ============================================
-// EMAIL SAFETY GUARD
-// Prevents accidental emails in dev/localhost
-// ============================================
+sgMail.setApiKey(process.env.SENDGRID_API_KEY)
+
+// Email safety guard - only send to real users in production
 const ALLOWED_TEST_EMAILS = ['rgairing@gmail.com']
 
 function isEmailAllowed(email) {
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || ''
   const isProduction = baseUrl.includes('pickcrown.vercel.app')
   
-  // In production, all emails allowed
   if (isProduction) return { allowed: true }
+  if (ALLOWED_TEST_EMAILS.includes(email.toLowerCase())) return { allowed: true }
   
-  // In dev/localhost, only allow test emails
-  if (ALLOWED_TEST_EMAILS.includes(email.toLowerCase())) {
-    return { allowed: true }
-  }
-  
-  return { allowed: false, reason: 'DEV MODE: Email blocked (not in allowed list)' }
+  return { allowed: false, reason: 'DEV MODE: Email blocked' }
 }
-// ============================================
+
+// Calculate standings for a pool
+async function getPoolStandings(poolId) {
+  const { data, error } = await supabase.rpc('calculate_standings', { p_pool_id: poolId })
+  if (error) {
+    console.error('Error calculating standings:', error)
+    return []
+  }
+  return data || []
+}
+
+// Calculate overall event podium (Top 3 across ALL pools)
+async function getEventPodium(eventId) {
+  // Get all pools for this event
+  const { data: pools } = await supabase
+    .from('pools')
+    .select('id')
+    .eq('event_id', eventId)
+
+  if (!pools || pools.length === 0) return []
+
+  // Get standings from all pools and combine
+  const allEntries = []
+  
+  for (const pool of pools) {
+    const standings = await getPoolStandings(pool.id)
+    allEntries.push(...standings)
+  }
+
+  // Sort by total_points descending, then by entry_name
+  allEntries.sort((a, b) => {
+    if (b.total_points !== a.total_points) {
+      return b.total_points - a.total_points
+    }
+    return a.entry_name.localeCompare(b.entry_name)
+  })
+
+  // Return top 3 only (the podium)
+  return allEntries.slice(0, 3).map((entry, idx) => ({
+    ...entry,
+    position: idx + 1, // 1, 2, 3
+    medal: idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'
+  }))
+}
 
 export async function POST(request) {
   try {
-    const { poolId } = await request.json()
+    const { eventId, poolId } = await request.json()
 
-    if (!poolId) {
-      return NextResponse.json({ error: 'poolId required' }, { status: 400 })
+    // Validate: need either eventId (send to all pools) or poolId (send to one pool)
+    if (!eventId && !poolId) {
+      return NextResponse.json({ error: 'eventId or poolId required' }, { status: 400 })
     }
 
-    // Get pool with event
-    const { data: pool, error: poolError } = await supabaseAdmin
-      .from('pools')
-      .select(`
-        *,
-        event:events(*)
-      `)
-      .eq('id', poolId)
-      .single()
-
-    if (poolError || !pool) {
-      return NextResponse.json({ error: 'Pool not found' }, { status: 404 })
+    // Get event details
+    let event
+    if (eventId) {
+      const { data } = await supabase
+        .from('events')
+        .select('*')
+        .eq('id', eventId)
+        .single()
+      event = data
+    } else {
+      const { data: poolData } = await supabase
+        .from('pools')
+        .select('*, event:events(*)')
+        .eq('id', poolId)
+        .single()
+      event = poolData?.event
     }
 
-    // Get standings
-    const { data: standings, error: standingsError } = await supabaseAdmin
-      .rpc('calculate_standings', { p_pool_id: poolId })
-
-    if (standingsError) {
-      return NextResponse.json({ error: 'Failed to calculate standings' }, { status: 500 })
+    if (!event) {
+      return NextResponse.json({ error: 'Event not found' }, { status: 404 })
     }
 
-    if (!standings || standings.length === 0) {
-      return NextResponse.json({ error: 'No entries in pool' }, { status: 400 })
+    // Check if event is completed
+    if (event.status !== 'completed') {
+      return NextResponse.json({ 
+        error: 'Event must be marked as completed before sending results emails' 
+      }, { status: 400 })
     }
+
+    // Get pools to send results for
+    let pools
+    if (poolId) {
+      const { data } = await supabase
+        .from('pools')
+        .select('*')
+        .eq('id', poolId)
+      pools = data
+    } else {
+      const { data } = await supabase
+        .from('pools')
+        .select('*')
+        .eq('event_id', event.id)
+      pools = data
+    }
+
+    if (!pools || pools.length === 0) {
+      return NextResponse.json({ error: 'No pools found' }, { status: 404 })
+    }
+
+    // Calculate event podium (Top 3 across all pools)
+    const eventPodium = await getEventPodium(event.id)
+
+    // Track emails sent (for deduplication)
+    const emailsSent = new Set()
+    let sent = 0
+    let skipped = 0
+    let deduplicated = 0
+    const errors = []
 
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://pickcrown.vercel.app'
-    const poolUrl = `${baseUrl}/pool/${poolId}`
 
-    const results = []
+    // Process each pool
+    for (const pool of pools) {
+      // Get standings for this pool
+      const standings = await getPoolStandings(pool.id)
+      
+      // Find pool champion
+      const champion = standings.find(s => s.rank === 1)
 
-    for (const entry of standings) {
-      // ============================================
-      // CHECK EMAIL SAFETY GUARD
-      // ============================================
-      const emailCheck = isEmailAllowed(entry.email)
-      if (!emailCheck.allowed) {
-        console.log(`🛑 ${emailCheck.reason}: ${entry.email}`)
-        results.push({ email: entry.email, status: 'blocked', reason: emailCheck.reason })
-        continue
-      }
-      // ============================================
+      // Send email to each entry
+      for (const entry of standings) {
+        const email = entry.email.toLowerCase()
 
-      // Check if already sent
-      const { data: existing } = await supabaseAdmin
-        .from('email_log')
-        .select('id')
-        .eq('pool_id', poolId)
-        .eq('email_type', 'results')
-        .eq('recipient_email', entry.email)
-        .single()
+        // Deduplication: If user is in multiple pools for same event, only send one email
+        if (emailsSent.has(email)) {
+          deduplicated++
+          continue
+        }
 
-      if (existing) {
-        results.push({ email: entry.email, status: 'skipped', reason: 'already sent' })
-        continue
-      }
+        // Check if email is allowed (dev mode guard)
+        const { allowed } = isEmailAllowed(email)
+        if (!allowed) {
+          skipped++
+          continue
+        }
 
-      const template = resultsEmail({
-        poolName: pool.name,
-        eventName: pool.event.name,
-        standings,
-        poolUrl,
-        recipientRank: entry.rank,
-        recipientName: entry.entry_name
-      })
+        // Check if we already sent a results email to this person for this event
+        const { data: existingLog } = await supabase
+          .from('email_log')
+          .select('id')
+          .eq('recipient_email', email)
+          .eq('email_type', 'results')
+          .eq('pool_id', pool.id)
+          .single()
 
-      try {
-        await sgMail.send({
-          from: process.env.EMAIL_FROM || 'picks@pickcrown.com',
-          to: entry.email,
-          subject: template.subject,
-          html: template.html,
-          text: template.text
-        })
+        if (existingLog) {
+          deduplicated++
+          continue
+        }
 
-        // Log success
-        await supabaseAdmin.from('email_log').insert({
-          pool_id: poolId,
-          email_type: 'results',
-          recipient_email: entry.email,
-          status: 'sent'
-        })
+        try {
+          // Build the email
+          const standingsUrl = `${baseUrl}/pool/${pool.id}/standings`
+          
+          // Build podium HTML
+          let podiumHtml = ''
+          if (eventPodium.length > 0) {
+            podiumHtml = `
+              <div style="margin-top: 32px; padding-top: 24px; border-top: 2px solid #eee;">
+                <h3 style="margin: 0 0 16px; color: #7c3aed;">🏆 PickCrown Event Podium</h3>
+                <p style="color: #666; font-size: 14px; margin-bottom: 16px;">Top 3 across all pools for this event:</p>
+                <div style="background: #f9fafb; padding: 16px; border-radius: 8px;">
+                  ${eventPodium.map(p => `
+                    <div style="display: flex; align-items: center; padding: 8px 0; ${p.position < 3 ? 'border-bottom: 1px solid #e5e7eb;' : ''}">
+                      <span style="font-size: 24px; margin-right: 12px;">${p.medal}</span>
+                      <span style="font-weight: ${p.position === 1 ? 'bold' : 'normal'};">${p.entry_name}</span>
+                      <span style="margin-left: auto; color: #666;">${p.total_points} pts</span>
+                    </div>
+                  `).join('')}
+                </div>
+              </div>
+            `
+          }
 
-        results.push({ email: entry.email, status: 'sent', rank: entry.rank })
-      } catch (emailError) {
-        // Log failure
-        await supabaseAdmin.from('email_log').insert({
-          pool_id: poolId,
-          email_type: 'results',
-          recipient_email: entry.email,
-          status: 'failed',
-          metadata: { error: emailError.message }
-        })
+          // Determine the user's result message
+          let resultMessage
+          if (entry.rank === 1) {
+            resultMessage = `<span style="font-size: 32px;">👑</span><br><strong>You won!</strong> Congratulations, champion!`
+          } else if (entry.rank <= 3) {
+            resultMessage = `You finished <strong>#${entry.rank}</strong> — great job!`
+          } else {
+            resultMessage = `You finished <strong>#${entry.rank}</strong> with ${entry.total_points} points.`
+          }
 
-        results.push({ email: entry.email, status: 'failed', error: emailError.message })
+          await sgMail.send({
+            to: email,
+            from: {
+              email: 'hello@pickcrown.app',
+              name: 'PickCrown'
+            },
+            subject: `${event.name} Results — ${entry.rank === 1 ? '👑 You Won!' : `You finished #${entry.rank}`}`,
+            html: `
+              <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h1 style="color: #7c3aed; margin-bottom: 8px;">📊 ${event.name} Results</h1>
+                <p style="color: #666; margin-top: 0;">Pool: ${pool.name}</p>
+                
+                <div style="background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); padding: 24px; border-radius: 12px; margin: 24px 0; text-align: center;">
+                  ${resultMessage}
+                </div>
+                
+                <div style="background: #f9fafb; padding: 20px; border-radius: 8px; margin: 24px 0;">
+                  <h3 style="margin: 0 0 16px;">Your Stats</h3>
+                  <table style="width: 100%;">
+                    <tr>
+                      <td style="padding: 8px 0; color: #666;">Your Score</td>
+                      <td style="padding: 8px 0; text-align: right; font-weight: bold;">${entry.total_points} points</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 8px 0; color: #666;">Your Rank</td>
+                      <td style="padding: 8px 0; text-align: right; font-weight: bold;">#${entry.rank} of ${standings.length}</td>
+                    </tr>
+                    ${champion ? `
+                    <tr>
+                      <td style="padding: 8px 0; color: #666;">Pool Champion</td>
+                      <td style="padding: 8px 0; text-align: right; font-weight: bold;">👑 ${champion.entry_name}</td>
+                    </tr>
+                    ` : ''}
+                  </table>
+                </div>
+                
+                <div style="text-align: center; margin: 32px 0;">
+                  <a href="${standingsUrl}" style="display: inline-block; padding: 16px 32px; background: #7c3aed; color: white; text-decoration: none; border-radius: 8px; font-weight: bold;">
+                    View Full Standings
+                  </a>
+                </div>
+                
+                ${podiumHtml}
+                
+                <hr style="border: none; border-top: 1px solid #eee; margin: 32px 0;" />
+                
+                <p style="color: #999; font-size: 12px; text-align: center;">
+                  PickCrown — Bragging rights only 😄
+                </p>
+              </div>
+            `
+          })
+
+          // Log the email
+          await supabase.from('email_log').insert({
+            pool_id: pool.id,
+            email_type: 'results',
+            recipient_email: email
+          })
+
+          emailsSent.add(email)
+          sent++
+        } catch (err) {
+          console.error(`Failed to send results to ${email}:`, err)
+          errors.push(email)
+        }
       }
     }
 
-    return NextResponse.json({
-      success: true,
-      sent: results.filter(r => r.status === 'sent').length,
-      skipped: results.filter(r => r.status === 'skipped').length,
-      failed: results.filter(r => r.status === 'failed').length,
-      blocked: results.filter(r => r.status === 'blocked').length,
-      results
+    return NextResponse.json({ 
+      success: true, 
+      sent, 
+      skipped,
+      deduplicated,
+      errors: errors.length > 0 ? errors : undefined,
+      podiumEntries: eventPodium.length
     })
 
   } catch (error) {
     console.error('Send results error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: 'Server error: ' + error.message }, { status: 500 })
   }
 }

@@ -21,7 +21,10 @@ export default function AdminHome() {
       .select(`
         *,
         pools (*),
-        categories (id)
+        categories (id),
+        teams (id),
+        rounds (id),
+        matchups (id)
       `)
       .order('start_time', { ascending: false })
 
@@ -57,6 +60,35 @@ export default function AdminHome() {
     copyToClipboard(getPoolUrl(poolId), () => alert('Link copied to clipboard!'))
   }
 
+  // Get stats based on event type
+  function getEventStats(event) {
+    if (event.event_type === 'bracket') {
+      return {
+        primary: `${event.teams?.length || 0} teams`,
+        secondary: `${event.matchups?.length || 0} matchups`
+      }
+    } else {
+      return {
+        primary: `${event.categories?.length || 0} categories`,
+        secondary: null
+      }
+    }
+  }
+
+  // Get event type badge
+  function getTypeBadge(eventType) {
+    switch (eventType) {
+      case 'bracket':
+        return { label: '🏆 Bracket', color: '#f59e0b', bg: '#fef3c7' }
+      case 'pick_one':
+        return { label: '📋 Pick One', color: '#3b82f6', bg: '#dbeafe' }
+      case 'hybrid':
+        return { label: '🔀 Hybrid', color: '#8b5cf6', bg: '#ede9fe' }
+      default:
+        return { label: eventType, color: '#666', bg: '#f3f4f6' }
+    }
+  }
+
   if (loading) {
     return <LoadingState message="Loading events..." />
   }
@@ -87,8 +119,10 @@ export default function AdminHome() {
         events.map(event => {
           const isExpanded = expandedEvents[event.id]
           const locked = isEventLocked(event.start_time)
-          const categoryCount = event.categories?.length || 0
           const poolCount = event.pools?.length || 0
+          const stats = getEventStats(event)
+          const typeBadge = getTypeBadge(event.event_type)
+          const isBracket = event.event_type === 'bracket'
 
           return (
             <Card key={event.id} style={{ marginBottom: 'var(--spacing-lg)', padding: 0 }}>
@@ -113,25 +147,37 @@ export default function AdminHome() {
                     ▶
                   </span>
                   <div>
-                    <h2 style={{ margin: 0, fontSize: 'var(--font-size-xl)' }}>
-                      {event.name}
-                      <span style={{ 
-                        marginLeft: 'var(--spacing-sm)', 
-                        fontSize: 'var(--font-size-md)', 
-                        color: 'var(--color-text-light)',
-                        fontWeight: 'normal'
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-xs)' }}>
+                      <h2 style={{ margin: 0, fontSize: 'var(--font-size-xl)' }}>
+                        {event.name}
+                        <span style={{ 
+                          marginLeft: 'var(--spacing-sm)', 
+                          fontSize: 'var(--font-size-md)', 
+                          color: 'var(--color-text-light)',
+                          fontWeight: 'normal'
+                        }}>
+                          {event.year}
+                        </span>
+                      </h2>
+                      <span style={{
+                        fontSize: 'var(--font-size-xs)',
+                        padding: '2px 8px',
+                        borderRadius: '12px',
+                        background: typeBadge.bg,
+                        color: typeBadge.color,
+                        fontWeight: 600
                       }}>
-                        {event.year}
+                        {typeBadge.label}
                       </span>
-                    </h2>
+                    </div>
                     <div style={{ 
                       fontSize: 'var(--font-size-sm)', 
                       color: 'var(--color-text-light)',
-                      marginTop: 'var(--spacing-xs)',
                       display: 'flex',
                       gap: 'var(--spacing-lg)'
                     }}>
-                      <span>{categoryCount} categories</span>
+                      <span>{stats.primary}</span>
+                      {stats.secondary && <span>{stats.secondary}</span>}
                       <span>{poolCount} pool{poolCount !== 1 ? 's' : ''}</span>
                       {locked ? (
                         <span style={{ color: 'var(--color-danger)' }}>🔒 Locked</span>
@@ -143,18 +189,32 @@ export default function AdminHome() {
                 </div>
 
                 <div 
-                  style={{ display: 'flex', gap: 'var(--spacing-sm)' }}
+                  style={{ display: 'flex', gap: 'var(--spacing-sm)', flexWrap: 'wrap' }}
                   onClick={(e) => e.stopPropagation()}
                 >
                   <Button href={`/admin/events/${event.id}/edit`} variant="secondary" size="sm">
                     Edit
                   </Button>
-                  <Button href={`/admin/events/${event.id}/bracket`} variant="warning-light" size="sm">
-                    Bracket
-                  </Button>
-                  <Button href={`/admin/events/${event.id}/categories`} variant="primary-light" size="sm">
-                    Categories
-                  </Button>
+                  
+                  {/* Show different setup buttons based on event type */}
+                  {isBracket ? (
+                    <>
+                      <Button href={`/admin/events/${event.id}/teams`} variant="warning-light" size="sm">
+                        Teams
+                      </Button>
+                      <Button href={`/admin/events/${event.id}/rounds`} variant="warning-light" size="sm">
+                        Rounds
+                      </Button>
+                      <Button href={`/admin/events/${event.id}/matchups`} variant="warning-light" size="sm">
+                        Matchups
+                      </Button>
+                    </>
+                  ) : (
+                    <Button href={`/admin/events/${event.id}/categories`} variant="primary-light" size="sm">
+                      Categories
+                    </Button>
+                  )}
+                  
                   <Button href={`/admin/events/${event.id}/results`} variant="success-light" size="sm">
                     Results
                   </Button>
@@ -221,15 +281,15 @@ export default function AdminHome() {
                             </code>
                           </div>
                         </div>
-                        <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
-                          <Button href={`/admin/pools/${pool.id}/edit`} variant="secondary" size="sm">
-                            Edit
+                        <div style={{ display: 'flex', gap: 'var(--spacing-sm)', flexWrap: 'wrap' }}>
+                          <Button href={`/pool/${pool.id}/manage`} variant="secondary" size="sm">
+                            Manage
                           </Button>
                           <Button onClick={() => handleCopyPoolLink(pool.id)} variant="primary-light" size="sm">
                             📋 Copy Link
                           </Button>
-                          <Button href={`/admin/pools/${pool.id}/entries`} variant="secondary" size="sm">
-                            View Entries
+                          <Button href={`/pool/${pool.id}/standings`} variant="secondary" size="sm">
+                            Standings
                           </Button>
                           <Button onClick={() => handleDeletePool(pool.id)} variant="danger-light" size="sm">
                             Delete
