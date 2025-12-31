@@ -1,13 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
-export async function POST(
-  request: Request,
-  { params }: { params: { eventId: string } }
-) {
+export async function POST(request, { params }) {
   try {
     const supabase = createClient()
-    const { eventId } = params
+    const { eventId } = await params
     
     const actorEmail = request.headers.get('x-user-email') || 'system'
     
@@ -27,13 +24,17 @@ export async function POST(
     if (error) throw error
     
     // Log the action
-    await supabase.rpc('log_audit_event', {
-      p_action: 'mark_event_complete',
-      p_actor_email: actorEmail,
-      p_target_type: 'event',
-      p_target_id: eventId,
-      p_metadata: { event_name: event?.name, previous_status: event?.status }
-    })
+    try {
+      await supabase.rpc('log_audit_event', {
+        p_action: 'mark_event_complete',
+        p_actor_email: actorEmail,
+        p_target_type: 'event',
+        p_target_id: eventId,
+        p_metadata: { event_name: event?.name, previous_status: event?.status }
+      })
+    } catch (e) {
+      // Audit log function may not exist yet
+    }
     
     return NextResponse.json({ success: true })
   } catch (error) {
