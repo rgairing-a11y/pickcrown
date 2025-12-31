@@ -489,7 +489,10 @@ export default function HomePage() {
         borderTop: '1px solid #e5e7eb',
         textAlign: 'center'
       }}>
-        <div style={{ display: 'flex', gap: 24, justifyContent: 'center', fontSize: 14 }}>
+        <div style={{ display: 'flex', gap: 24, justifyContent: 'center', fontSize: 14, flexWrap: 'wrap' }}>
+          <Link href="/commissioner/signup" style={{ color: '#7c3aed', fontWeight: 600 }}>
+            👑 Become a Commissioner
+          </Link>
           <Link href="/feedback" style={{ color: '#3b82f6' }}>
             💡 Feedback
           </Link>
