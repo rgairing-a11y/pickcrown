@@ -99,9 +99,14 @@ export default function AdminHome() {
         title="👑 Admin Dashboard"
         backLink={null}
         actions={
-          <Button href="/admin/events/new" variant="success">
-            + New Event
-          </Button>
+          <div style={{ display: 'flex', gap: 12 }}>
+            <Button href="/admin/audit-log" variant="secondary">
+              📋 Audit Log
+            </Button>
+            <Button href="/admin/events/new" variant="success">
+              + New Event
+            </Button>
+          </div>
         }
       />
 

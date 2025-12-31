@@ -118,15 +118,22 @@ export default function AdminResultsPage({ params }) {
     
     setSaving(true)
     
-    const res = await fetch('/api/events', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: eventId, status: 'completed' })
+    // Use the new endpoint with audit logging
+    const res = await fetch(`/api/events/${eventId}/complete`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'x-user-email': typeof window !== 'undefined' 
+          ? localStorage.getItem('pickcrown_email') || 'admin' 
+          : 'admin'
+      }
     })
 
     if (!res.ok) {
       const err = await res.json()
       alert('Error: ' + err.error)
+    } else {
+      alert('Event marked as complete!')
     }
     
     await loadEvent()
@@ -220,7 +227,47 @@ export default function AdminResultsPage({ params }) {
         </div>
       </Card>
 
-      {categories.length === 0 ? (
+      {/* Bracket Event - Redirect to Matchups */}
+      {event.event_type === 'bracket' && (
+        <Card style={{ textAlign: 'center', padding: 'var(--spacing-xxl)' }}>
+          <div style={{ fontSize: 48, marginBottom: 'var(--spacing-md)' }}>🏆</div>
+          <h2 style={{ margin: '0 0 var(--spacing-md)' }}>This is a Bracket Event</h2>
+          <p style={{ color: 'var(--color-text-light)', marginBottom: 'var(--spacing-lg)' }}>
+            Bracket events use matchups instead of categories.<br />
+            Enter results by selecting winners for each matchup.
+          </p>
+          <Button
+            href={'/admin/events/' + eventId + '/matchups'}
+            variant="primary"
+            style={{ fontSize: '16px', padding: '14px 28px' }}
+          >
+            🎯 Enter Matchup Results
+          </Button>
+        </Card>
+      )}
+
+      {/* Hybrid Event - Show both options */}
+      {event.event_type === 'hybrid' && (
+        <Card style={{ marginBottom: 'var(--spacing-lg)', background: '#f0f9ff', border: '1px solid #bae6fd' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)', flexWrap: 'wrap' }}>
+            <div style={{ flex: 1 }}>
+              <h3 style={{ margin: '0 0 4px' }}>🎯 This is a Hybrid Event</h3>
+              <p style={{ margin: 0, fontSize: '14px', color: '#0369a1' }}>
+                Enter bracket matchup results AND category results below.
+              </p>
+            </div>
+            <Button
+              href={'/admin/events/' + eventId + '/matchups'}
+              variant="secondary"
+            >
+              Enter Matchup Results
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      {/* Pick-One Event with no categories */}
+      {event.event_type !== 'bracket' && categories.length === 0 ? (
         <Card>
           <EmptyState
             icon="📋"
@@ -230,7 +277,7 @@ export default function AdminResultsPage({ params }) {
             actionHref={'/admin/events/' + eventId + '/categories'}
           />
         </Card>
-      ) : (
+      ) : event.event_type !== 'bracket' && (
         categories.map((category, idx) => {
           const selectedOptionId = pendingResults[category.id]
           const savedCorrect = category.options?.find(o => o.is_correct)

@@ -21,6 +21,11 @@ export default function ManagePoolPage({ params }) {
   const [selectedTargetPool, setSelectedTargetPool] = useState('')
   const [sendingInvites, setSendingInvites] = useState(false)
 
+  // Delete/Archive state (NEW)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [isArchiving, setIsArchiving] = useState(false)
+
   useEffect(() => {
     async function unwrapParams() {
       const { poolId } = await params
@@ -118,24 +123,61 @@ export default function ManagePoolPage({ params }) {
     setLoading(false)
   }
 
-  async function handleDeletePool() {
-    if (!confirm(`Are you sure you want to delete "${pool.name}"?\n\nThis will remove all ${entries.length} entries and cannot be undone.`)) return
-    if (!confirm('This is your last chance. Really delete this pool?')) return
-    
+  // NEW: Archive handler
+  async function handleArchive(status) {
+    setIsArchiving(true)
     try {
-      const { error } = await supabase
-        .from('pools')
-        .delete()
-        .eq('id', poolId)
+      const response = await fetch(`/api/pools/${poolId}/archive`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-email': pool?.owner_email || ''
+        },
+        body: JSON.stringify({ status })
+      })
       
-      if (error) {
-        alert('Error deleting pool: ' + error.message)
-      } else {
-        alert('Pool deleted successfully')
-        window.location.href = '/'
-      }
-    } catch (err) {
-      alert('Error: ' + err.message)
+      if (!response.ok) throw new Error('Failed to update pool status')
+      
+      alert(`Pool ${status === 'archived' ? 'archived' : 'unarchived'} successfully`)
+      loadPoolData() // Refresh
+    } catch (error) {
+      console.error('Archive error:', error)
+      alert('Failed to update pool status. Please try again.')
+    } finally {
+      setIsArchiving(false)
+    }
+  }
+
+  // UPDATED: Delete handler with new API
+  async function handleDeletePool() {
+    if (!confirm(`Are you sure you want to delete "${pool.name}"?\n\nThis will remove all ${entries.length} entries and cannot be undone.`)) {
+      setShowDeleteConfirm(false)
+      return
+    }
+    if (!confirm('This is your last chance. Really delete this pool?')) {
+      setShowDeleteConfirm(false)
+      return
+    }
+    
+    setIsDeleting(true)
+    try {
+      const response = await fetch(`/api/pools/${poolId}`, {
+        method: 'DELETE',
+        headers: {
+          'x-user-email': pool?.owner_email || ''
+        }
+      })
+      
+      if (!response.ok) throw new Error('Failed to delete pool')
+      
+      alert('Pool deleted successfully')
+      window.location.href = '/'
+    } catch (error) {
+      console.error('Delete error:', error)
+      alert('Failed to delete pool. Please try again.')
+    } finally {
+      setIsDeleting(false)
+      setShowDeleteConfirm(false)
     }
   }
 
@@ -219,6 +261,21 @@ export default function ManagePoolPage({ params }) {
       }}>
         {isLocked ? '🔒 Locked' : '🟢 Open for picks'}
       </p>
+
+      {/* NEW: Archive status badge */}
+      {pool.status === 'archived' && (
+        <p style={{ 
+          display: 'inline-block',
+          marginLeft: 8,
+          padding: '4px 12px', 
+          borderRadius: '4px',
+          fontSize: '14px',
+          background: '#fef3c7',
+          color: '#92400e'
+        }}>
+          📦 Archived
+        </p>
+      )}
 
       {/* Share Link */}
       <div style={{ 
@@ -478,7 +535,7 @@ export default function ManagePoolPage({ params }) {
         </div>
       )}
 
-      {/* Danger Zone */}
+      {/* Danger Zone - UPDATED with Archive */}
       <div style={{ 
         marginTop: 48, 
         padding: 24, 
@@ -486,26 +543,133 @@ export default function ManagePoolPage({ params }) {
         borderRadius: 8,
         background: '#fef2f2'
       }}>
-        <h3 style={{ margin: '0 0 8px', color: '#dc2626', fontSize: '16px' }}>⚠️ Danger Zone</h3>
-        <p style={{ color: '#991b1b', fontSize: '14px', marginBottom: 16 }}>
-          Deleting a pool removes all entries and picks permanently.
-        </p>
-        <button
-          onClick={handleDeletePool}
-          style={{
-            padding: '10px 20px',
-            background: '#dc2626',
-            color: 'white',
-            border: 'none',
-            borderRadius: 6,
-            cursor: 'pointer',
-            fontWeight: 600,
-            fontSize: '14px'
-          }}
-        >
-          🗑️ Delete Pool
-        </button>
+        <h3 style={{ margin: '0 0 16px', color: '#dc2626', fontSize: '16px' }}>⚠️ Danger Zone</h3>
+        
+        {/* Archive/Unarchive Section */}
+        <div style={{ 
+          marginBottom: 16, 
+          padding: 16, 
+          background: pool.status === 'archived' ? '#dcfce7' : '#fef3c7',
+          border: `1px solid ${pool.status === 'archived' ? '#bbf7d0' : '#fde68a'}`,
+          borderRadius: 6 
+        }}>
+          <h4 style={{ margin: '0 0 4px', fontSize: '14px', fontWeight: 600 }}>
+            {pool.status === 'archived' ? '📦 Unarchive Pool' : '📦 Archive Pool'}
+          </h4>
+          <p style={{ margin: '0 0 12px', fontSize: '13px', color: '#666' }}>
+            {pool.status === 'archived' 
+              ? 'Restore this pool to active lists'
+              : 'Hide this pool from active lists (can be reversed)'
+            }
+          </p>
+          <button
+            onClick={() => handleArchive(pool.status === 'archived' ? 'active' : 'archived')}
+            disabled={isArchiving}
+            style={{
+              padding: '8px 16px',
+              background: pool.status === 'archived' ? '#16a34a' : '#f59e0b',
+              color: 'white',
+              border: 'none',
+              borderRadius: 6,
+              cursor: isArchiving ? 'not-allowed' : 'pointer',
+              fontWeight: 600,
+              fontSize: '14px',
+              opacity: isArchiving ? 0.5 : 1
+            }}
+          >
+            {isArchiving 
+              ? 'Processing...' 
+              : (pool.status === 'archived' ? 'Unarchive' : 'Archive')
+            }
+          </button>
+        </div>
+
+        {/* Delete Section */}
+        <div>
+          <p style={{ color: '#991b1b', fontSize: '14px', marginBottom: 16 }}>
+            Deleting a pool removes all entries and picks permanently.
+          </p>
+          <button
+            onClick={() => setShowDeleteConfirm(true)}
+            disabled={isDeleting}
+            style={{
+              padding: '10px 20px',
+              background: '#dc2626',
+              color: 'white',
+              border: 'none',
+              borderRadius: 6,
+              cursor: isDeleting ? 'not-allowed' : 'pointer',
+              fontWeight: 600,
+              fontSize: '14px',
+              opacity: isDeleting ? 0.5 : 1
+            }}
+          >
+            {isDeleting ? 'Deleting...' : '🗑️ Delete Pool'}
+          </button>
+        </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 50
+        }}>
+          <div style={{
+            background: 'white',
+            padding: 24,
+            borderRadius: 8,
+            maxWidth: 400,
+            width: '90%'
+          }}>
+            <h3 style={{ fontSize: '18px', fontWeight: 600, marginBottom: 16 }}>
+              Confirm Deletion
+            </h3>
+            <p style={{ marginBottom: 24, color: '#666' }}>
+              This will permanently delete <strong>{pool.name}</strong> and all associated entries and picks.
+              This action cannot be undone.
+            </p>
+            <div style={{ display: 'flex', gap: 12 }}>
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                style={{
+                  flex: 1,
+                  padding: '10px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: 6,
+                  background: 'white',
+                  cursor: 'pointer',
+                  fontWeight: 600
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeletePool}
+                disabled={isDeleting}
+                style={{
+                  flex: 1,
+                  padding: '10px',
+                  background: '#dc2626',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: 6,
+                  cursor: isDeleting ? 'not-allowed' : 'pointer',
+                  fontWeight: 600,
+                  opacity: isDeleting ? 0.5 : 1
+                }}
+              >
+                {isDeleting ? 'Deleting...' : 'Yes, Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

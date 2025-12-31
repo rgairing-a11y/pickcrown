@@ -17,6 +17,12 @@ export default function HomePage() {
   const [managedPools, setManagedPools] = useState([])
   const [upcomingEvents, setUpcomingEvents] = useState([])
 
+  // Create Pool Modal State
+  const [showCreatePool, setShowCreatePool] = useState(false)
+  const [selectedEvent, setSelectedEvent] = useState(null)
+  const [poolName, setPoolName] = useState('')
+  const [creatingPool, setCreatingPool] = useState(false)
+
   // Check localStorage on mount
   useEffect(() => {
     const saved = localStorage.getItem('pickcrown_email')
@@ -56,6 +62,7 @@ export default function HomePage() {
         event:events(id, name, year, start_time, status)
       `)
       .ilike('owner_email', userEmail)
+      .neq('status', 'archived') // Hide archived pools
       .order('created_at', { ascending: false })
 
     setManagedPools(poolsData || [])
@@ -88,6 +95,53 @@ export default function HomePage() {
     setStoredEmail(null)
     setEntries([])
     setManagedPools([])
+  }
+
+  function openCreatePoolModal(event) {
+    setSelectedEvent(event)
+    setPoolName(`${event.name} Pool`)
+    setShowCreatePool(true)
+  }
+
+  async function handleCreatePool(e) {
+    e.preventDefault()
+    if (!poolName.trim() || !selectedEvent) return
+
+    setCreatingPool(true)
+
+    try {
+      const res = await fetch('/api/pools', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          event_id: selectedEvent.id,
+          name: poolName.trim(),
+          owner_email: storedEmail,
+          owner_name: storedEmail.split('@')[0], // Simple name from email
+          status: 'active'
+        })
+      })
+
+      if (!res.ok) {
+        const err = await res.json()
+        alert('Error creating pool: ' + err.error)
+        setCreatingPool(false)
+        return
+      }
+
+      const pool = await res.json()
+      
+      // Close modal and redirect to manage page
+      setShowCreatePool(false)
+      setSelectedEvent(null)
+      setPoolName('')
+      
+      // Redirect to the new pool's manage page
+      window.location.href = `/pool/${pool.id}/manage`
+    } catch (err) {
+      alert('Error: ' + err.message)
+      setCreatingPool(false)
+    }
   }
 
   const isLocked = (startTime) => new Date(startTime) < new Date()
@@ -230,7 +284,7 @@ export default function HomePage() {
               You're not in any pools yet.
             </p>
             <p style={{ color: '#999', fontSize: 14 }}>
-              If someone invited you, check your link — or start one below.
+              If someone invited you, check your link — or start a pool below.
             </p>
           </div>
         ) : (
@@ -354,14 +408,13 @@ export default function HomePage() {
       )}
 
       {/* ==========================================
-          SECTION 3: What's Starting Soon
+          SECTION 3: What's Starting Soon (with Start Pool)
           ========================================== */}
       {upcomingEvents.length > 0 && (
         <div style={{ marginBottom: 40 }}>
-          <h2 style={{ fontSize: 20, marginBottom: 8 }}>📅 What's Starting Soon</h2>
+          <h2 style={{ fontSize: 20, marginBottom: 8 }}>📅 Upcoming Events</h2>
           <p style={{ color: '#666', fontSize: 14, marginBottom: 16 }}>
-            Coming up next on PickCrown.<br/>
-            Get your gang together and start a pool before the games begin.
+            Start a pool for your friends, family, or coworkers!
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {upcomingEvents.map(event => (
@@ -379,7 +432,7 @@ export default function HomePage() {
               >
                 <div>
                   <h3 style={{ margin: 0, fontSize: 16 }}>
-                    {event.event_type === 'hybrid' ? '🎉' : '🏈'} {event.name}
+                    {event.event_type === 'hybrid' ? '🎉' : event.event_type === 'bracket' ? '🏈' : '🏆'} {event.name}
                   </h3>
                   <p style={{ margin: '4px 0 0', fontSize: 13, color: '#666' }}>
                     {new Date(event.start_time).toLocaleDateString('en-US', {
@@ -390,12 +443,42 @@ export default function HomePage() {
                     })}
                   </p>
                 </div>
+                <button
+                  onClick={() => openCreatePoolModal(event)}
+                  style={{
+                    padding: '10px 20px',
+                    background: '#f59e0b',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: 6,
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                    fontSize: 14
+                  }}
+                >
+                  🚀 Start a Pool
+                </button>
               </div>
             ))}
           </div>
-          <p style={{ fontSize: 13, color: '#666', marginTop: 16 }}>
-            Want to run a pool? Contact the admin to get one set up for your group.
-          </p>
+        </div>
+      )}
+
+      {/* No upcoming events message */}
+      {upcomingEvents.length === 0 && (
+        <div style={{ marginBottom: 40 }}>
+          <h2 style={{ fontSize: 20, marginBottom: 8 }}>📅 Upcoming Events</h2>
+          <div style={{
+            padding: 24,
+            background: '#f9fafb',
+            borderRadius: 8,
+            border: '1px solid #e5e7eb',
+            textAlign: 'center'
+          }}>
+            <p style={{ color: '#666' }}>
+              No upcoming events right now. Check back soon!
+            </p>
+          </div>
         </div>
       )}
 
@@ -410,6 +493,9 @@ export default function HomePage() {
           <Link href="/feedback" style={{ color: '#3b82f6' }}>
             💡 Feedback
           </Link>
+          <Link href="/find-my-picks" style={{ color: '#3b82f6' }}>
+            🔍 Find My Picks
+          </Link>
           <Link href="/admin" style={{ color: '#64748b' }}>
             Admin
           </Link>
@@ -418,6 +504,117 @@ export default function HomePage() {
           © 2025 PickCrown • Built for fun, not profit
         </p>
       </div>
+
+      {/* ==========================================
+          CREATE POOL MODAL
+          ========================================== */}
+      {showCreatePool && selectedEvent && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 50,
+          padding: 24
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: 12,
+            padding: 32,
+            maxWidth: 440,
+            width: '100%',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
+          }}>
+            <h2 style={{ margin: '0 0 8px', fontSize: 24 }}>🚀 Start a Pool</h2>
+            <p style={{ color: '#666', marginBottom: 24, fontSize: 14 }}>
+              for <strong>{selectedEvent.name}</strong>
+            </p>
+
+            <form onSubmit={handleCreatePool}>
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ 
+                  display: 'block', 
+                  marginBottom: 8, 
+                  fontWeight: 600,
+                  fontSize: 14 
+                }}>
+                  Pool Name
+                </label>
+                <input
+                  type="text"
+                  value={poolName}
+                  onChange={(e) => setPoolName(e.target.value)}
+                  placeholder="e.g., Smith Family Pool"
+                  required
+                  style={{
+                    width: '100%',
+                    padding: 12,
+                    fontSize: 16,
+                    border: '2px solid #e5e7eb',
+                    borderRadius: 8
+                  }}
+                />
+                <p style={{ fontSize: 12, color: '#999', marginTop: 8 }}>
+                  Pick something your friends will recognize!
+                </p>
+              </div>
+
+              <div style={{ 
+                padding: 16, 
+                background: '#f0fdf4', 
+                borderRadius: 8,
+                marginBottom: 24,
+                fontSize: 14
+              }}>
+                <p style={{ margin: 0, color: '#166534' }}>
+                  <strong>You'll be the commissioner.</strong><br/>
+                  Share the link with your group after creating.
+                </p>
+              </div>
+
+              <div style={{ display: 'flex', gap: 12 }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCreatePool(false)
+                    setSelectedEvent(null)
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: 14,
+                    fontSize: 16,
+                    border: '1px solid #d1d5db',
+                    borderRadius: 8,
+                    background: 'white',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={creatingPool || !poolName.trim()}
+                  style={{
+                    flex: 1,
+                    padding: 14,
+                    fontSize: 16,
+                    fontWeight: 600,
+                    background: creatingPool ? '#9ca3af' : '#16a34a',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: 8,
+                    cursor: creatingPool ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  {creatingPool ? 'Creating...' : 'Create Pool'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
