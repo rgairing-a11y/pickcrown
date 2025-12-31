@@ -100,6 +100,9 @@ export default function AdminHome() {
         backLink={null}
         actions={
           <div style={{ display: 'flex', gap: 12 }}>
+            <Button href="/admin/seasons" variant="secondary">
+              🏆 Seasons
+            </Button>
             <Button href="/admin/audit-log" variant="secondary">
               📋 Audit Log
             </Button>
