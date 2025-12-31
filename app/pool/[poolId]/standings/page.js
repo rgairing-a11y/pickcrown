@@ -1,10 +1,12 @@
 export const dynamic = 'force-dynamic'
 import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
+import ScenarioSimulator from '../../../../components/ScenarioSimulator'
 
+// Use service role key for full data access, fallback to anon
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 )
 
 export default async function StandingsPage({ params }) {
@@ -87,14 +89,14 @@ export default async function StandingsPage({ params }) {
     }
   }
 
-  // Get Bracket Popular Picks (for bracket/hybrid events)
-  if (isLocked && (pool.event?.event_type === 'bracket' || pool.event?.event_type === 'hybrid')) {
+  // Get Bracket Popular Picks (check if event has matchups, regardless of event_type)
+  if (isLocked) {
     // Get rounds
     const { data: rounds } = await supabase
       .from('rounds')
-      .select('id, name, round_number, points')
+      .select('id, name, round_order, points')
       .eq('event_id', pool.event.id)
-      .order('round_number')
+      .order('round_order')
 
     // Get matchups with teams
     const { data: matchups } = await supabase
@@ -108,24 +110,26 @@ export default async function StandingsPage({ params }) {
       `)
       .eq('event_id', pool.event.id)
 
-    // Get all entries for this pool
-    const { data: entries } = await supabase
-      .from('pool_entries')
-      .select('id')
-      .eq('pool_id', poolId)
+    // Only proceed if there are matchups (this is a bracket event)
+    if (matchups && matchups.length > 0) {
+      // Get all entries for this pool
+      const { data: entries } = await supabase
+        .from('pool_entries')
+        .select('id')
+        .eq('pool_id', poolId)
 
-    const entryIds = entries?.map(e => e.id) || []
+      const entryIds = entries?.map(e => e.id) || []
 
-    if (entryIds.length > 0 && matchups && matchups.length > 0) {
-      // Get all bracket picks
-      const { data: bracketPicks } = await supabase
-        .from('bracket_picks')
-        .select('matchup_id, picked_team_id')
-        .in('pool_entry_id', entryIds)
+      if (entryIds.length > 0) {
+        // Get all bracket picks
+        const { data: bracketPicks } = await supabase
+          .from('bracket_picks')
+          .select('matchup_id, picked_team_id')
+          .in('pool_entry_id', entryIds)
 
-      // Group matchups by round
-      bracketPopularPicks = (rounds || []).map(round => {
-        const roundMatchups = matchups.filter(m => m.round_id === round.id)
+        // Group matchups by round
+        bracketPopularPicks = (rounds || []).map(round => {
+          const roundMatchups = matchups.filter(m => m.round_id === round.id)
 
         const matchupStats = roundMatchups.map(matchup => {
           const matchupPicks = bracketPicks?.filter(p => p.matchup_id === matchup.id) || []
@@ -170,6 +174,180 @@ export default async function StandingsPage({ params }) {
           matchups: matchupStats
         }
       }).filter(round => round.matchups.length > 0)
+      }
+    }
+  }
+
+  // Calculate Champion Status (for bracket events)
+  let championStatus = {}
+  let eliminatedTeams = new Set()
+  let remainingMatchups = 0
+  let pathToVictory = []
+  let maxPotentialByEntry = {}
+  let allBracketPicks = []
+  let simulatorMatchups = []
+  let simulatorRoundPoints = {}
+  let simulatorRoundNames = {}
+  
+  if (isLocked) {
+    // Get all matchups to find eliminated teams
+    const { data: allMatchups } = await supabase
+      .from('matchups')
+      .select('id, team_a_id, team_b_id, winner_team_id, round_id')
+      .eq('event_id', pool.event.id)
+
+    // Get rounds for point values
+    const { data: roundsData } = await supabase
+      .from('rounds')
+      .select('id, name, points')
+      .eq('event_id', pool.event.id)
+
+    const roundPoints = {}
+    const roundNames = {}
+    roundsData?.forEach(r => { 
+      roundPoints[r.id] = r.points 
+      roundNames[r.id] = r.name
+    })
+
+    if (allMatchups && allMatchups.length > 0) {
+      // Find eliminated teams (lost a matchup)
+      allMatchups.forEach(m => {
+        if (m.winner_team_id) {
+          // The loser is eliminated
+          const loserId = m.winner_team_id === m.team_a_id ? m.team_b_id : m.team_a_id
+          eliminatedTeams.add(loserId)
+        } else {
+          remainingMatchups++
+        }
+      })
+
+      // Get remaining matchups (no winner yet)
+      const undecidedMatchups = allMatchups.filter(m => !m.winner_team_id)
+
+      // Get all entries with their bracket picks
+      const { data: entries } = await supabase
+        .from('pool_entries')
+        .select('id, entry_name')
+        .eq('pool_id', poolId)
+
+      if (entries && entries.length > 0) {
+        const entryIds = entries.map(e => e.id)
+        
+        // Get bracket picks for all entries
+        const { data: allPicks } = await supabase
+          .from('bracket_picks')
+          .select('pool_entry_id, picked_team_id, matchup_id')
+          .in('pool_entry_id', entryIds)
+
+        // Store for scenario simulator
+        allBracketPicks = allPicks || []
+        simulatorRoundPoints = roundPoints
+        simulatorRoundNames = roundNames
+        
+        // Get matchups with team details for simulator
+        const { data: matchupsWithTeams } = await supabase
+          .from('matchups')
+          .select(`
+            id,
+            round_id,
+            winner_team_id,
+            team_a:teams!matchups_team_a_id_fkey(id, name, seed),
+            team_b:teams!matchups_team_b_id_fkey(id, name, seed)
+          `)
+          .eq('event_id', pool.event.id)
+        
+        simulatorMatchups = matchupsWithTeams || []
+
+        // For each entry, calculate status and potential
+        entries.forEach(entry => {
+          const entryPicks = allPicks?.filter(p => p.pool_entry_id === entry.id) || []
+          
+          // Get picks for matchups that haven't been decided yet
+          const remainingPicks = entryPicks.filter(pick => {
+            const matchup = allMatchups.find(m => m.id === pick.matchup_id)
+            return matchup && !matchup.winner_team_id
+          })
+          
+          // Count how many of those picks are for teams still alive
+          const alivePicks = remainingPicks.filter(pick => !eliminatedTeams.has(pick.picked_team_id))
+          
+          championStatus[entry.id] = {
+            totalRemaining: remainingPicks.length,
+            aliveCount: alivePicks.length,
+            isEliminated: remainingPicks.length > 0 && alivePicks.length === 0
+          }
+
+          // Calculate max potential points
+          let potentialPoints = 0
+          alivePicks.forEach(pick => {
+            const matchup = allMatchups.find(m => m.id === pick.matchup_id)
+            if (matchup) {
+              potentialPoints += roundPoints[matchup.round_id] || 0
+            }
+          })
+          
+          maxPotentialByEntry[entry.id] = potentialPoints
+        })
+
+        // Calculate path to victory for each entry
+        const sortedStandings = [...(standings || [])].sort((a, b) => b.total_points - a.total_points)
+        
+        // Check if we have any potential data
+        const hasPotentialData = Object.values(maxPotentialByEntry).some(v => v > 0)
+        
+        if (sortedStandings.length > 0 && undecidedMatchups.length > 0) {
+          const leader = sortedStandings[0]
+          const leaderPotential = maxPotentialByEntry[leader.entry_id] || 0
+          const leaderMax = leader.total_points + leaderPotential
+
+          sortedStandings.forEach((entry, idx) => {
+            const myPotential = maxPotentialByEntry[entry.entry_id] || 0
+            const myMax = entry.total_points + myPotential
+            const gap = leader.total_points - entry.total_points
+
+            if (idx === 0) {
+              // Leader
+              const secondPlace = sortedStandings[1]
+              if (secondPlace) {
+                const secondMax = secondPlace.total_points + (maxPotentialByEntry[secondPlace.entry_id] || 0)
+                // Only show "clinched" if we have pick data AND leader's current > secondMax
+                const hasClinched = hasPotentialData && (entry.total_points >= secondMax)
+                
+                pathToVictory.push({
+                  entry_id: entry.entry_id,
+                  entry_name: entry.entry_name,
+                  status: hasClinched ? 'clinched' : 'leading',
+                  message: hasClinched 
+                    ? '🏆 Clinched victory!' 
+                    : hasPotentialData
+                      ? `Leading by ${gap > 0 ? gap : 0}. Max possible: ${leaderMax} pts.`
+                      : `Leading by ${gap > 0 ? gap : 0}.`,
+                  potentialPoints: myPotential,
+                  maxTotal: myMax,
+                  canWin: true
+                })
+              }
+            } else {
+              // Challengers
+              const canCatchUp = !hasPotentialData || myMax >= leader.total_points
+              
+              pathToVictory.push({
+                entry_id: entry.entry_id,
+                entry_name: entry.entry_name,
+                status: !canCatchUp ? 'eliminated' : gap === 0 ? 'tied' : 'chasing',
+                message: !canCatchUp 
+                  ? '❌ Cannot catch the leader'
+                  : hasPotentialData
+                    ? `${gap} pts behind. Can earn up to ${myPotential} more pts.`
+                    : `${gap} pts behind.`,
+                potentialPoints: myPotential,
+                maxTotal: myMax,
+                canWin: canCatchUp
+              })
+            }
+          })
+        }
+      }
     }
   }
 
@@ -230,35 +408,145 @@ export default async function StandingsPage({ params }) {
         </a>
       </div>
 
-      {/* Standings Table */}
+      {/* Standings Table with Podium */}
+      {standings?.length > 0 && (
+        <>
+          {/* Podium for Top 3 positions (handling ties) */}
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'center', 
+            alignItems: 'flex-end',
+            gap: 16,
+            marginTop: 32,
+            marginBottom: 32,
+            padding: 24,
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            borderRadius: 16
+          }}>
+            {/* Silver - 2nd position */}
+            {standings[1] && (
+              <div style={{ textAlign: 'center', order: 1 }}>
+                <div style={{ fontSize: 40 }}>🥈</div>
+                <div style={{
+                  background: '#e5e7eb',
+                  padding: '20px 24px',
+                  borderRadius: '12px 12px 0 0',
+                  minWidth: 100,
+                  height: 80
+                }}>
+                  <div style={{ fontWeight: 'bold', color: '#374151', fontSize: 14 }}>{standings[1].entry_name}</div>
+                  <div style={{ color: '#6b7280', fontSize: 20, fontWeight: 'bold' }}>{standings[1].total_points}</div>
+                </div>
+              </div>
+            )}
+            
+            {/* Gold - 1st position */}
+            {standings[0] && (
+              <div style={{ textAlign: 'center', order: 2 }}>
+                <div style={{ fontSize: 48 }}>🥇</div>
+                <div style={{
+                  background: '#fef3c7',
+                  padding: '24px 32px',
+                  borderRadius: '12px 12px 0 0',
+                  minWidth: 120,
+                  height: 100,
+                  border: '3px solid #f59e0b'
+                }}>
+                  <div style={{ fontWeight: 'bold', color: '#92400e', fontSize: 16 }}>{standings[0].entry_name}</div>
+                  <div style={{ color: '#d97706', fontSize: 28, fontWeight: 'bold' }}>{standings[0].total_points}</div>
+                </div>
+              </div>
+            )}
+            
+            {/* Bronze - 3rd position */}
+            {standings[2] && (
+              <div style={{ textAlign: 'center', order: 3 }}>
+                <div style={{ fontSize: 36 }}>🥉</div>
+                <div style={{
+                  background: '#fed7aa',
+                  padding: '16px 20px',
+                  borderRadius: '12px 12px 0 0',
+                  minWidth: 90,
+                  height: 60
+                }}>
+                  <div style={{ fontWeight: 'bold', color: '#9a3412', fontSize: 13 }}>{standings[2].entry_name}</div>
+                  <div style={{ color: '#c2410c', fontSize: 18, fontWeight: 'bold' }}>{standings[2].total_points}</div>
+                </div>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* Full Standings Table */}
       <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 24 }}>
         <thead>
           <tr style={{ background: '#f0f0f0' }}>
             <th style={{ padding: 12, textAlign: 'left' }}>Rank</th>
             <th style={{ padding: 12, textAlign: 'left' }}>Entry Name</th>
+            {Object.keys(championStatus).length > 0 && remainingMatchups > 0 && (
+              <th style={{ padding: 12, textAlign: 'center' }}>Status</th>
+            )}
             <th style={{ padding: 12, textAlign: 'right' }}>Points</th>
           </tr>
         </thead>
         <tbody>
-          {standings?.map((entry, idx) => (
-            <tr
-              key={entry.entry_id}
-              style={{
-                borderBottom: '1px solid #ddd',
-                background: idx % 2 === 0 ? 'white' : '#f9f9f9'
-              }}
-            >
-              <td style={{ padding: 12 }}>
-                {entry.rank === 1 ? '👑' : ''} #{entry.rank}
-              </td>
-              <td style={{ padding: 12, fontWeight: entry.rank <= 3 ? 'bold' : 'normal' }}>
-                {entry.entry_name}
-              </td>
-              <td style={{ padding: 12, textAlign: 'right' }}>
-                {entry.total_points}
-              </td>
-            </tr>
-          ))}
+          {standings?.map((entry, idx) => {
+            const status = championStatus[entry.entry_id]
+            const medal = entry.rank === 1 ? '🥇' : entry.rank === 2 ? '🥈' : entry.rank === 3 ? '🥉' : ''
+            
+            return (
+              <tr
+                key={entry.entry_id}
+                style={{
+                  borderBottom: '1px solid #ddd',
+                  background: entry.rank === 1 ? '#fefce8' : 
+                             entry.rank === 2 ? '#f9fafb' : 
+                             entry.rank === 3 ? '#fff7ed' : 
+                             idx % 2 === 0 ? 'white' : '#f9f9f9'
+                }}
+              >
+                <td style={{ padding: 12 }}>
+                  {medal} #{entry.rank}
+                </td>
+                <td style={{ padding: 12, fontWeight: entry.rank <= 3 ? 'bold' : 'normal' }}>
+                  {entry.entry_name}
+                </td>
+                {Object.keys(championStatus).length > 0 && remainingMatchups > 0 && (
+                  <td style={{ padding: 12, textAlign: 'center' }}>
+                    {status?.isEliminated ? (
+                      <span style={{
+                        padding: '4px 10px',
+                        background: '#fee2e2',
+                        color: '#dc2626',
+                        borderRadius: 12,
+                        fontSize: 12,
+                        fontWeight: 600
+                      }}>
+                        ❌ Eliminated
+                      </span>
+                    ) : status?.aliveCount > 0 ? (
+                      <span style={{
+                        padding: '4px 10px',
+                        background: '#dcfce7',
+                        color: '#16a34a',
+                        borderRadius: 12,
+                        fontSize: 12,
+                        fontWeight: 600
+                      }}>
+                        🟢 {status.aliveCount} alive
+                      </span>
+                    ) : (
+                      <span style={{ color: '#9ca3af', fontSize: 12 }}>—</span>
+                    )}
+                  </td>
+                )}
+                <td style={{ padding: 12, textAlign: 'right', fontWeight: entry.rank <= 3 ? 'bold' : 'normal' }}>
+                  {entry.total_points}
+                </td>
+              </tr>
+            )
+          })}
         </tbody>
       </table>
 
@@ -266,6 +554,111 @@ export default async function StandingsPage({ params }) {
         <p style={{ textAlign: 'center', marginTop: 24, color: '#666' }}>
           No entries yet
         </p>
+      )}
+
+      {/* Path to Victory Section */}
+      {isLocked && pathToVictory.length > 0 && remainingMatchups > 0 && (
+        <div style={{ marginTop: 48 }}>
+          <h2 style={{ fontSize: '20px', marginBottom: 8 }}>🛤️ Path to Victory</h2>
+          <p style={{ color: '#666', fontSize: 14, marginBottom: 24 }}>
+            {remainingMatchups} matchup{remainingMatchups !== 1 ? 's' : ''} remaining
+          </p>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {pathToVictory.map((pv, idx) => (
+              <div
+                key={pv.entry_id}
+                style={{
+                  padding: 16,
+                  background: pv.status === 'clinched' ? '#dcfce7' :
+                             pv.status === 'leading' ? '#fefce8' :
+                             pv.status === 'eliminated' ? '#fee2e2' :
+                             '#f9fafb',
+                  borderRadius: 8,
+                  border: pv.status === 'clinched' ? '2px solid #22c55e' :
+                         pv.status === 'leading' ? '2px solid #eab308' :
+                         '1px solid #e5e7eb'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <span style={{ 
+                      fontWeight: 600, 
+                      fontSize: 16,
+                      color: pv.status === 'eliminated' ? '#9ca3af' : '#374151'
+                    }}>
+                      {idx === 0 ? '👑 ' : ''}{pv.entry_name}
+                    </span>
+                    <span style={{ 
+                      marginLeft: 12, 
+                      fontSize: 13,
+                      color: pv.status === 'clinched' ? '#16a34a' :
+                             pv.status === 'leading' ? '#ca8a04' :
+                             pv.status === 'eliminated' ? '#dc2626' :
+                             '#6b7280'
+                    }}>
+                      {pv.message}
+                    </span>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: 12, color: '#9ca3af' }}>Max possible</div>
+                    <div style={{ 
+                      fontWeight: 'bold', 
+                      fontSize: 18,
+                      color: pv.canWin ? '#374151' : '#9ca3af'
+                    }}>
+                      {pv.maxTotal} pts
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Potential points bar */}
+                {pv.potentialPoints > 0 && (
+                  <div style={{ marginTop: 12 }}>
+                    <div style={{ 
+                      fontSize: 11, 
+                      color: '#6b7280', 
+                      marginBottom: 4 
+                    }}>
+                      +{pv.potentialPoints} potential points remaining
+                    </div>
+                    <div style={{
+                      height: 6,
+                      background: '#e5e7eb',
+                      borderRadius: 3,
+                      overflow: 'hidden'
+                    }}>
+                      <div style={{
+                        height: '100%',
+                        width: `${Math.min(100, (pv.potentialPoints / (pathToVictory[0]?.potentialPoints || pv.potentialPoints)) * 100)}%`,
+                        background: pv.canWin ? '#3b82f6' : '#9ca3af',
+                        borderRadius: 3
+                      }} />
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Scenario Simulator */}
+      {isLocked && remainingMatchups > 0 && simulatorMatchups.length > 0 && (
+        <ScenarioSimulator
+          matchups={simulatorMatchups.map(m => ({
+            id: m.id,
+            round_id: m.round_id,
+            round: { name: simulatorRoundNames[m.round_id] || 'Round' },
+            team_a: m.team_a,
+            team_b: m.team_b,
+            winner_team_id: m.winner_team_id
+          }))}
+          entries={standings?.map(s => ({ id: s.entry_id, entry_name: s.entry_name })) || []}
+          currentStandings={standings}
+          roundPoints={simulatorRoundPoints}
+          bracketPicks={allBracketPicks}
+        />
       )}
 
       {/* Popular Picks Section (Pick-One/Hybrid) */}
