@@ -11,10 +11,14 @@ export default function ScenarioSimulator({
 }) {
   const [hypotheticalWinners, setHypotheticalWinners] = useState({})
   
-  // Get undecided matchups
-  const undecidedMatchups = matchups?.filter(m => !m.winner_team_id) || []
+  // Filter matchups: only show undecided games where BOTH teams are known (not TBD)
+  const simulatableMatchups = matchups?.filter(m => 
+    !m.winner_team_id && // Not already decided
+    m.team_a?.id && // Team A is known
+    m.team_b?.id    // Team B is known
+  ) || []
   
-  if (undecidedMatchups.length === 0) {
+  if (simulatableMatchups.length === 0) {
     return null
   }
 
@@ -77,6 +81,20 @@ export default function ScenarioSimulator({
     setHypotheticalWinners({})
   }
 
+  // Group matchups by round for better organization
+  const matchupsByRound = {}
+  simulatableMatchups.forEach(m => {
+    const roundName = m.round?.name || 'Round'
+    if (!matchupsByRound[roundName]) {
+      matchupsByRound[roundName] = {
+        name: roundName,
+        points: roundPoints[m.round_id] || 0,
+        matchups: []
+      }
+    }
+    matchupsByRound[roundName].matchups.push(m)
+  })
+
   return (
     <div style={{ marginTop: 48 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
@@ -103,77 +121,97 @@ export default function ScenarioSimulator({
         )}
       </div>
 
-      {/* Matchup Selector */}
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
-        gap: 12,
-        marginBottom: 24
-      }}>
-        {undecidedMatchups.map(matchup => {
-          const selectedTeam = hypotheticalWinners[matchup.id]
+      {/* Matchup Selector - grouped by round */}
+      {Object.values(matchupsByRound).map(round => (
+        <div key={round.name} style={{ marginBottom: 24 }}>
+          <div style={{ 
+            fontSize: 14, 
+            fontWeight: 600, 
+            color: '#374151', 
+            marginBottom: 12,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}>
+            <span>{round.name}</span>
+            <span style={{
+              fontSize: 12,
+              background: '#e0f2fe',
+              color: '#0369a1',
+              padding: '4px 10px',
+              borderRadius: 12
+            }}>
+              {round.points} pts each
+            </span>
+          </div>
           
-          return (
-            <div
-              key={matchup.id}
-              style={{
-                padding: 12,
-                background: '#f9fafb',
-                borderRadius: 8,
-                border: selectedTeam ? '2px solid #3b82f6' : '1px solid #e5e7eb'
-              }}
-            >
-              <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 8 }}>
-                {matchup.round?.name || 'Round'} • {roundPoints[matchup.round_id] || 0} pts
-              </div>
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
+            gap: 12
+          }}>
+            {round.matchups.map(matchup => {
+              const selectedTeam = hypotheticalWinners[matchup.id]
               
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {/* Team A */}
-                <button
-                  onClick={() => toggleWinner(matchup.id, matchup.team_a?.id)}
+              return (
+                <div
+                  key={matchup.id}
                   style={{
-                    padding: '8px 12px',
-                    background: selectedTeam === matchup.team_a?.id ? '#3b82f6' : 'white',
-                    color: selectedTeam === matchup.team_a?.id ? 'white' : '#374151',
-                    border: '1px solid #d1d5db',
-                    borderRadius: 6,
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                    fontSize: 14,
-                    fontWeight: selectedTeam === matchup.team_a?.id ? 600 : 400
+                    padding: 12,
+                    background: '#f9fafb',
+                    borderRadius: 8,
+                    border: selectedTeam ? '2px solid #3b82f6' : '1px solid #e5e7eb'
                   }}
                 >
-                  {matchup.team_a?.seed && `#${matchup.team_a.seed} `}
-                  {matchup.team_a?.name || 'TBD'}
-                  {selectedTeam === matchup.team_a?.id && ' ✓'}
-                </button>
-                
-                <div style={{ textAlign: 'center', fontSize: 11, color: '#9ca3af' }}>vs</div>
-                
-                {/* Team B */}
-                <button
-                  onClick={() => toggleWinner(matchup.id, matchup.team_b?.id)}
-                  style={{
-                    padding: '8px 12px',
-                    background: selectedTeam === matchup.team_b?.id ? '#3b82f6' : 'white',
-                    color: selectedTeam === matchup.team_b?.id ? 'white' : '#374151',
-                    border: '1px solid #d1d5db',
-                    borderRadius: 6,
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                    fontSize: 14,
-                    fontWeight: selectedTeam === matchup.team_b?.id ? 600 : 400
-                  }}
-                >
-                  {matchup.team_b?.seed && `#${matchup.team_b.seed} `}
-                  {matchup.team_b?.name || 'TBD'}
-                  {selectedTeam === matchup.team_b?.id && ' ✓'}
-                </button>
-              </div>
-            </div>
-          )
-        })}
-      </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {/* Team A */}
+                    <button
+                      onClick={() => toggleWinner(matchup.id, matchup.team_a?.id)}
+                      style={{
+                        padding: '8px 12px',
+                        background: selectedTeam === matchup.team_a?.id ? '#3b82f6' : 'white',
+                        color: selectedTeam === matchup.team_a?.id ? 'white' : '#374151',
+                        border: '1px solid #d1d5db',
+                        borderRadius: 6,
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        fontSize: 14,
+                        fontWeight: selectedTeam === matchup.team_a?.id ? 600 : 400
+                      }}
+                    >
+                      {matchup.team_a?.seed && `#${matchup.team_a.seed} `}
+                      {matchup.team_a?.name || 'TBD'}
+                      {selectedTeam === matchup.team_a?.id && ' ✓'}
+                    </button>
+                    
+                    <div style={{ textAlign: 'center', fontSize: 11, color: '#9ca3af' }}>vs</div>
+                    
+                    {/* Team B */}
+                    <button
+                      onClick={() => toggleWinner(matchup.id, matchup.team_b?.id)}
+                      style={{
+                        padding: '8px 12px',
+                        background: selectedTeam === matchup.team_b?.id ? '#3b82f6' : 'white',
+                        color: selectedTeam === matchup.team_b?.id ? 'white' : '#374151',
+                        border: '1px solid #d1d5db',
+                        borderRadius: 6,
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        fontSize: 14,
+                        fontWeight: selectedTeam === matchup.team_b?.id ? 600 : 400
+                      }}
+                    >
+                      {matchup.team_b?.seed && `#${matchup.team_b.seed} `}
+                      {matchup.team_b?.name || 'TBD'}
+                      {selectedTeam === matchup.team_b?.id && ' ✓'}
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      ))}
 
       {/* Hypothetical Standings */}
       {hasSelections && (

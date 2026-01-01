@@ -51,11 +51,17 @@ export async function POST(request) {
       return NextResponse.json({ error: eventError.message }, { status: 500 })
     }
 
-    // Clone categories and options
+    let clonedCounts = {
+      categories: 0,
+      rounds: 0,
+      teams: 0,
+      matchups: 0
+    }
+
+    // Clone categories and options (for pick-one/hybrid events)
     const sortedCategories = (sourceEvent.categories || []).sort((a, b) => a.order_index - b.order_index)
 
     for (const category of sortedCategories) {
-      // Create category
       const { data: newCategory, error: catError } = await supabase
         .from('categories')
         .insert({
@@ -63,7 +69,6 @@ export async function POST(request) {
           name: category.name,
           type: category.type,
           order_index: category.order_index
-          // phase_id intentionally omitted - phases need manual setup
         })
         .select()
         .single()
@@ -73,28 +78,103 @@ export async function POST(request) {
         continue
       }
 
-      // Create options (without is_correct)
+      clonedCounts.categories++
+
       const options = (category.options || []).map(opt => ({
         category_id: newCategory.id,
         name: opt.name,
-        is_correct: null // Fresh - no results
+        is_correct: null
       }))
 
       if (options.length > 0) {
-        const { error: optError } = await supabase
-          .from('category_options')
-          .insert(options)
+        await supabase.from('category_options').insert(options)
+      }
+    }
 
-        if (optError) {
-          console.error('Error creating options:', optError)
+    // Clone rounds (for bracket events)
+    const { data: sourceRounds } = await supabase
+      .from('rounds')
+      .select('*')
+      .eq('event_id', eventId)
+      .order('round_order')
+
+    const roundIdMap = {}
+
+    if (sourceRounds && sourceRounds.length > 0) {
+      for (const round of sourceRounds) {
+        const { data: newRound } = await supabase
+          .from('rounds')
+          .insert({
+            event_id: newEvent.id,
+            name: round.name,
+            round_order: round.round_order,
+            points: round.points
+          })
+          .select()
+          .single()
+        
+        if (newRound) {
+          roundIdMap[round.id] = newRound.id
+          clonedCounts.rounds++
         }
+      }
+    }
+
+    // Clone teams
+    const { data: sourceTeams } = await supabase
+      .from('teams')
+      .select('*')
+      .eq('event_id', eventId)
+      .order('seed')
+
+    const teamIdMap = {}
+
+    if (sourceTeams && sourceTeams.length > 0) {
+      for (const team of sourceTeams) {
+        const { data: newTeam } = await supabase
+          .from('teams')
+          .insert({
+            event_id: newEvent.id,
+            name: team.name,
+            seed: team.seed,
+            region: team.region
+          })
+          .select()
+          .single()
+        
+        if (newTeam) {
+          teamIdMap[team.id] = newTeam.id
+          clonedCounts.teams++
+        }
+      }
+    }
+
+    // Clone matchups (without results)
+    const { data: sourceMatchups } = await supabase
+      .from('matchups')
+      .select('*')
+      .eq('event_id', eventId)
+
+    if (sourceMatchups && sourceMatchups.length > 0) {
+      for (const matchup of sourceMatchups) {
+        await supabase
+          .from('matchups')
+          .insert({
+            event_id: newEvent.id,
+            round_id: roundIdMap[matchup.round_id] || null,
+            team_a_id: teamIdMap[matchup.team_a_id] || null,
+            team_b_id: teamIdMap[matchup.team_b_id] || null,
+            winner_team_id: null,
+            matchup_order: matchup.matchup_order
+          })
+        clonedCounts.matchups++
       }
     }
 
     return NextResponse.json({ 
       success: true, 
       event: newEvent,
-      categoriesCloned: sortedCategories.length
+      cloned: clonedCounts
     })
 
   } catch (error) {

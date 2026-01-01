@@ -216,6 +216,67 @@ export default function RoundsAdminPage({ params }) {
         </Link>
       </div>
 
+      {/* Shortcuts */}
+      <div style={{ 
+        display: 'flex', 
+        gap: 12, 
+        marginBottom: 24,
+        flexWrap: 'wrap'
+      }}>
+        <Link
+          href={`/admin/events/${eventId}/clone`}
+          style={{
+            padding: '8px 16px',
+            background: '#dbeafe',
+            color: '#1d4ed8',
+            borderRadius: 6,
+            textDecoration: 'none',
+            fontSize: 14
+          }}
+        >
+          📋 Clone Event
+        </Link>
+        <Link
+          href={`/admin/events/${eventId}/import-bracket`}
+          style={{
+            padding: '8px 16px',
+            background: '#dcfce7',
+            color: '#166534',
+            borderRadius: 6,
+            textDecoration: 'none',
+            fontSize: 14
+          }}
+        >
+          📥 Import Teams (CSV)
+        </Link>
+        <Link
+          href={`/admin/events/${eventId}/categories`}
+          style={{
+            padding: '8px 16px',
+            background: '#fef3c7',
+            color: '#92400e',
+            borderRadius: 6,
+            textDecoration: 'none',
+            fontSize: 14
+          }}
+        >
+          📝 Categories
+        </Link>
+        <Link
+          href={`/admin/events/${eventId}/results`}
+          style={{
+            padding: '8px 16px',
+            background: '#fee2e2',
+            color: '#b91c1c',
+            borderRadius: 6,
+            textDecoration: 'none',
+            fontSize: 14
+          }}
+        >
+          🏆 Results
+        </Link>
+      </div>
+
       {/* Add Round Form */}
       <div style={{ 
         padding: 20, 
