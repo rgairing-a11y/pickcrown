@@ -8,6 +8,7 @@ import { CONFERENCE_COLORS } from '../lib/constants'
 
 export default function BracketPickForm({ pool, rounds, matchups, teams }) {
   const [entryName, setEntryName] = useState('')
+  const [displayName, setDisplayName] = useState('')
   const [email, setEmail] = useState('')
   const [tieBreaker, setTieBreaker] = useState('')
   const [picks, setPicks] = useState({}) // matchup_id -> team_id
@@ -85,6 +86,7 @@ export default function BracketPickForm({ pool, rounds, matchups, teams }) {
         .insert({
           pool_id: pool.id,
           entry_name: entryName.trim(),
+          display_name: displayName.trim() || null,
           email: email.toLowerCase().trim(),
           tie_breaker_value: requiresTiebreaker ? parseInt(tieBreaker) : null
         })
@@ -169,13 +171,22 @@ export default function BracketPickForm({ pool, rounds, matchups, teams }) {
           />
         </FormField>
 
-        <FormField label="Email" required>
+        <FormField label="Email" required hint="For reminders and results">
           <input
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="your@email.com"
             required
+          />
+        </FormField>
+
+        <FormField label="What should we call you?" hint="This appears on standings">
+          <input
+            type="text"
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
+            placeholder={email ? email.split('@')[0] : 'Your name'}
           />
         </FormField>
 

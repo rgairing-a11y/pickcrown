@@ -387,6 +387,17 @@ export default async function StandingsPage({ params }) {
           </Link>
         )}
 
+        {/* My Picks first */}
+        {isLocked && simulatorMatchups.length > 0 && (
+          <MyPicksButton
+            poolEntries={myPicksEntries}
+            bracketPicks={allBracketPicks}
+            matchups={simulatorMatchups}
+            roundNames={simulatorRoundNames}
+          />
+        )}
+
+        {/* All Picks second */}
         {isLocked && (
           <Link
             href={`/pool/${poolId}/picks`}
@@ -402,31 +413,6 @@ export default async function StandingsPage({ params }) {
           >
             📊 View All Picks
           </Link>
-        )}
-
-        <a
-          href={`/api/pools/${poolId}/export`}
-          download
-          style={{
-            display: 'inline-block',
-            padding: '12px 20px',
-            background: '#6b7280',
-            color: '#fff',
-            borderRadius: 8,
-            textDecoration: 'none',
-            fontWeight: 'bold'
-          }}
-        >
-          📥 Export CSV
-        </a>
-
-        {isLocked && simulatorMatchups.length > 0 && (
-          <MyPicksButton
-            poolEntries={myPicksEntries}
-            bracketPicks={allBracketPicks}
-            matchups={simulatorMatchups}
-            roundNames={simulatorRoundNames}
-          />
         )}
       </div>
 

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
+import EntriesList from '../components/EntriesList'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -37,7 +38,7 @@ export default function HomePage() {
   async function loadUserData(userEmail) {
     setLoading(true)
 
-    // 1. Get user's entries
+    // 1. Get user's entries with season info
     const { data: entriesData } = await supabase
       .from('pool_entries')
       .select(`
@@ -46,7 +47,15 @@ export default function HomePage() {
           id,
           name,
           owner_email,
-          event:events(id, name, year, start_time, status)
+          event:events(
+            id, 
+            name, 
+            year, 
+            start_time, 
+            status,
+            season_id,
+            season:seasons(id, name, description)
+          )
         )
       `)
       .ilike('email', userEmail)
@@ -267,7 +276,7 @@ export default function HomePage() {
       </div>
 
       {/* ==========================================
-          SECTION 1: Your Entries
+          SECTION 1: Your Entries (Season-First)
           ========================================== */}
       <div style={{ marginBottom: 40 }}>
         <h2 style={{ fontSize: 20, marginBottom: 16 }}>🎯 Your Entries</h2>
@@ -288,70 +297,7 @@ export default function HomePage() {
             </p>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {entries.map(entry => {
-              const locked = isLocked(entry.pool?.event?.start_time)
-              return (
-                <div
-                  key={entry.id}
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    padding: 16,
-                    background: locked ? '#f8fafc' : '#f0fdf4',
-                    borderRadius: 8,
-                    border: `1px solid ${locked ? '#e2e8f0' : '#bbf7d0'}`
-                  }}
-                >
-                  <div>
-                    <h3 style={{ margin: 0, fontSize: 16 }}>{entry.pool?.name}</h3>
-                    <p style={{ margin: '4px 0 0', fontSize: 13, color: '#666' }}>
-                      {entry.pool?.event?.name} ({entry.pool?.event?.year})
-                      <span style={{ marginLeft: 8, color: locked ? '#dc2626' : '#16a34a' }}>
-                        {locked ? '🔒 Locked' : '🟢 Open'}
-                      </span>
-                    </p>
-                    <p style={{ margin: '4px 0 0', fontSize: 12, color: '#999' }}>
-                      Entry: {entry.entry_name}
-                    </p>
-                  </div>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    {!locked && (
-                      <Link
-                        href={`/pool/${entry.pool?.id}`}
-                        style={{
-                          padding: '8px 16px',
-                          background: '#16a34a',
-                          color: 'white',
-                          borderRadius: 6,
-                          textDecoration: 'none',
-                          fontWeight: 600,
-                          fontSize: 14
-                        }}
-                      >
-                        Enter Picks
-                      </Link>
-                    )}
-                    <Link
-                      href={`/pool/${entry.pool?.id}/standings`}
-                      style={{
-                        padding: '8px 16px',
-                        background: '#3b82f6',
-                        color: 'white',
-                        borderRadius: 6,
-                        textDecoration: 'none',
-                        fontWeight: 600,
-                        fontSize: 14
-                      }}
-                    >
-                      Standings
-                    </Link>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
+          <EntriesList entries={entries} isLocked={isLocked} />
         )}
       </div>
 
@@ -493,14 +439,8 @@ export default function HomePage() {
           <Link href="/commissioner/signup" style={{ color: '#7c3aed', fontWeight: 600 }}>
             👑 Become a Commissioner
           </Link>
-          <Link href="/feedback" style={{ color: '#3b82f6' }}>
-            💡 Feedback
-          </Link>
-          <Link href="/find-my-picks" style={{ color: '#3b82f6' }}>
-            🔍 Find My Picks
-          </Link>
-          <Link href="/admin" style={{ color: '#64748b' }}>
-            Admin
+          <Link href="/about" style={{ color: '#6b7280' }}>
+            About PickCrown
           </Link>
         </div>
         <p style={{ marginTop: 16, fontSize: 12, color: '#94a3b8' }}>

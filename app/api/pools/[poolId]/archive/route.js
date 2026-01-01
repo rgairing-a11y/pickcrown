@@ -1,13 +1,15 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+)
 
 export async function PATCH(request, { params }) {
   try {
-    const supabase = createClient()
-    const { poolId } = params
+    const { poolId } = await params
     const { status } = await request.json()
-    
-    const actorEmail = request.headers.get('x-user-email') || 'system'
     
     // Update pool status
     const { error } = await supabase
@@ -15,23 +17,13 @@ export async function PATCH(request, { params }) {
       .update({ status })
       .eq('id', poolId)
     
-    if (error) throw error
-    
-    // Log the action
-    await supabase.rpc('log_audit_event', {
-      p_action: status === 'archived' ? 'archive_pool' : 'unarchive_pool',
-      p_actor_email: actorEmail,
-      p_target_type: 'pool',
-      p_target_id: poolId,
-      p_metadata: { new_status: status }
-    })
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
     
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Error updating pool status:', error)
-    return NextResponse.json(
-      { error: 'Failed to update pool status' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Failed to update pool status' }, { status: 500 })
   }
 }

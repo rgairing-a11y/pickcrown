@@ -10,6 +10,7 @@ const supabase = createClient(
 
 export default function PickSubmissionForm({ pool }) {
   const [entryName, setEntryName] = useState('')
+  const [displayName, setDisplayName] = useState('')
   const [email, setEmail] = useState('')
   const [tieBreaker, setTieBreaker] = useState('')
   const [picks, setPicks] = useState({})
@@ -47,6 +48,7 @@ export default function PickSubmissionForm({ pool }) {
         if (entry) {
           setExistingEntry(entry)
           setEntryName(entry.entry_name)
+          setDisplayName(entry.display_name || '')
           setTieBreaker(entry.tie_breaker_value?.toString() || '')
           setIsEditMode(true)
 
@@ -99,6 +101,7 @@ export default function PickSubmissionForm({ pool }) {
         const { error: updateError } = await supabase
           .from('pool_entries')
           .update({
+            display_name: displayName.trim() || null,
             tie_breaker_value: requiresTiebreaker ? parseInt(tieBreaker) : null
           })
           .eq('id', existingEntry.id)
@@ -124,6 +127,7 @@ export default function PickSubmissionForm({ pool }) {
           .insert({
             pool_id: pool.id,
             entry_name: entryName.trim(),
+            display_name: displayName.trim() || null,
             email: email.toLowerCase().trim(),
             tie_breaker_value: requiresTiebreaker ? parseInt(tieBreaker) : null
           })
@@ -279,9 +283,29 @@ export default function PickSubmissionForm({ pool }) {
             background: isEditMode ? '#f3f4f6' : 'white'
           }}
         />
-        {isEditMode && (
-          <small style={{ color: '#666' }}>Email cannot be changed</small>
-        )}
+        <small style={{ color: '#666' }}>We'll use this for reminders and results</small>
+      </div>
+
+      <div style={{ marginBottom: 16 }}>
+        <label
+          style={{ display: 'block', marginBottom: 8, fontWeight: 'bold' }}
+        >
+          What should we call you?
+        </label>
+        <input
+          type="text"
+          value={displayName}
+          onChange={(e) => setDisplayName(e.target.value)}
+          placeholder={email ? email.split('@')[0] : 'Your name'}
+          style={{
+            width: '100%',
+            padding: 12,
+            fontSize: 16,
+            border: '1px solid #ccc',
+            borderRadius: 4
+          }}
+        />
+        <small style={{ color: '#666' }}>This is how you'll appear on standings</small>
       </div>
 
       {requiresTiebreaker && (
