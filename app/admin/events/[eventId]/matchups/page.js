@@ -243,8 +243,12 @@ export default function MatchupsAdminPage({ params }) {
               </h3>
               
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {roundMatchups.map(matchup => (
+                {roundMatchups.map((matchup, idx) => (
                   <div key={matchup.id} style={{ padding: 16, background: '#f9fafb', borderRadius: 8, border: '1px solid #e5e7eb' }}>
+                    <div style={{ fontSize: 11, color: '#666', marginBottom: 8 }}>
+                      <strong>Position {matchup.bracket_position || idx + 1}</strong>
+                      {round.round_order && ` → Winner advances to Round ${round.round_order + 1}, Position ${Math.ceil((matchup.bracket_position || idx + 1) / 2)}`}
+                    </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                       <button
                         onClick={() => handleSetWinner(matchup.id, matchup.team_a?.id)}
