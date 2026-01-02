@@ -1,317 +1,134 @@
-'use client'
-
-import { useState, useEffect } from 'react'
-import { supabase } from '../../lib/supabase'
 import Link from 'next/link'
-import { Card, PageHeader, Button, EmptyState, LoadingState } from '../../components/ui'
-import { isEventLocked, getPoolUrl, copyToClipboard } from '../../lib/utils'
 
-export default function AdminHome() {
-  const [events, setEvents] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [expandedEvents, setExpandedEvents] = useState({})
-
-  useEffect(() => {
-    loadData()
-  }, [])
-
-  async function loadData() {
-    const { data: eventsData } = await supabase
-      .from('events')
-      .select(`
-        *,
-        pools (*),
-        categories (id),
-        teams (id),
-        rounds (id),
-        matchups (id)
-      `)
-      .order('start_time', { ascending: false })
-
-    setEvents(eventsData || [])
-    
-    const expanded = {}
-    eventsData?.forEach(e => expanded[e.id] = true)
-    setExpandedEvents(expanded)
-    
-    setLoading(false)
-  }
-
-  function toggleExpand(eventId) {
-    setExpandedEvents(prev => ({
-      ...prev,
-      [eventId]: !prev[eventId]
-    }))
-  }
-
-  async function handleDeleteEvent(eventId) {
-    if (!confirm('Delete this event, all its categories, and all its pools?')) return
-    await supabase.from('events').delete().eq('id', eventId)
-    loadData()
-  }
-
-  async function handleDeletePool(poolId) {
-    if (!confirm('Delete this pool and all its entries?')) return
-    await supabase.from('pools').delete().eq('id', poolId)
-    loadData()
-  }
-
-  function handleCopyPoolLink(poolId) {
-    copyToClipboard(getPoolUrl(poolId), () => alert('Link copied to clipboard!'))
-  }
-
-  // Get stats based on event type
-  function getEventStats(event) {
-    if (event.event_type === 'bracket') {
-      return {
-        primary: `${event.teams?.length || 0} teams`,
-        secondary: `${event.matchups?.length || 0} matchups`
-      }
-    } else {
-      return {
-        primary: `${event.categories?.length || 0} categories`,
-        secondary: null
-      }
-    }
-  }
-
-  // Get event type badge
-  function getTypeBadge(eventType) {
-    switch (eventType) {
-      case 'bracket':
-        return { label: '🏆 Bracket', color: '#f59e0b', bg: '#fef3c7' }
-      case 'pick_one':
-        return { label: '📋 Pick One', color: '#3b82f6', bg: '#dbeafe' }
-      case 'hybrid':
-        return { label: '🔀 Hybrid', color: '#8b5cf6', bg: '#ede9fe' }
-      default:
-        return { label: eventType, color: '#666', bg: '#f3f4f6' }
-    }
-  }
-
-  if (loading) {
-    return <LoadingState message="Loading events..." />
-  }
-
+export default function AboutPage() {
   return (
-    <div>
-      <PageHeader
-        title="👑 Admin Dashboard"
-        backLink={null}
-        actions={
-          <div style={{ display: 'flex', gap: 12 }}>
-            <Button href="/admin/seasons" variant="secondary">
-              🏆 Seasons
-            </Button>
-            <Button href="/admin/audit-log" variant="secondary">
-              📋 Audit Log
-            </Button>
-            <Button href="/admin/events/new" variant="success">
-              + New Event
-            </Button>
-          </div>
-        }
-      />
+    <div style={{ maxWidth: 700, margin: '0 auto', padding: 24 }}>
+      <h1 style={{ fontSize: 32, marginBottom: 8 }}>👑 What is PickCrown?</h1>
+      
+      <p style={{ fontSize: 18, color: '#555', marginBottom: 32, lineHeight: 1.6 }}>
+        PickCrown is the easiest way to run a private prediction pool with people you already know.
+        <br /><br />
+        No accounts. No ads. No pressure.
+      </p>
 
-      {events.length === 0 ? (
-        <Card>
-          <EmptyState
-            icon="📅"
-            title="No events yet"
-            description="Create your first event to get started"
-            actionLabel="Create Event"
-            actionHref="/admin/events/new"
-          />
-        </Card>
-      ) : (
-        events.map(event => {
-          const isExpanded = expandedEvents[event.id]
-          const locked = isEventLocked(event.start_time)
-          const poolCount = event.pools?.length || 0
-          const stats = getEventStats(event)
-          const typeBadge = getTypeBadge(event.event_type)
-          const isBracket = event.event_type === 'bracket'
+      <div style={{ marginBottom: 48 }}>
+        <h2 style={{ fontSize: 20, marginBottom: 16 }}>How it works</h2>
+        <ol style={{ fontSize: 16, color: '#444', lineHeight: 1.8, paddingLeft: 24 }}>
+          <li>Someone creates a pool for an event and shares a private link</li>
+          <li>You submit your picks before the event locks</li>
+          <li>Results are entered once, standings update automatically</li>
+        </ol>
+      </div>
 
-          return (
-            <Card key={event.id} style={{ marginBottom: 'var(--spacing-lg)', padding: 0 }}>
-              {/* Event Header */}
-              <div 
-                onClick={() => toggleExpand(event.id)}
-                style={{
-                  padding: 'var(--spacing-lg)',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  borderBottom: isExpanded ? '1px solid var(--color-border-light)' : 'none'
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)' }}>
-                  <span style={{ 
-                    fontSize: 'var(--font-size-xl)',
-                    transition: 'transform 0.2s',
-                    transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)'
-                  }}>
-                    ▶
-                  </span>
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-xs)' }}>
-                      <h2 style={{ margin: 0, fontSize: 'var(--font-size-xl)' }}>
-                        {event.name}
-                        <span style={{ 
-                          marginLeft: 'var(--spacing-sm)', 
-                          fontSize: 'var(--font-size-md)', 
-                          color: 'var(--color-text-light)',
-                          fontWeight: 'normal'
-                        }}>
-                          {event.year}
-                        </span>
-                      </h2>
-                      <span style={{
-                        fontSize: 'var(--font-size-xs)',
-                        padding: '2px 8px',
-                        borderRadius: '12px',
-                        background: typeBadge.bg,
-                        color: typeBadge.color,
-                        fontWeight: 600
-                      }}>
-                        {typeBadge.label}
-                      </span>
-                    </div>
-                    <div style={{ 
-                      fontSize: 'var(--font-size-sm)', 
-                      color: 'var(--color-text-light)',
-                      display: 'flex',
-                      gap: 'var(--spacing-lg)'
-                    }}>
-                      <span>{stats.primary}</span>
-                      {stats.secondary && <span>{stats.secondary}</span>}
-                      <span>{poolCount} pool{poolCount !== 1 ? 's' : ''}</span>
-                      {locked ? (
-                        <span style={{ color: 'var(--color-danger)' }}>🔒 Locked</span>
-                      ) : (
-                        <span style={{ color: 'var(--color-success)' }}>🟢 Open</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
+      <div style={{ marginBottom: 48 }}>
+        <h2 style={{ fontSize: 20, marginBottom: 16 }}>What makes PickCrown different</h2>
+        
+        <div style={{ marginBottom: 24 }}>
+          <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>🔒 Private by default</h3>
+          <p style={{ color: '#666', margin: 0 }}>
+            Pools are invite-only. There's no public directory and no social pressure.
+          </p>
+        </div>
 
-                <div 
-                  style={{ display: 'flex', gap: 'var(--spacing-sm)', flexWrap: 'wrap' }}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <Button href={`/admin/events/${event.id}/edit`} variant="secondary" size="sm">
-                    Edit
-                  </Button>
-                  
-                  {/* Show different setup buttons based on event type */}
-                  {isBracket ? (
-                    <>
-                      <Button href={`/admin/events/${event.id}/teams`} variant="warning-light" size="sm">
-                        Teams
-                      </Button>
-                      <Button href={`/admin/events/${event.id}/rounds`} variant="warning-light" size="sm">
-                        Rounds
-                      </Button>
-                      <Button href={`/admin/events/${event.id}/matchups`} variant="warning-light" size="sm">
-                        Matchups
-                      </Button>
-                    </>
-                  ) : (
-                    <Button href={`/admin/events/${event.id}/categories`} variant="primary-light" size="sm">
-                      Categories
-                    </Button>
-                  )}
-                  
-                  <Button href={`/admin/events/${event.id}/results`} variant="success-light" size="sm">
-                    Results
-                  </Button>
-                  <Button onClick={() => handleDeleteEvent(event.id)} variant="danger-light" size="sm">
-                    Delete
-                  </Button>
-                </div>
-              </div>
+        <div style={{ marginBottom: 24 }}>
+          <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>😌 Low-stress by design</h3>
+          <p style={{ color: '#666', margin: 0 }}>
+            No live scoring. No trash talk. No push notifications. One reminder. One results email.
+          </p>
+        </div>
 
-              {/* Pools Section (Expanded) */}
-              {isExpanded && (
-                <div style={{ padding: 'var(--spacing-lg)', background: 'var(--color-background)' }}>
-                  <div style={{ 
-                    display: 'flex', 
-                    justifyContent: 'space-between', 
-                    alignItems: 'center',
-                    marginBottom: 'var(--spacing-md)'
-                  }}>
-                    <h3 style={{ margin: 0, fontSize: 'var(--font-size-md)', color: 'var(--color-text-light)' }}>
-                      POOLS
-                    </h3>
-                    <Button href={`/admin/pools/new?eventId=${event.id}`} variant="ghost" size="sm">
-                      + Add Pool
-                    </Button>
-                  </div>
+        <div style={{ marginBottom: 24 }}>
+          <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>🎯 Event-centric, not account-centric</h3>
+          <p style={{ color: '#666', margin: 0 }}>
+            You don't "join PickCrown." You're invited to an event, you make your picks, and you're done.
+          </p>
+        </div>
 
-                  {event.pools?.length === 0 ? (
-                    <div style={{
-                      padding: 'var(--spacing-lg)',
-                      textAlign: 'center',
-                      background: 'var(--color-white)',
-                      borderRadius: 'var(--radius-lg)',
-                      color: 'var(--color-text-muted)'
-                    }}>
-                      No pools yet for this event
-                    </div>
-                  ) : (
-                    event.pools?.map(pool => (
-                      <div 
-                        key={pool.id}
-                        style={{
-                          background: 'var(--color-white)',
-                          padding: 'var(--spacing-lg)',
-                          borderRadius: 'var(--radius-lg)',
-                          marginBottom: 'var(--spacing-sm)',
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          flexWrap: 'wrap',
-                          gap: 'var(--spacing-md)'
-                        }}
-                      >
-                        <div>
-                          <strong>{pool.name}</strong>
-                          <div style={{ marginTop: 'var(--spacing-xs)' }}>
-                            <code style={{ 
-                              fontSize: 'var(--font-size-xs)', 
-                              background: 'var(--color-background-dark)', 
-                              padding: '2px var(--spacing-sm)',
-                              borderRadius: 'var(--radius-sm)',
-                              color: 'var(--color-text-light)'
-                            }}>
-                              /pool/{pool.id}
-                            </code>
-                          </div>
-                        </div>
-                        <div style={{ display: 'flex', gap: 'var(--spacing-sm)', flexWrap: 'wrap' }}>
-                          <Button href={`/pool/${pool.id}/manage`} variant="secondary" size="sm">
-                            Manage
-                          </Button>
-                          <Button onClick={() => handleCopyPoolLink(pool.id)} variant="primary-light" size="sm">
-                            📋 Copy Link
-                          </Button>
-                          <Button href={`/pool/${pool.id}/standings`} variant="secondary" size="sm">
-                            Standings
-                          </Button>
-                          <Button onClick={() => handleDeletePool(pool.id)} variant="danger-light" size="sm">
-                            Delete
-                          </Button>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              )}
-            </Card>
-          )
-        })
-      )}
+        <div style={{ marginBottom: 24 }}>
+          <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>♻️ Built for reuse</h3>
+          <p style={{ color: '#666', margin: 0 }}>
+            Run the same pool next year. Or across a season. Without starting from scratch.
+          </p>
+        </div>
+      </div>
+
+      <div style={{ marginBottom: 48 }}>
+        <h2 style={{ fontSize: 20, marginBottom: 16 }}>What PickCrown is NOT</h2>
+        <ul style={{ fontSize: 16, color: '#666', lineHeight: 1.8, paddingLeft: 24 }}>
+          <li>Not a gambling site</li>
+          <li>Not a social network</li>
+          <li>Not a live scoreboard</li>
+          <li>Not a fantasy sports platform</li>
+        </ul>
+        <p style={{ marginTop: 16, color: '#666' }}>
+          If you're looking for constant updates and competition, this probably isn't for you.
+          <br />
+          If you want something simple, calm, and fun — welcome.
+        </p>
+      </div>
+
+      <div style={{ marginBottom: 48 }}>
+        <h2 style={{ fontSize: 20, marginBottom: 16 }}>FAQ</h2>
+        
+        <div style={{ marginBottom: 20 }}>
+          <h4 style={{ margin: '0 0 4px', fontWeight: 600 }}>Do I need an account?</h4>
+          <p style={{ color: '#666', margin: 0 }}>
+            No. PickCrown uses email-only access. You'll get a link when you join a pool.
+          </p>
+        </div>
+
+        <div style={{ marginBottom: 20 }}>
+          <h4 style={{ margin: '0 0 4px', fontWeight: 600 }}>Can I change my picks?</h4>
+          <p style={{ color: '#666', margin: 0 }}>
+            You can edit picks until the event locks. After that, picks are final.
+          </p>
+        </div>
+
+        <div style={{ marginBottom: 20 }}>
+          <h4 style={{ margin: '0 0 4px', fontWeight: 600 }}>Who enters the results?</h4>
+          <p style={{ color: '#666', margin: 0 }}>
+            An admin enters results once per event. Those results apply to all pools tied to that event.
+          </p>
+        </div>
+
+        <div style={{ marginBottom: 20 }}>
+          <h4 style={{ margin: '0 0 4px', fontWeight: 600 }}>What kinds of events does PickCrown support?</h4>
+          <p style={{ color: '#666', margin: 0 }}>
+            Brackets (playoffs, tournaments), pick-one categories (Oscars, reality TV), hybrid events (wrestling), and multi-phase events (group stage → knockout).
+          </p>
+        </div>
+
+        <div style={{ marginBottom: 20 }}>
+          <h4 style={{ margin: '0 0 4px', fontWeight: 600 }}>Will I get spammed?</h4>
+          <p style={{ color: '#666', margin: 0 }}>
+            No. PickCrown sends one reminder before picks lock and one results email after the event. That's it.
+          </p>
+        </div>
+
+        <div style={{ marginBottom: 20 }}>
+          <h4 style={{ margin: '0 0 4px', fontWeight: 600 }}>Is PickCrown free?</h4>
+          <p style={{ color: '#666', margin: 0 }}>
+            Right now, yes. Any future monetization will never interfere with private pools or participation.
+          </p>
+        </div>
+      </div>
+
+      <div style={{ textAlign: 'center', marginTop: 48 }}>
+        <Link 
+          href="/"
+          style={{
+            display: 'inline-block',
+            padding: '12px 32px',
+            background: '#3b82f6',
+            color: 'white',
+            borderRadius: 8,
+            textDecoration: 'none',
+            fontWeight: 600
+          }}
+        >
+          Get Started →
+        </Link>
+      </div>
     </div>
   )
 }
