@@ -128,60 +128,84 @@ export async function PUT(request) {
 }
 
 // Advance winner to the next round's matchup
+// SUPPORTS BYES: If a slot is already filled (bye team), fills the other slot
 async function advanceWinnerToNextRound(eventId, currentRoundOrder, bracketPosition, winnerTeamId) {
+  console.log(`[ADVANCE] Round ${currentRoundOrder}, Pos ${bracketPosition} -> Winner: ${winnerTeamId}`)
+  
   // Get the next round
-  const { data: nextRound } = await supabase
+  const { data: nextRound, error: nextRoundError } = await supabase
     .from('rounds')
-    .select('id')
+    .select('id, name, round_order')
     .eq('event_id', eventId)
     .eq('round_order', currentRoundOrder + 1)
     .single()
 
-  if (!nextRound) {
-    // No next round - this is the final, nothing to advance
+  if (nextRoundError || !nextRound) {
+    console.log(`[ADVANCE] No next round found (this might be the final)`)
     return
   }
+
+  console.log(`[ADVANCE] Next round: ${nextRound.name} (order: ${nextRound.round_order})`)
 
   // Calculate which matchup in the next round this feeds into
   // Positions 1,2 feed into next round position 1
   // Positions 3,4 feed into next round position 2, etc.
   const nextBracketPosition = Math.ceil(bracketPosition / 2)
   
-  // Odd positions go to team_a, even positions go to team_b
-  const isTeamA = bracketPosition % 2 === 1
+  // Default slot based on odd/even position
+  const defaultIsTeamA = bracketPosition % 2 === 1
 
-  // Find or create the next round matchup
-  let { data: nextMatchup } = await supabase
+  console.log(`[ADVANCE] Looking for Round ${nextRound.round_order}, Position ${nextBracketPosition}`)
+
+  // Find the existing next round matchup
+  const { data: nextMatchup, error: matchupError } = await supabase
     .from('matchups')
     .select('*')
     .eq('round_id', nextRound.id)
     .eq('bracket_position', nextBracketPosition)
     .single()
 
-  if (!nextMatchup) {
-    // Create the next round matchup
-    const { data: created } = await supabase
-      .from('matchups')
-      .insert({
-        event_id: eventId,
-        round_id: nextRound.id,
-        bracket_position: nextBracketPosition,
-        team_a_id: isTeamA ? winnerTeamId : null,
-        team_b_id: isTeamA ? null : winnerTeamId
-      })
-      .select()
-      .single()
-    nextMatchup = created
+  if (matchupError || !nextMatchup) {
+    console.log(`[ADVANCE] WARNING: No matchup found at Round ${nextRound.round_order}, Position ${nextBracketPosition}`)
+    console.log(`[ADVANCE] You need to create empty matchups in later rounds first!`)
+    return
+  }
+
+  // BYE SUPPORT: Determine which slot to fill
+  // If one slot is already filled (bye team), fill the other slot
+  // If both empty, use the default formula
+  // If both filled, log warning
+  let updateData
+  
+  if (nextMatchup.team_a_id && nextMatchup.team_b_id) {
+    console.log(`[ADVANCE] WARNING: Both slots already filled in next matchup!`)
+    console.log(`[ADVANCE] team_a: ${nextMatchup.team_a_id}, team_b: ${nextMatchup.team_b_id}`)
+    return
+  } else if (nextMatchup.team_a_id && !nextMatchup.team_b_id) {
+    // Team A has bye, fill Team B
+    console.log(`[ADVANCE] BYE detected in Team A slot, placing winner in Team B`)
+    updateData = { team_b_id: winnerTeamId }
+  } else if (!nextMatchup.team_a_id && nextMatchup.team_b_id) {
+    // Team B has bye, fill Team A
+    console.log(`[ADVANCE] BYE detected in Team B slot, placing winner in Team A`)
+    updateData = { team_a_id: winnerTeamId }
   } else {
-    // Update existing matchup with the advancing team
-    const updateData = isTeamA 
+    // Both empty, use default formula
+    console.log(`[ADVANCE] No bye detected, using default slot: ${defaultIsTeamA ? 'Team A' : 'Team B'}`)
+    updateData = defaultIsTeamA 
       ? { team_a_id: winnerTeamId }
       : { team_b_id: winnerTeamId }
-    
-    await supabase
-      .from('matchups')
-      .update(updateData)
-      .eq('id', nextMatchup.id)
+  }
+
+  const { error: updateError } = await supabase
+    .from('matchups')
+    .update(updateData)
+    .eq('id', nextMatchup.id)
+
+  if (updateError) {
+    console.log(`[ADVANCE] ERROR updating matchup: ${updateError.message}`)
+  } else {
+    console.log(`[ADVANCE] SUCCESS: ${winnerTeamId} placed in next round`)
   }
 }
 

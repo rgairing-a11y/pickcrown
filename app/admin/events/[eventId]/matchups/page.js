@@ -142,16 +142,32 @@ export default function MatchupsAdminPage({ params }) {
       <p style={{ color: '#666', marginBottom: 24 }}>{event.name} {event.year}</p>
 
       {/* Navigation */}
-      <div style={{ display: 'flex', gap: 12, marginBottom: 24, padding: 16, background: '#f3f4f6', borderRadius: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-        <Link href={`/admin/events/${eventId}/teams`} style={{ color: '#6b7280', textDecoration: 'none' }}>
-          1. Teams ({teams.length})
+      <div style={{ display: 'flex', gap: 12, marginBottom: 24, padding: 16, background: '#f3f4f6', borderRadius: 8, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+          <Link href={`/admin/events/${eventId}/teams`} style={{ color: '#6b7280', textDecoration: 'none' }}>
+            1. Teams ({teams.length})
+          </Link>
+          <span style={{ color: '#9ca3af' }}>→</span>
+          <Link href={`/admin/events/${eventId}/rounds`} style={{ color: '#6b7280', textDecoration: 'none' }}>
+            2. Rounds ({rounds.length})
+          </Link>
+          <span style={{ color: '#9ca3af' }}>→</span>
+          <span style={{ fontWeight: 600, color: '#3b82f6' }}>3. Matchups</span>
+        </div>
+        <Link 
+          href={`/admin/events/${eventId}/bracket-setup`}
+          style={{ 
+            padding: '8px 16px', 
+            background: '#f59e0b', 
+            color: 'white', 
+            borderRadius: 6, 
+            textDecoration: 'none',
+            fontWeight: 600,
+            fontSize: 13
+          }}
+        >
+          🔧 Bracket Setup
         </Link>
-        <span style={{ color: '#9ca3af' }}>→</span>
-        <Link href={`/admin/events/${eventId}/rounds`} style={{ color: '#6b7280', textDecoration: 'none' }}>
-          2. Rounds ({rounds.length})
-        </Link>
-        <span style={{ color: '#9ca3af' }}>→</span>
-        <span style={{ fontWeight: 600, color: '#3b82f6' }}>3. Matchups</span>
       </div>
 
       {/* Prerequisites check */}

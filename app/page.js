@@ -3,429 +3,568 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
-import EntriesList from '../components/EntriesList'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 )
 
+// SORTING RULE: Locked beats open. Seasons beat events. Now beats later.
+
+// Visibility helper: Is pool currently visible?
+// Visible if: open_date <= now AND (archive_date is null OR archive_date > now) AND status != 'archived'
+function isPoolVisible(pool) {
+  if (!pool) return false
+  if (pool.status === 'archived') return false
+  
+  const now = new Date()
+  
+  // Check open_date (if set and in future, not visible yet)
+  if (pool.open_date && new Date(pool.open_date) > now) return false
+  
+  // Check archive_date (if set and in past, auto-archived)
+  if (pool.archive_date && new Date(pool.archive_date) < now) return false
+  
+  return true
+}
+
 export default function HomePage() {
   const [email, setEmail] = useState('')
-  const [storedEmail, setStoredEmail] = useState(null)
-  const [loading, setLoading] = useState(true)
   const [entries, setEntries] = useState([])
   const [managedPools, setManagedPools] = useState([])
-  const [upcomingEvents, setUpcomingEvents] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [hasSearched, setHasSearched] = useState(false)
 
-  // Create Pool Modal State
-  const [showCreatePool, setShowCreatePool] = useState(false)
-  const [selectedEvent, setSelectedEvent] = useState(null)
-  const [poolName, setPoolName] = useState('')
-  const [creatingPool, setCreatingPool] = useState(false)
-
-  // Check localStorage on mount
   useEffect(() => {
-    const saved = localStorage.getItem('pickcrown_email')
-    if (saved) {
-      setStoredEmail(saved)
-      loadUserData(saved)
-    } else {
-      setLoading(false)
+    const savedEmail = localStorage.getItem('pickcrown_email')
+    if (savedEmail) {
+      setEmail(savedEmail)
+      loadUserData(savedEmail)
     }
   }, [])
 
   async function loadUserData(userEmail) {
+    if (!userEmail) return
     setLoading(true)
+    setHasSearched(true)
 
-    // 1. Get user's entries with season info
+    const normalizedEmail = userEmail.toLowerCase().trim()
+    localStorage.setItem('pickcrown_email', normalizedEmail)
+
+    // Get user's entries with full context (including visibility columns)
     const { data: entriesData } = await supabase
       .from('pool_entries')
       .select(`
-        *,
-        pool:pools(
+        id,
+        entry_name,
+        display_name,
+        pool:pools!inner(
           id,
           name,
-          owner_email,
+          status,
+          open_date,
+          archive_date,
           event:events(
-            id, 
-            name, 
-            year, 
-            start_time, 
-            status,
-            season_id,
-            season:seasons(id, name, description)
+            id, name, year, start_time, status,
+            season:seasons(id, name)
           )
         )
       `)
-      .ilike('email', userEmail)
-      .order('created_at', { ascending: false })
+      .ilike('email', normalizedEmail)
 
-    setEntries(entriesData || [])
-
-    // 2. Get pools user manages
-    const { data: poolsData } = await supabase
+    // Get pools user manages (including visibility columns)
+    const { data: managedData } = await supabase
       .from('pools')
       .select(`
-        *,
+        id,
+        name,
+        status,
+        open_date,
+        archive_date,
         event:events(id, name, year, start_time, status)
       `)
-      .ilike('owner_email', userEmail)
-      .neq('status', 'archived') // Hide archived pools
-      .order('created_at', { ascending: false })
+      .ilike('owner_email', normalizedEmail)
 
-    setManagedPools(poolsData || [])
+    // Filter entries to only visible pools (client-side for flexibility)
+    const visibleEntries = (entriesData || []).filter(e => isPoolVisible(e.pool))
+    const visibleManaged = (managedData || []).filter(p => isPoolVisible(p))
 
-    // 3. Get upcoming events
-    const { data: eventsData } = await supabase
-      .from('events')
-      .select('*')
-      .gt('start_time', new Date().toISOString())
-      .order('start_time', { ascending: true })
-      .limit(5)
-
-    setUpcomingEvents(eventsData || [])
-
+    setEntries(visibleEntries)
+    setManagedPools(visibleManaged)
     setLoading(false)
   }
 
-  function handleContinue(e) {
+  function handleSubmit(e) {
     e.preventDefault()
-    if (!email.trim()) return
-    
-    const normalizedEmail = email.toLowerCase().trim()
-    localStorage.setItem('pickcrown_email', normalizedEmail)
-    setStoredEmail(normalizedEmail)
-    loadUserData(normalizedEmail)
-  }
-
-  function handleLogout() {
-    localStorage.removeItem('pickcrown_email')
-    setStoredEmail(null)
-    setEntries([])
-    setManagedPools([])
-  }
-
-  function openCreatePoolModal(event) {
-    setSelectedEvent(event)
-    setPoolName(`${event.name} Pool`)
-    setShowCreatePool(true)
-  }
-
-  async function handleCreatePool(e) {
-    e.preventDefault()
-    if (!poolName.trim() || !selectedEvent) return
-
-    setCreatingPool(true)
-
-    try {
-      const res = await fetch('/api/pools', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          event_id: selectedEvent.id,
-          name: poolName.trim(),
-          owner_email: storedEmail,
-          owner_name: storedEmail.split('@')[0], // Simple name from email
-          status: 'active'
-        })
-      })
-
-      if (!res.ok) {
-        const err = await res.json()
-        alert('Error creating pool: ' + err.error)
-        setCreatingPool(false)
-        return
-      }
-
-      const pool = await res.json()
-      
-      // Close modal and redirect to manage page
-      setShowCreatePool(false)
-      setSelectedEvent(null)
-      setPoolName('')
-      
-      // Redirect to the new pool's manage page
-      window.location.href = `/pool/${pool.id}/manage`
-    } catch (err) {
-      alert('Error: ' + err.message)
-      setCreatingPool(false)
+    if (email.trim()) {
+      loadUserData(email.trim())
     }
   }
 
-  const isLocked = (startTime) => new Date(startTime) < new Date()
+  // Helper: Is event locked or in progress?
+  const isHappeningNow = (event) => {
+    if (!event) return false
+    const now = new Date()
+    const startTime = new Date(event.start_time)
+    return startTime < now && event.status !== 'completed'
+  }
 
-  // ==========================================
-  // ENTRY GATE (No email yet)
-  // ==========================================
-  if (!storedEmail) {
+  // Helper: Is event open for picks?
+  const isOpen = (event) => {
+    if (!event) return false
+    return new Date(event.start_time) > new Date()
+  }
+
+  // Helper: Is event completed?
+  const isCompleted = (event) => {
+    return event?.status === 'completed'
+  }
+
+  // Process entries into sections
+  const processEntries = () => {
+    const happeningNow = []
+    const seasonMap = new Map()
+    const standalone = []
+
+    entries.forEach(entry => {
+      const event = entry.pool?.event
+      const season = event?.season
+
+      if (isHappeningNow(event)) {
+        happeningNow.push(entry)
+      }
+
+      if (season) {
+        if (!seasonMap.has(season.id)) {
+          seasonMap.set(season.id, { season, entries: [] })
+        }
+        seasonMap.get(season.id).entries.push(entry)
+      } else {
+        standalone.push(entry)
+      }
+    })
+
+    // Sort seasons: Active first, then by earliest event
+    const seasons = Array.from(seasonMap.values()).sort((a, b) => {
+      const aHasActive = a.entries.some(e => isHappeningNow(e.pool?.event) || isOpen(e.pool?.event))
+      const bHasActive = b.entries.some(e => isHappeningNow(e.pool?.event) || isOpen(e.pool?.event))
+      if (aHasActive && !bHasActive) return -1
+      if (!aHasActive && bHasActive) return 1
+      
+      const aEarliest = Math.min(...a.entries.map(e => new Date(e.pool?.event?.start_time || 0)))
+      const bEarliest = Math.min(...b.entries.map(e => new Date(e.pool?.event?.start_time || 0)))
+      return aEarliest - bEarliest
+    })
+
+    // Sort entries within each season: Locked > Open > Completed
+    seasons.forEach(s => {
+      s.entries.sort((a, b) => {
+        const aEvent = a.pool?.event
+        const bEvent = b.pool?.event
+        const aScore = isHappeningNow(aEvent) ? 0 : isOpen(aEvent) ? 1 : 2
+        const bScore = isHappeningNow(bEvent) ? 0 : isOpen(bEvent) ? 1 : 2
+        if (aScore !== bScore) return aScore - bScore
+        return new Date(aEvent?.start_time || 0) - new Date(bEvent?.start_time || 0)
+      })
+    })
+
+    // Sort standalone: Locked > Open > Completed
+    standalone.sort((a, b) => {
+      const aEvent = a.pool?.event
+      const bEvent = b.pool?.event
+      const aScore = isHappeningNow(aEvent) ? 0 : isOpen(aEvent) ? 1 : 2
+      const bScore = isHappeningNow(bEvent) ? 0 : isOpen(bEvent) ? 1 : 2
+      if (aScore !== bScore) return aScore - bScore
+      return new Date(aEvent?.start_time || 0) - new Date(bEvent?.start_time || 0)
+    })
+
+    return { happeningNow, seasons, standalone }
+  }
+
+  const { happeningNow, seasons, standalone } = processEntries()
+
+  // Entry Card Component
+  const EntryCard = ({ entry, showSeason = false }) => {
+    const event = entry.pool?.event
+    const happening = isHappeningNow(event)
+    const open = isOpen(event)
+    const completed = isCompleted(event)
+
     return (
       <div style={{
-        minHeight: '100vh',
         display: 'flex',
+        justifyContent: 'space-between',
         alignItems: 'center',
-        justifyContent: 'center',
-        padding: 24,
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+        padding: 14,
+        background: happening ? '#fef3c7' : open ? '#f0fdf4' : '#f9fafb',
+        borderRadius: 8,
+        border: `1px solid ${happening ? '#fcd34d' : open ? '#bbf7d0' : '#e5e7eb'}`,
+        marginBottom: 8
       }}>
-        <div style={{
-          maxWidth: 440,
-          width: '100%',
-          background: 'white',
-          borderRadius: 16,
-          padding: 40,
-          boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
-          textAlign: 'center'
-        }}>
-          <h1 style={{ fontSize: 48, marginBottom: 8 }}>👑</h1>
-          <h2 style={{ fontSize: 28, marginBottom: 16 }}>PickCrown</h2>
-          <p style={{ color: '#555', fontSize: 16, lineHeight: 1.6, marginBottom: 8 }}>
-            Friendly prediction pools for groups — sports, wrestling, and more.
+        <div style={{ flex: 1 }}>
+          <h4 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>
+            {entry.pool?.name}
+          </h4>
+          <p style={{ margin: '4px 0 0', fontSize: 13, color: '#666' }}>
+            {event?.name} {event?.year}
+            {showSeason && event?.season && (
+              <span style={{ marginLeft: 8, color: '#8b5cf6' }}>
+                • {event.season.name}
+              </span>
+            )}
           </p>
-          <p style={{ color: '#777', fontSize: 14, marginBottom: 32 }}>
-            No accounts to manage. No clutter.<br/>
-            Just pick, play, and see how you stack up.
+          <p style={{ margin: '2px 0 0', fontSize: 12, color: '#999' }}>
+            Entry: {entry.display_name || entry.entry_name}
           </p>
-
-          <form onSubmit={handleContinue}>
-            <p style={{ fontSize: 14, color: '#333', marginBottom: 12, textAlign: 'left' }}>
-              Enter your email to see your pools or get started.
-            </p>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              required
+        </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {happening && (
+            <span style={{ 
+              padding: '4px 10px', 
+              background: '#f59e0b', 
+              color: 'white', 
+              borderRadius: 12, 
+              fontSize: 11, 
+              fontWeight: 600 
+            }}>
+              🔒 LIVE
+            </span>
+          )}
+          {open && (
+            <Link
+              href={`/pool/${entry.pool?.id}`}
               style={{
-                width: '100%',
-                padding: 14,
-                fontSize: 16,
-                border: '2px solid #e5e7eb',
-                borderRadius: 8,
-                marginBottom: 16
-              }}
-            />
-            <button
-              type="submit"
-              style={{
-                width: '100%',
-                padding: 14,
-                fontSize: 16,
-                fontWeight: 600,
-                background: '#3b82f6',
+                padding: '8px 14px',
+                background: '#16a34a',
                 color: 'white',
-                border: 'none',
-                borderRadius: 8,
-                cursor: 'pointer'
+                borderRadius: 6,
+                textDecoration: 'none',
+                fontWeight: 600,
+                fontSize: 13
               }}
             >
-              Continue
-            </button>
-          </form>
-
-          <p style={{ fontSize: 12, color: '#999', marginTop: 20 }}>
-            We only use your email to show your pools and send game updates.
-          </p>
+              Make Picks
+            </Link>
+          )}
+          <Link
+            href={`/pool/${entry.pool?.id}/standings`}
+            style={{
+              padding: '8px 14px',
+              background: '#3b82f6',
+              color: 'white',
+              borderRadius: 6,
+              textDecoration: 'none',
+              fontWeight: 600,
+              fontSize: 13
+            }}
+          >
+            Standings
+          </Link>
         </div>
       </div>
     )
   }
 
-  // ==========================================
-  // HOMEPAGE (Email known)
-  // ==========================================
-  if (loading) {
+  // Season Card Component
+  const SeasonCard = ({ seasonData }) => {
+    const [expanded, setExpanded] = useState(true)
+    const { season, entries: seasonEntries } = seasonData
+    
+    const activeCount = seasonEntries.filter(e => 
+      isHappeningNow(e.pool?.event) || isOpen(e.pool?.event)
+    ).length
+    const hasActive = activeCount > 0
+
     return (
-      <div style={{ padding: 24, textAlign: 'center' }}>
-        <p>Loading your pools...</p>
+      <div style={{
+        marginBottom: 16,
+        border: hasActive ? '2px solid #a78bfa' : '1px solid #e5e7eb',
+        borderRadius: 12,
+        overflow: 'hidden'
+      }}>
+        <button
+          onClick={() => setExpanded(!expanded)}
+          style={{
+            width: '100%',
+            padding: 16,
+            background: hasActive 
+              ? 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)'
+              : '#f3f4f6',
+            color: hasActive ? 'white' : '#374151',
+            border: 'none',
+            cursor: 'pointer',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            textAlign: 'left'
+          }}
+        >
+          <div>
+            <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>
+              🏆 {season.name}
+            </h3>
+            <p style={{ margin: '4px 0 0', fontSize: 13, opacity: 0.9 }}>
+              {seasonEntries.length} event{seasonEntries.length !== 1 ? 's' : ''}
+              {activeCount > 0 && (
+                <span style={{ marginLeft: 8, fontWeight: 600 }}>
+                  • {activeCount} active
+                </span>
+              )}
+            </p>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <Link
+              href={`/season/${season.id}/standings`}
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                padding: '6px 12px',
+                background: hasActive ? 'rgba(255,255,255,0.2)' : '#e5e7eb',
+                color: hasActive ? 'white' : '#374151',
+                borderRadius: 6,
+                textDecoration: 'none',
+                fontSize: 12,
+                fontWeight: 600
+              }}
+            >
+              Season Standings
+            </Link>
+            <span style={{ fontSize: 18 }}>{expanded ? '▼' : '▶'}</span>
+          </div>
+        </button>
+        
+        {expanded && (
+          <div style={{ padding: 12, background: hasActive ? '#faf5ff' : '#fafafa' }}>
+            {seasonEntries.map(entry => (
+              <EntryCard key={entry.id} entry={entry} />
+            ))}
+          </div>
+        )}
       </div>
     )
   }
 
   return (
     <div style={{ maxWidth: 800, margin: '0 auto', padding: 24 }}>
-      
       {/* Header */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 32
-      }}>
-        <div>
-          <h1 style={{ fontSize: 28, marginBottom: 4 }}>👑 PickCrown</h1>
-          <p style={{ color: '#666', fontSize: 14 }}>
-            Welcome back, {storedEmail}
-          </p>
-        </div>
-        <button
-          onClick={handleLogout}
-          style={{
-            padding: '8px 16px',
-            background: 'white',
-            color: '#666',
-            border: '1px solid #ddd',
-            borderRadius: 6,
-            cursor: 'pointer',
-            fontSize: 13
-          }}
-        >
-          Switch Email
-        </button>
+      <div style={{ textAlign: 'center', marginBottom: 32 }}>
+        <h1 style={{ fontSize: 48, margin: '0 0 8px' }}>👑</h1>
+        <h2 style={{ fontSize: 28, margin: '0 0 8px', fontWeight: 700 }}>PickCrown</h2>
+        <p style={{ color: '#666', margin: 0 }}>
+          Private prediction pools for people you know
+        </p>
       </div>
 
-      {/* ==========================================
-          SECTION 1: Your Entries (Season-First)
-          ========================================== */}
-      <div style={{ marginBottom: 40 }}>
-        <h2 style={{ fontSize: 20, marginBottom: 16 }}>🎯 Your Entries</h2>
-        
-        {entries.length === 0 ? (
-          <div style={{
-            padding: 24,
-            background: '#f9fafb',
-            borderRadius: 8,
-            border: '1px solid #e5e7eb',
-            textAlign: 'center'
-          }}>
-            <p style={{ color: '#666', marginBottom: 8 }}>
-              You're not in any pools yet.
-            </p>
-            <p style={{ color: '#999', fontSize: 14 }}>
-              If someone invited you, check your link — or start a pool below.
-            </p>
-          </div>
-        ) : (
-          <EntriesList entries={entries} isLocked={isLocked} />
-        )}
-      </div>
-
-      {/* ==========================================
-          SECTION 2: Pools You Manage (Conditional)
-          ========================================== */}
-      {managedPools.length > 0 && (
-        <div style={{ marginBottom: 40 }}>
-          <h2 style={{ fontSize: 20, marginBottom: 16 }}>🛠️ Pools You Manage</h2>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {managedPools.map(pool => {
-              const locked = isLocked(pool.event?.start_time)
-              return (
-                <div
-                  key={pool.id}
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    padding: 16,
-                    background: '#faf5ff',
-                    borderRadius: 8,
-                    border: '1px solid #e9d5ff'
-                  }}
-                >
-                  <div>
-                    <h3 style={{ margin: 0, fontSize: 16 }}>{pool.name}</h3>
-                    <p style={{ margin: '4px 0 0', fontSize: 13, color: '#666' }}>
-                      {pool.event?.name} ({pool.event?.year})
-                      <span style={{ marginLeft: 8, color: locked ? '#dc2626' : '#16a34a' }}>
-                        {locked ? '🔒 Locked' : '🟢 Open'}
-                      </span>
-                    </p>
-                  </div>
-                  <Link
-                    href={`/pool/${pool.id}/manage`}
-                    style={{
-                      padding: '8px 16px',
-                      background: '#7c3aed',
-                      color: 'white',
-                      borderRadius: 6,
-                      textDecoration: 'none',
-                      fontWeight: 600,
-                      fontSize: 14
-                    }}
-                  >
-                    Manage
-                  </Link>
-                </div>
-              )
-            })}
-          </div>
+      {/* Email Gate */}
+      <form onSubmit={handleSubmit} style={{ marginBottom: 32 }}>
+        <div style={{ display: 'flex', gap: 12, maxWidth: 500, margin: '0 auto' }}>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Enter your email to find your pools"
+            required
+            style={{
+              flex: 1,
+              padding: 14,
+              fontSize: 16,
+              border: '2px solid #e5e7eb',
+              borderRadius: 8
+            }}
+          />
+          <button
+            type="submit"
+            disabled={loading}
+            style={{
+              padding: '14px 24px',
+              background: '#3b82f6',
+              color: 'white',
+              border: 'none',
+              borderRadius: 8,
+              fontWeight: 600,
+              cursor: loading ? 'not-allowed' : 'pointer'
+            }}
+          >
+            {loading ? '...' : 'Go'}
+          </button>
         </div>
-      )}
+      </form>
 
-      {/* ==========================================
-          SECTION 3: What's Starting Soon (with Start Pool)
-          ========================================== */}
-      {upcomingEvents.length > 0 && (
-        <div style={{ marginBottom: 40 }}>
-          <h2 style={{ fontSize: 20, marginBottom: 8 }}>📅 Upcoming Events</h2>
-          <p style={{ color: '#666', fontSize: 14, marginBottom: 16 }}>
-            Start a pool for your friends, family, or coworkers!
-          </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {upcomingEvents.map(event => (
-              <div
-                key={event.id}
+      {/* Content */}
+      {hasSearched && !loading && (
+        <>
+          {entries.length === 0 && managedPools.length === 0 ? (
+            <div style={{
+              textAlign: 'center',
+              padding: 48,
+              background: '#f9fafb',
+              borderRadius: 12,
+              border: '1px solid #e5e7eb'
+            }}>
+              <p style={{ fontSize: 18, color: '#666', margin: '0 0 8px' }}>
+                No active pools found for this email
+              </p>
+              <p style={{ fontSize: 14, color: '#999', margin: 0 }}>
+                If you've been invited to a pool, use the link you received.
+              </p>
+              <Link
+                href="/archived"
                 style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  padding: 16,
-                  background: '#fffbeb',
-                  borderRadius: 8,
-                  border: '1px solid #fde68a'
+                  display: 'inline-block',
+                  marginTop: 16,
+                  padding: '8px 16px',
+                  background: '#e5e7eb',
+                  color: '#374151',
+                  borderRadius: 6,
+                  textDecoration: 'none',
+                  fontSize: 13
                 }}
               >
-                <div>
-                  <h3 style={{ margin: 0, fontSize: 16 }}>
-                    {event.event_type === 'hybrid' ? '🎉' : event.event_type === 'bracket' ? '🏈' : '🏆'} {event.name}
-                  </h3>
-                  <p style={{ margin: '4px 0 0', fontSize: 13, color: '#666' }}>
-                    {new Date(event.start_time).toLocaleDateString('en-US', {
-                      weekday: 'long',
-                      month: 'long',
-                      day: 'numeric',
-                      year: 'numeric'
-                    })}
+                📦 Check Archived Pools
+              </Link>
+            </div>
+          ) : (
+            <>
+              {/* SECTION 1: HAPPENING NOW */}
+              {happeningNow.length > 0 && (
+                <section style={{ marginBottom: 32 }}>
+                  <div style={{
+                    background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                    color: 'white',
+                    padding: 16,
+                    borderRadius: '12px 12px 0 0',
+                    marginBottom: 0
+                  }}>
+                    <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>
+                      🔒 Happening Now
+                    </h2>
+                    <p style={{ margin: '4px 0 0', fontSize: 13, opacity: 0.9 }}>
+                      These events are locked or underway
+                    </p>
+                  </div>
+                  <div style={{
+                    background: '#fffbeb',
+                    padding: 12,
+                    borderRadius: '0 0 12px 12px',
+                    border: '2px solid #fcd34d',
+                    borderTop: 'none'
+                  }}>
+                    {happeningNow.map(entry => (
+                      <EntryCard key={entry.id} entry={entry} showSeason />
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {happeningNow.length === 0 && (
+                <div style={{
+                  padding: 20,
+                  background: '#f0fdf4',
+                  borderRadius: 12,
+                  border: '1px solid #bbf7d0',
+                  marginBottom: 32,
+                  textAlign: 'center'
+                }}>
+                  <p style={{ margin: 0, color: '#166534' }}>
+                    ✓ No active events right now. You're all caught up!
                   </p>
                 </div>
-                <button
-                  onClick={() => openCreatePoolModal(event)}
-                  style={{
-                    padding: '10px 20px',
-                    background: '#f59e0b',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: 6,
-                    cursor: 'pointer',
-                    fontWeight: 600,
-                    fontSize: 14
-                  }}
-                >
-                  🚀 Start a Pool
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+              )}
 
-      {/* No upcoming events message */}
-      {upcomingEvents.length === 0 && (
-        <div style={{ marginBottom: 40 }}>
-          <h2 style={{ fontSize: 20, marginBottom: 8 }}>📅 Upcoming Events</h2>
-          <div style={{
-            padding: 24,
-            background: '#f9fafb',
-            borderRadius: 8,
-            border: '1px solid #e5e7eb',
-            textAlign: 'center'
-          }}>
-            <p style={{ color: '#666' }}>
-              No upcoming events right now. Check back soon!
-            </p>
-          </div>
-        </div>
+              {/* SECTION 2: YOUR SEASONS */}
+              {seasons.length > 0 && (
+                <section style={{ marginBottom: 32 }}>
+                  <h2 style={{ 
+                    fontSize: 16, 
+                    color: '#666', 
+                    marginBottom: 16,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>
+                    Your Seasons
+                  </h2>
+                  {seasons.map(seasonData => (
+                    <SeasonCard key={seasonData.season.id} seasonData={seasonData} />
+                  ))}
+                </section>
+              )}
+
+              {/* SECTION 3: STANDALONE EVENTS */}
+              {standalone.length > 0 && (
+                <section style={{ marginBottom: 32 }}>
+                  <h2 style={{ 
+                    fontSize: 16, 
+                    color: '#666', 
+                    marginBottom: 16,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>
+                    Other Events
+                  </h2>
+                  {standalone.map(entry => (
+                    <EntryCard key={entry.id} entry={entry} />
+                  ))}
+                </section>
+              )}
+
+              {/* SECTION 4: POOLS YOU MANAGE */}
+              {managedPools.length > 0 && (
+                <section style={{ marginBottom: 32 }}>
+                  <h2 style={{ 
+                    fontSize: 16, 
+                    color: '#666', 
+                    marginBottom: 16,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>
+                    🛠️ Pools You Manage
+                  </h2>
+                  {managedPools
+                    .sort((a, b) => {
+                      const aScore = isHappeningNow(a.event) ? 0 : isOpen(a.event) ? 1 : 2
+                      const bScore = isHappeningNow(b.event) ? 0 : isOpen(b.event) ? 1 : 2
+                      return aScore - bScore
+                    })
+                    .map(pool => (
+                      <div
+                        key={pool.id}
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          padding: 14,
+                          background: isHappeningNow(pool.event) ? '#fef3c7' : '#f3f4f6',
+                          borderRadius: 8,
+                          border: `1px solid ${isHappeningNow(pool.event) ? '#fcd34d' : '#e5e7eb'}`,
+                          marginBottom: 8
+                        }}
+                      >
+                        <div>
+                          <h4 style={{ margin: 0, fontSize: 15 }}>{pool.name}</h4>
+                          <p style={{ margin: '4px 0 0', fontSize: 13, color: '#666' }}>
+                            {pool.event?.name} {pool.event?.year}
+                          </p>
+                        </div>
+                        <Link
+                          href={`/pool/${pool.id}/manage`}
+                          style={{
+                            padding: '8px 14px',
+                            background: '#7c3aed',
+                            color: 'white',
+                            borderRadius: 6,
+                            textDecoration: 'none',
+                            fontWeight: 600,
+                            fontSize: 13
+                          }}
+                        >
+                          Manage
+                        </Link>
+                      </div>
+                    ))}
+                </section>
+              )}
+            </>
+          )}
+        </>
       )}
 
       {/* Footer */}
@@ -439,6 +578,9 @@ export default function HomePage() {
           <Link href="/commissioner/signup" style={{ color: '#7c3aed', fontWeight: 600 }}>
             👑 Become a Commissioner
           </Link>
+          <Link href="/archived" style={{ color: '#6b7280' }}>
+            📦 Archived Pools
+          </Link>
           <Link href="/about" style={{ color: '#6b7280' }}>
             About PickCrown
           </Link>
@@ -447,117 +589,6 @@ export default function HomePage() {
           © 2025 PickCrown • Built for fun, not profit
         </p>
       </div>
-
-      {/* ==========================================
-          CREATE POOL MODAL
-          ========================================== */}
-      {showCreatePool && selectedEvent && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(0, 0, 0, 0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 50,
-          padding: 24
-        }}>
-          <div style={{
-            background: 'white',
-            borderRadius: 12,
-            padding: 32,
-            maxWidth: 440,
-            width: '100%',
-            boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
-          }}>
-            <h2 style={{ margin: '0 0 8px', fontSize: 24 }}>🚀 Start a Pool</h2>
-            <p style={{ color: '#666', marginBottom: 24, fontSize: 14 }}>
-              for <strong>{selectedEvent.name}</strong>
-            </p>
-
-            <form onSubmit={handleCreatePool}>
-              <div style={{ marginBottom: 20 }}>
-                <label style={{ 
-                  display: 'block', 
-                  marginBottom: 8, 
-                  fontWeight: 600,
-                  fontSize: 14 
-                }}>
-                  Pool Name
-                </label>
-                <input
-                  type="text"
-                  value={poolName}
-                  onChange={(e) => setPoolName(e.target.value)}
-                  placeholder="e.g., Smith Family Pool"
-                  required
-                  style={{
-                    width: '100%',
-                    padding: 12,
-                    fontSize: 16,
-                    border: '2px solid #e5e7eb',
-                    borderRadius: 8
-                  }}
-                />
-                <p style={{ fontSize: 12, color: '#999', marginTop: 8 }}>
-                  Pick something your friends will recognize!
-                </p>
-              </div>
-
-              <div style={{ 
-                padding: 16, 
-                background: '#f0fdf4', 
-                borderRadius: 8,
-                marginBottom: 24,
-                fontSize: 14
-              }}>
-                <p style={{ margin: 0, color: '#166534' }}>
-                  <strong>You'll be the commissioner.</strong><br/>
-                  Share the link with your group after creating.
-                </p>
-              </div>
-
-              <div style={{ display: 'flex', gap: 12 }}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowCreatePool(false)
-                    setSelectedEvent(null)
-                  }}
-                  style={{
-                    flex: 1,
-                    padding: 14,
-                    fontSize: 16,
-                    border: '1px solid #d1d5db',
-                    borderRadius: 8,
-                    background: 'white',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={creatingPool || !poolName.trim()}
-                  style={{
-                    flex: 1,
-                    padding: 14,
-                    fontSize: 16,
-                    fontWeight: 600,
-                    background: creatingPool ? '#9ca3af' : '#16a34a',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: 8,
-                    cursor: creatingPool ? 'not-allowed' : 'pointer'
-                  }}
-                >
-                  {creatingPool ? 'Creating...' : 'Create Pool'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
