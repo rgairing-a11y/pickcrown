@@ -235,10 +235,15 @@ export default async function StandingsPage({ params }) {
       if (entries && entries.length > 0) {
         const entryIds = entries.map(e => e.id)
         
-        // Get bracket picks for all entries
+        // Get bracket picks for all entries (include picked team details)
         const { data: allPicks } = await supabase
           .from('bracket_picks')
-          .select('pool_entry_id, picked_team_id, matchup_id')
+          .select(`
+            pool_entry_id, 
+            picked_team_id, 
+            matchup_id,
+            picked_team:teams!bracket_picks_picked_team_id_fkey(id, name, seed)
+          `)
           .in('pool_entry_id', entryIds)
 
         // Store for scenario simulator
@@ -569,84 +574,93 @@ export default async function StandingsPage({ params }) {
         <div style={{ marginTop: 48 }}>
           <h2 style={{ fontSize: '20px', marginBottom: 8 }}>🛤️ Path to Victory</h2>
           <p style={{ color: '#666', fontSize: 14, marginBottom: 24 }}>
-            {remainingMatchups} matchup{remainingMatchups !== 1 ? 's' : ''} remaining
+            {remainingMatchups} game{remainingMatchups !== 1 ? 's' : ''} left
           </p>
           
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {pathToVictory.map((pv, idx) => (
-              <div
-                key={pv.entry_id}
-                style={{
-                  padding: 16,
-                  background: pv.status === 'clinched' ? '#dcfce7' :
-                             pv.status === 'leading' ? '#fefce8' :
-                             pv.status === 'eliminated' ? '#fee2e2' :
-                             '#f9fafb',
-                  borderRadius: 8,
-                  border: pv.status === 'clinched' ? '2px solid #22c55e' :
-                         pv.status === 'leading' ? '2px solid #eab308' :
-                         '1px solid #e5e7eb'
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <span style={{ 
-                      fontWeight: 600, 
-                      fontSize: 16,
-                      color: pv.status === 'eliminated' ? '#9ca3af' : '#374151'
-                    }}>
-                      {idx === 0 ? '👑 ' : ''}{pv.entry_name}
-                    </span>
-                    <span style={{ 
-                      marginLeft: 12, 
-                      fontSize: 13,
-                      color: pv.status === 'clinched' ? '#16a34a' :
-                             pv.status === 'leading' ? '#ca8a04' :
-                             pv.status === 'eliminated' ? '#dc2626' :
-                             '#6b7280'
-                    }}>
-                      {pv.message}
-                    </span>
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: 12, color: '#9ca3af' }}>Max possible</div>
-                    <div style={{ 
-                      fontWeight: 'bold', 
-                      fontSize: 18,
-                      color: pv.canWin ? '#374151' : '#9ca3af'
-                    }}>
-                      {pv.maxTotal} pts
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {pathToVictory.map((pv, idx) => {
+              const currentPts = pv.maxTotal - pv.potentialPoints
+              const maxLeaderPts = pathToVictory[0]?.maxTotal || pv.maxTotal
+              const barWidth = Math.min(100, (pv.maxTotal / maxLeaderPts) * 100)
+              const currentWidth = Math.min(100, (currentPts / maxLeaderPts) * 100)
+              
+              return (
+                <div
+                  key={pv.entry_id}
+                  style={{
+                    padding: '12px 16px',
+                    background: pv.status === 'eliminated' ? '#fef2f2' : '#fff',
+                    borderRadius: 8,
+                    border: pv.status === 'clinched' ? '2px solid #22c55e' :
+                           pv.status === 'leading' ? '2px solid #eab308' :
+                           '1px solid #e5e7eb'
+                  }}
+                >
+                  {/* Row 1: Name + Status + Points */}
+                  <div style={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center',
+                    marginBottom: 8
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ 
+                        fontWeight: 600, 
+                        fontSize: 15,
+                        color: pv.status === 'eliminated' ? '#9ca3af' : '#374151'
+                      }}>
+                        {pv.entry_name}
+                      </span>
+                      {pv.status === 'clinched' && (
+                        <span style={{ fontSize: 12, color: '#16a34a', fontWeight: 600 }}>✓ Clinched</span>
+                      )}
+                      {pv.status === 'leading' && (
+                        <span style={{ fontSize: 12, color: '#ca8a04', fontWeight: 600 }}>👑 Leading</span>
+                      )}
+                      {pv.status === 'eliminated' && (
+                        <span style={{ fontSize: 12, color: '#dc2626' }}>✗ Out</span>
+                      )}
                     </div>
+                    <div style={{ 
+                      fontSize: 14, 
+                      color: pv.status === 'eliminated' ? '#9ca3af' : '#374151',
+                      fontWeight: 500
+                    }}>
+                      {currentPts} → {pv.maxTotal} pts
+                    </div>
+                  </div>
+                  
+                  {/* Row 2: Visual bar */}
+                  <div style={{
+                    height: 8,
+                    background: '#e5e7eb',
+                    borderRadius: 4,
+                    overflow: 'hidden',
+                    position: 'relative'
+                  }}>
+                    {/* Max possible (lighter) */}
+                    <div style={{
+                      position: 'absolute',
+                      height: '100%',
+                      width: `${barWidth}%`,
+                      background: pv.status === 'eliminated' ? '#d1d5db' : '#bfdbfe',
+                      borderRadius: 4
+                    }} />
+                    {/* Current points (solid) */}
+                    <div style={{
+                      position: 'absolute',
+                      height: '100%',
+                      width: `${currentWidth}%`,
+                      background: pv.status === 'clinched' ? '#22c55e' :
+                                 pv.status === 'leading' ? '#eab308' :
+                                 pv.status === 'eliminated' ? '#9ca3af' :
+                                 '#3b82f6',
+                      borderRadius: 4
+                    }} />
                   </div>
                 </div>
-                
-                {/* Potential points bar */}
-                {pv.potentialPoints > 0 && (
-                  <div style={{ marginTop: 12 }}>
-                    <div style={{ 
-                      fontSize: 11, 
-                      color: '#6b7280', 
-                      marginBottom: 4 
-                    }}>
-                      +{pv.potentialPoints} potential points remaining
-                    </div>
-                    <div style={{
-                      height: 6,
-                      background: '#e5e7eb',
-                      borderRadius: 3,
-                      overflow: 'hidden'
-                    }}>
-                      <div style={{
-                        height: '100%',
-                        width: `${Math.min(100, (pv.potentialPoints / (pathToVictory[0]?.potentialPoints || pv.potentialPoints)) * 100)}%`,
-                        background: pv.canWin ? '#3b82f6' : '#9ca3af',
-                        borderRadius: 3
-                      }} />
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       )}

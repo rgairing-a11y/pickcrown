@@ -217,9 +217,9 @@ export default function MyPicksButton({
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {matchups?.filter(m => picksByMatchup[m.id]).map(matchup => {
                     const pick = picksByMatchup[matchup.id]
-                    const pickedTeam = matchup.team_a?.id === pick.picked_team_id 
-                      ? matchup.team_a 
-                      : matchup.team_b
+                    // Use picked_team from the pick data (works even when matchup teams are null)
+                    const pickedTeam = pick.picked_team || 
+                      (matchup.team_a?.id === pick.picked_team_id ? matchup.team_a : matchup.team_b)
                     const isCorrect = matchup.winner_team_id === pick.picked_team_id
                     const isWrong = matchup.winner_team_id && matchup.winner_team_id !== pick.picked_team_id
                     const isPending = !matchup.winner_team_id
