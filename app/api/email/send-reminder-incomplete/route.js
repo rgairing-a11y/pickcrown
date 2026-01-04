@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import sgMail from '@sendgrid/mail'
 import { createClient } from '@supabase/supabase-js'
-import { reminderEmail } from '@/lib/email-templates'
 
 sgMail.setApiKey(process.env.SENDGRID_API_KEY)
 
@@ -9,20 +8,6 @@ const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 )
-
-// ============================================
-// EMAIL SAFETY GUARD
-// ============================================
-const ALLOWED_TEST_EMAILS = ['rgairing@gmail.com']
-
-function isEmailAllowed(email) {
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || ''
-  const isProduction = baseUrl.includes('pickcrown.vercel.app')
-  if (isProduction) return { allowed: true }
-  if (ALLOWED_TEST_EMAILS.includes(email.toLowerCase())) return { allowed: true }
-  return { allowed: false, reason: 'DEV MODE: Email blocked' }
-}
-// ============================================
 
 export async function POST(request) {
   try {
@@ -62,28 +47,63 @@ export async function POST(request) {
     const results = []
 
     for (const email of emails) {
-      // Check safety guard
-      const emailCheck = isEmailAllowed(email)
-      if (!emailCheck.allowed) {
-        console.log(`🛑 ${emailCheck.reason}: ${email}`)
-        results.push({ email, status: 'blocked', reason: emailCheck.reason })
-        continue
-      }
-
-      const template = reminderEmail({
-        poolName: pool.name,
-        eventName: pool.event.name,
-        deadline,
-        poolUrl
-      })
-
       try {
         await sgMail.send({
-          from: process.env.EMAIL_FROM || 'picks@pickcrown.com',
+          from: process.env.EMAIL_FROM || 'hello@pickcrown.app',
           to: email,
-          subject: `⏰ Reminder: Finish your ${pool.event.name} picks!`,
-          html: template.html,
-          text: template.text
+          subject: `🎯 ${pool.name} – don't forget to finish!`,
+          html: `
+            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+              <h1 style="color: #1a1a1a; font-size: 24px; margin-bottom: 20px;">
+                👑 Almost There!
+              </h1>
+              
+              <p style="font-size: 16px; color: #333; line-height: 1.6;">
+                Looks like you started your picks for <strong>${pool.name}</strong> but haven't finished yet. No worries – there's still time!
+              </p>
+              
+              <div style="background: #fef9c3; border-radius: 8px; padding: 16px; margin: 24px 0; border-left: 4px solid #eab308;">
+                <p style="margin: 0 0 8px; font-size: 15px; color: #333;">
+                  <strong>${pool.event.name}</strong>
+                </p>
+                <p style="margin: 0; font-size: 14px; color: #666;">
+                  ⏰ Picks lock: <strong>${deadline}</strong>
+                </p>
+              </div>
+              
+              <p style="font-size: 15px; color: #333; line-height: 1.6; margin-bottom: 24px;">
+                <strong>What happens next:</strong> Once you submit, you'll see everyone's picks after the deadline passes. Then we track the results together!
+              </p>
+              
+              <a href="${poolUrl}" style="display: inline-block; background: #3b82f6; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px;">
+                Finish Your Picks →
+              </a>
+              
+              <p style="font-size: 14px; color: #666; margin-top: 32px;">
+                See you at the finish line! 🏁
+              </p>
+              
+              <hr style="border: none; border-top: 1px solid #eee; margin: 32px 0;">
+              
+              <p style="font-size: 12px; color: #999;">
+                You're receiving this because you have incomplete picks in a PickCrown pool.
+              </p>
+            </div>
+          `,
+          text: `
+Almost There!
+
+Looks like you started your picks for ${pool.name} but haven't finished yet. No worries – there's still time!
+
+Event: ${pool.event.name}
+Picks lock: ${deadline}
+
+What happens next: Once you submit, you'll see everyone's picks after the deadline passes. Then we track the results together!
+
+Finish your picks: ${poolUrl}
+
+See you at the finish line!
+          `.trim()
         })
 
         results.push({ email, status: 'sent' })
@@ -95,7 +115,6 @@ export async function POST(request) {
     return NextResponse.json({
       success: true,
       sent: results.filter(r => r.status === 'sent').length,
-      blocked: results.filter(r => r.status === 'blocked').length,
       failed: results.filter(r => r.status === 'failed').length,
       results
     })

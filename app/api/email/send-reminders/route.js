@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import sgMail from '@sendgrid/mail'
 import { createClient } from '@supabase/supabase-js'
-import { reminderEmail } from '@/lib/email-templates'
 
 sgMail.setApiKey(process.env.SENDGRID_API_KEY)
 
@@ -9,28 +8,6 @@ const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 )
-
-// ============================================
-// EMAIL SAFETY GUARD
-// Prevents accidental emails in dev/localhost
-// ============================================
-const ALLOWED_TEST_EMAILS = ['rgairing@gmail.com']
-
-function isEmailAllowed(email) {
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || ''
-  const isProduction = baseUrl.includes('pickcrown.vercel.app')
-  
-  // In production, all emails allowed
-  if (isProduction) return { allowed: true }
-  
-  // In dev/localhost, only allow test emails
-  if (ALLOWED_TEST_EMAILS.includes(email.toLowerCase())) {
-    return { allowed: true }
-  }
-  
-  return { allowed: false, reason: 'DEV MODE: Email blocked (not in allowed list)' }
-}
-// ============================================
 
 export async function POST(request) {
   try {
@@ -74,17 +51,6 @@ export async function POST(request) {
     const results = []
 
     for (const entry of pool.entries) {
-      // ============================================
-      // CHECK EMAIL SAFETY GUARD
-      // ============================================
-      const emailCheck = isEmailAllowed(entry.email)
-      if (!emailCheck.allowed) {
-        console.log(`🛑 ${emailCheck.reason}: ${entry.email}`)
-        results.push({ email: entry.email, status: 'blocked', reason: emailCheck.reason })
-        continue
-      }
-      // ============================================
-
       // Check if already sent
       const { data: existing } = await supabaseAdmin
         .from('email_log')
@@ -99,20 +65,66 @@ export async function POST(request) {
         continue
       }
 
-      const template = reminderEmail({
-        poolName: pool.name,
-        eventName: pool.event.name,
-        deadline,
-        poolUrl
-      })
-
       try {
         await sgMail.send({
-          from: process.env.EMAIL_FROM || 'picks@pickcrown.com',
+          from: process.env.EMAIL_FROM || 'hello@pickcrown.app',
           to: entry.email,
-          subject: template.subject,
-          html: template.html,
-          text: template.text
+          subject: `🎯 ${pool.name} – picks close soon!`,
+          html: `
+            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+              <h1 style="color: #1a1a1a; font-size: 24px; margin-bottom: 20px;">
+                👑 Quick Reminder
+              </h1>
+              
+              <p style="font-size: 16px; color: #333; line-height: 1.6;">
+                Hey! Just a friendly nudge – your picks for <strong>${pool.name}</strong> are due soon.
+              </p>
+              
+              <div style="background: #f8f9fa; border-radius: 8px; padding: 16px; margin: 24px 0; border-left: 4px solid #3b82f6;">
+                <p style="margin: 0 0 8px; font-size: 15px; color: #333;">
+                  <strong>${pool.event.name}</strong>
+                </p>
+                <p style="margin: 0; font-size: 14px; color: #666;">
+                  ⏰ Picks lock: <strong>${deadline}</strong>
+                </p>
+              </div>
+              
+              <p style="font-size: 15px; color: #333; line-height: 1.6; margin-bottom: 24px;">
+                <strong>What happens next:</strong> Once picks lock, you'll be able to see everyone's picks and track the standings as results come in. No pressure – just fun!
+              </p>
+              
+              <a href="${poolUrl}" style="display: inline-block; background: #3b82f6; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px;">
+                Submit Your Picks →
+              </a>
+              
+              <p style="font-size: 14px; color: #666; margin-top: 32px;">
+                Good luck! 🍀
+              </p>
+              
+              <hr style="border: none; border-top: 1px solid #eee; margin: 32px 0;">
+              
+              <p style="font-size: 12px; color: #999;">
+                You're receiving this because you joined a PickCrown pool. No action needed if you've already submitted.
+              </p>
+            </div>
+          `,
+          text: `
+Quick Reminder from PickCrown
+
+Hey! Just a friendly nudge – your picks for ${pool.name} are due soon.
+
+Event: ${pool.event.name}
+Picks lock: ${deadline}
+
+What happens next: Once picks lock, you'll be able to see everyone's picks and track the standings as results come in. No pressure – just fun!
+
+Submit your picks: ${poolUrl}
+
+Good luck!
+
+---
+You're receiving this because you joined a PickCrown pool. No action needed if you've already submitted.
+          `.trim()
         })
 
         // Log success
@@ -143,7 +155,6 @@ export async function POST(request) {
       sent: results.filter(r => r.status === 'sent').length,
       skipped: results.filter(r => r.status === 'skipped').length,
       failed: results.filter(r => r.status === 'failed').length,
-      blocked: results.filter(r => r.status === 'blocked').length,
       results
     })
 

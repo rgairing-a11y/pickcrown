@@ -9,19 +9,6 @@ const supabase = createClient(
 
 sgMail.setApiKey(process.env.SENDGRID_API_KEY)
 
-// Email safety guard - only send to real users in production
-const ALLOWED_TEST_EMAILS = ['rgairing@gmail.com']
-
-function isEmailAllowed(email) {
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || ''
-  const isProduction = baseUrl.includes('pickcrown.vercel.app')
-  
-  if (isProduction) return { allowed: true }
-  if (ALLOWED_TEST_EMAILS.includes(email.toLowerCase())) return { allowed: true }
-  
-  return { allowed: false, reason: 'DEV MODE: Email blocked' }
-}
-
 // Calculate standings for a pool
 async function getPoolStandings(poolId) {
   const { data, error } = await supabase.rpc('calculate_standings', { p_pool_id: poolId })
@@ -130,7 +117,6 @@ export async function POST(request) {
     // Track emails sent (for deduplication)
     const emailsSent = new Set()
     let sent = 0
-    let skipped = 0
     let deduplicated = 0
     const errors = []
 
@@ -151,13 +137,6 @@ export async function POST(request) {
         // Deduplication: If user is in multiple pools for same event, only send one email
         if (emailsSent.has(email)) {
           deduplicated++
-          continue
-        }
-
-        // Check if email is allowed (dev mode guard)
-        const { allowed } = isEmailAllowed(email)
-        if (!allowed) {
-          skipped++
           continue
         }
 
@@ -256,7 +235,8 @@ export async function POST(request) {
                 <hr style="border: none; border-top: 1px solid #eee; margin: 32px 0;" />
                 
                 <p style="color: #999; font-size: 12px; text-align: center;">
-                  PickCrown — Bragging rights only 😄
+                  PickCrown — Bragging rights only 😄<br>
+                  Thanks for playing! Until next time. 🙌
                 </p>
               </div>
             `
@@ -281,7 +261,6 @@ export async function POST(request) {
     return NextResponse.json({ 
       success: true, 
       sent, 
-      skipped,
       deduplicated,
       errors: errors.length > 0 ? errors : undefined,
       podiumEntries: eventPodium.length

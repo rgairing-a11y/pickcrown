@@ -191,6 +191,22 @@ export default async function PoolPage({ params }) {
           )}
         </div>
 
+        {/* Pool Notes (if set by commissioner) */}
+        {pool.notes && (
+          <div style={{ 
+            marginTop: 16,
+            padding: '12px 16px', 
+            background: '#fef9c3', 
+            borderRadius: 8,
+            borderLeft: '4px solid #f59e0b',
+            fontSize: 14,
+            color: '#92400e'
+          }}>
+            <strong style={{ display: 'block', marginBottom: 4 }}>📝 Pool Notes</strong>
+            <span style={{ whiteSpace: 'pre-wrap' }}>{pool.notes}</span>
+          </div>
+        )}
+
         <div style={{ marginTop: 16 }}>
           <CopyLinkButton 
             url={'https://pickcrown.vercel.app/pool/' + poolId} 

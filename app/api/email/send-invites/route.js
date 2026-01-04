@@ -9,19 +9,6 @@ const supabase = createClient(
 
 sgMail.setApiKey(process.env.SENDGRID_API_KEY)
 
-// Email safety guard
-const ALLOWED_TEST_EMAILS = ['rgairing@gmail.com']
-
-function isEmailAllowed(email) {
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || ''
-  const isProduction = baseUrl.includes('pickcrown.vercel.app')
-  
-  if (isProduction) return { allowed: true }
-  if (ALLOWED_TEST_EMAILS.includes(email.toLowerCase())) return { allowed: true }
-  
-  return { allowed: false, reason: 'DEV MODE: Email blocked' }
-}
-
 export async function POST(request) {
   try {
     const { emails, targetPoolId } = await request.json()
@@ -58,17 +45,9 @@ export async function POST(request) {
     })
 
     let sent = 0
-    let skipped = 0
     const errors = []
 
     for (const email of emails) {
-      const { allowed, reason } = isEmailAllowed(email)
-      
-      if (!allowed) {
-        skipped++
-        continue
-      }
-
       try {
         await sgMail.send({
           to: email,
@@ -76,22 +55,32 @@ export async function POST(request) {
             email: 'hello@pickcrown.app',
             name: 'PickCrown'
           },
-          subject: `You're invited to ${pool.name}!`,
+          subject: `🎯 You're invited to ${pool.name}!`,
           html: `
-            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
-              <h1 style="color: #7c3aed;">👑 You're Invited!</h1>
+            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+              <h1 style="color: #7c3aed; margin-bottom: 16px;">👑 You're Invited!</h1>
               
-              <p>You've been invited to join <strong>${pool.name}</strong> for ${pool.event.name}.</p>
+              <p style="font-size: 16px; line-height: 1.6; color: #333;">
+                You've been invited to join <strong>${pool.name}</strong> for ${pool.event.name}.
+              </p>
               
-              <p><strong>Deadline:</strong> ${deadline}</p>
+              <div style="background: #f8f9fa; border-radius: 8px; padding: 16px; margin: 24px 0; border-left: 4px solid #7c3aed;">
+                <p style="margin: 0; font-size: 14px; color: #666;">
+                  ⏰ Picks lock: <strong>${deadline}</strong>
+                </p>
+              </div>
+              
+              <p style="font-size: 15px; color: #333; margin-bottom: 24px;">
+                <strong>What to do:</strong> Click the button below, enter your email, and make your picks before the deadline. It only takes a few minutes!
+              </p>
               
               <div style="margin: 32px 0;">
-                <a href="${poolUrl}" style="display: inline-block; padding: 16px 32px; background: #7c3aed; color: white; text-decoration: none; border-radius: 8px; font-weight: bold;">
-                  Make Your Picks
+                <a href="${poolUrl}" style="display: inline-block; padding: 16px 32px; background: #7c3aed; color: white; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 15px;">
+                  Make Your Picks →
                 </a>
               </div>
               
-              <p style="color: #666; font-size: 14px;">
+              <p style="color: #666; font-size: 14px; margin-top: 32px;">
                 Good luck! 🍀
               </p>
               
@@ -121,7 +110,6 @@ export async function POST(request) {
     return NextResponse.json({ 
       success: true, 
       sent, 
-      skipped,
       errors: errors.length > 0 ? errors : undefined
     })
 

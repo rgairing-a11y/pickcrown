@@ -250,26 +250,19 @@ export default function ManagePoolPage({ params }) {
     }
 
     try {
-      const res = await fetch(`/api/entries/${editingEntry.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const { error } = await supabase
+        .from('pool_entries')
+        .update({ 
           entry_name: editForm.entry_name.trim(),
           email: editForm.email.trim().toLowerCase()
         })
-      })
+        .eq('id', editingEntry.id)
 
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to update')
+      if (error) throw error
 
-      // Update local state immediately
-      setEntries(prev => prev.map(e => 
-        e.id === editingEntry.id 
-          ? { ...e, entry_name: editForm.entry_name.trim(), email: editForm.email.trim().toLowerCase() }
-          : e
-      ))
-      
+      alert('Entry updated!')
       setEditingEntry(null)
+      loadPoolData() // Refresh
     } catch (err) {
       alert('Failed to update: ' + err.message)
     }
@@ -281,15 +274,16 @@ export default function ManagePoolPage({ params }) {
     }
 
     try {
-      const res = await fetch(`/api/entries/${entry.id}`, {
-        method: 'DELETE'
-      })
+      // Delete picks first (foreign key constraint)
+      await supabase.from('bracket_picks').delete().eq('pool_entry_id', entry.id)
+      await supabase.from('category_picks').delete().eq('pool_entry_id', entry.id)
+      
+      // Delete entry
+      const { error } = await supabase.from('pool_entries').delete().eq('id', entry.id)
+      if (error) throw error
 
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to delete')
-
-      // Update local state
-      setEntries(prev => prev.filter(e => e.id !== entry.id))
+      alert('Entry deleted')
+      loadPoolData()
     } catch (err) {
       alert('Failed to delete: ' + err.message)
     }
