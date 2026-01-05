@@ -61,16 +61,22 @@ export default function ManageSeasonPage({ params }) {
   async function addEventToSeason(eventId) {
     setSaving(true)
     
-    const res = await fetch('/api/seasons/events', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ seasonId, eventId })
-    })
+    try {
+      const res = await fetch('/api/seasons/events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ seasonId, eventId })
+      })
 
-    if (res.ok) {
-      await loadData()
-    } else {
-      alert('Failed to add event')
+      const data = await res.json()
+      
+      if (res.ok) {
+        await loadData()
+      } else {
+        alert('Failed to add event: ' + (data.error || 'Unknown error'))
+      }
+    } catch (err) {
+      alert('Failed to add event: ' + err.message)
     }
     
     setSaving(false)
