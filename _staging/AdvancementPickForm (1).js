@@ -14,7 +14,7 @@ export default function AdvancementPickForm({ pool, rounds, teams, matchups }) {
   const [entryName, setEntryName] = useState('')
   const [email, setEmail] = useState('')
   const [tieBreaker, setTieBreaker] = useState('')
-  const [picks, setPicks] = useState({}) // { `${teamId}|${roundId}`: true }
+  const [picks, setPicks] = useState({}) // { `${teamId}-${roundId}`: true }
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState('')
@@ -50,6 +50,8 @@ export default function AdvancementPickForm({ pool, rounds, teams, matchups }) {
         .eq('email', emailToCheck.toLowerCase().trim())
         .single()
 
+      console.log('Checking for existing entry:', { email: emailToCheck, poolId: pool.id, entry, error: entryError })
+
       if (entry) {
         setExistingEntry(entry)
         setEntryName(entry.entry_name)
@@ -61,14 +63,19 @@ export default function AdvancementPickForm({ pool, rounds, teams, matchups }) {
           .select('*')
           .eq('pool_entry_id', entry.id)
 
+        console.log('Loaded existing picks:', { count: existingPicks?.length, picks: existingPicks, error: picksError })
+
         if (existingPicks && existingPicks.length > 0) {
           const picksMap = {}
           existingPicks.forEach(p => {
-            const key = `${p.team_id}|${p.round_id}`
+            const key = `${p.team_id}-${p.round_id}`
             picksMap[key] = true
+            console.log('Pick loaded:', key)
           })
+          console.log('Setting picks state:', picksMap)
           setPicks(picksMap)
         } else {
+          console.log('No picks found, clearing state')
           setPicks({})
         }
       } else {
@@ -76,6 +83,7 @@ export default function AdvancementPickForm({ pool, rounds, teams, matchups }) {
         setPicks({})
       }
     } catch (err) {
+      console.error('Error loading entry:', err)
       setExistingEntry(null)
     }
     setLoading(false)
@@ -142,7 +150,7 @@ export default function AdvancementPickForm({ pool, rounds, teams, matchups }) {
     const prevRound = sortedRounds.find(r => r.round_order === roundOrder - 1)
     if (!prevRound) return false
     
-    return picks[`${teamId}|${prevRound.id}`] === true
+    return picks[`${teamId}-${prevRound.id}`] === true
   }
 
   // Get teams that can be selected for a round
@@ -154,7 +162,7 @@ export default function AdvancementPickForm({ pool, rounds, teams, matchups }) {
   // Count how many teams are picked for a round/conference
   const getPickCount = (roundId, conference) => {
     const confTeams = teamsByConference[conference] || []
-    return confTeams.filter(team => picks[`${team.id}|${roundId}`]).length
+    return confTeams.filter(team => picks[`${team.id}-${roundId}`]).length
   }
 
   // How many teams should advance from each round per conference
@@ -180,14 +188,14 @@ export default function AdvancementPickForm({ pool, rounds, teams, matchups }) {
     setPicks(prev => {
       const next = { ...prev }
       // Set winner as advancing from Wild Card
-      next[`${teamId}|${wildCardRound.id}`] = true
+      next[`${teamId}-${wildCardRound.id}`] = true
       // Remove loser from Wild Card
-      delete next[`${otherTeamId}|${wildCardRound.id}`]
+      delete next[`${otherTeamId}-${wildCardRound.id}`]
       
       // Also remove loser from all later rounds (survival rule)
       sortedRounds.forEach(r => {
         if (r.round_order > 1) {
-          delete next[`${otherTeamId}|${r.id}`]
+          delete next[`${otherTeamId}-${r.id}`]
         }
       })
       
@@ -200,7 +208,7 @@ export default function AdvancementPickForm({ pool, rounds, teams, matchups }) {
     const round = sortedRounds.find(r => r.id === roundId)
     if (!round) return
 
-    const key = `${teamId}|${roundId}`
+    const key = `${teamId}-${roundId}`
     const currentCount = getPickCount(roundId, conference)
     const required = getRequiredPicks(round.round_order)
 
@@ -212,7 +220,7 @@ export default function AdvancementPickForm({ pool, rounds, teams, matchups }) {
         delete next[key]
         sortedRounds.forEach(r => {
           if (r.round_order > round.round_order) {
-            delete next[`${teamId}|${r.id}`]
+            delete next[`${teamId}-${r.id}`]
           }
         })
       } else {
@@ -234,12 +242,12 @@ export default function AdvancementPickForm({ pool, rounds, teams, matchups }) {
       const next = { ...prev }
       // Remove any existing Super Bowl pick
       Object.keys(next).forEach(key => {
-        if (key.endsWith(`|${roundId}`)) {
+        if (key.endsWith(`-${roundId}`)) {
           delete next[key]
         }
       })
       // Set new pick
-      next[`${teamId}|${roundId}`] = true
+      next[`${teamId}-${roundId}`] = true
       return next
     })
   }
@@ -332,7 +340,7 @@ export default function AdvancementPickForm({ pool, rounds, teams, matchups }) {
       const pickInserts = Object.entries(picks)
         .filter(([_, value]) => value === true)
         .map(([key]) => {
-          const [teamId, roundId] = key.split('|')
+          const [teamId, roundId] = key.split('-')
           return {
             pool_entry_id: entryId,
             team_id: teamId,
@@ -556,6 +564,24 @@ export default function AdvancementPickForm({ pool, rounds, teams, matchups }) {
         </span>
       </div>
 
+      {/* DEBUG: Show loaded picks (remove this later) */}
+      {Object.keys(picks).length > 0 && (
+        <div style={{
+          padding: 12,
+          background: '#f0f9ff',
+          border: '1px solid #0ea5e9',
+          borderRadius: 8,
+          marginBottom: 16,
+          fontSize: 12,
+          fontFamily: 'monospace'
+        }}>
+          <strong>DEBUG - Loaded {Object.keys(picks).length} picks:</strong>
+          <pre style={{ margin: '8px 0 0 0', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+            {JSON.stringify(picks, null, 2)}
+          </pre>
+        </div>
+      )}
+
       {/* Rounds */}
       {sortedRounds.map((round, idx) => (
         <RoundSection
@@ -638,6 +664,10 @@ function RoundSection({
   teams
 }) {
   const required = getRequiredPicks(round.round_order)
+  
+  // Debug: Check if any picks match this round
+  const picksForThisRound = Object.keys(picks).filter(key => key.endsWith(`-${round.id}`))
+  console.log(`Round ${round.name} (${round.id}): ${picksForThisRound.length} picks found`, picksForThisRound)
 
   return (
     <div style={{
@@ -698,8 +728,8 @@ function RoundSection({
                     key={matchup.id}
                     matchup={matchup}
                     pickedTeamId={
-                      picks[`${matchup.team_a_id}|${round.id}`] ? matchup.team_a_id :
-                      picks[`${matchup.team_b_id}|${round.id}`] ? matchup.team_b_id : null
+                      picks[`${matchup.team_a_id}-${round.id}`] ? matchup.team_a_id :
+                      picks[`${matchup.team_b_id}-${round.id}`] ? matchup.team_b_id : null
                     }
                     onPick={(teamId) => onWildCardPick(matchup.id, teamId)}
                   />
@@ -751,7 +781,7 @@ function RoundSection({
                 </p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {selectableTeams.map(team => {
-                    const isSelected = picks[`${team.id}|${round.id}`]
+                    const isSelected = picks[`${team.id}-${round.id}`]
                     return (
                       <button
                         key={team.id}
@@ -800,7 +830,7 @@ function RoundSection({
             {['AFC', 'NFC'].map(conference => {
               const selectableTeams = getSelectableTeams(round, conference)
               return selectableTeams.map(team => {
-                const isSelected = picks[`${team.id}|${round.id}`]
+                const isSelected = picks[`${team.id}-${round.id}`]
                 return (
                   <button
                     key={team.id}

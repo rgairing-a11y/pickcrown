@@ -21,6 +21,10 @@ export default function AdvancementPickForm({ pool, rounds, teams, matchups }) {
   const [existingEntry, setExistingEntry] = useState(null)
   const [loading, setLoading] = useState(false)
 
+  // Helper to create/parse pick keys (using | as separator since UUIDs contain -)
+  const makePickKey = (teamId, roundId) => `${teamId}|${roundId}`
+  const parsePickKey = (key) => key.split('|')
+
   // Pre-fill email from localStorage and check for existing entry
   useEffect(() => {
     const savedEmail = localStorage.getItem('pickcrown_email')
@@ -50,6 +54,8 @@ export default function AdvancementPickForm({ pool, rounds, teams, matchups }) {
         .eq('email', emailToCheck.toLowerCase().trim())
         .single()
 
+      console.log('Checking for existing entry:', { email: emailToCheck, poolId: pool.id, entry, error: entryError })
+
       if (entry) {
         setExistingEntry(entry)
         setEntryName(entry.entry_name)
@@ -61,14 +67,19 @@ export default function AdvancementPickForm({ pool, rounds, teams, matchups }) {
           .select('*')
           .eq('pool_entry_id', entry.id)
 
+        console.log('Loaded existing picks:', { count: existingPicks?.length, picks: existingPicks, error: picksError })
+
         if (existingPicks && existingPicks.length > 0) {
           const picksMap = {}
           existingPicks.forEach(p => {
             const key = `${p.team_id}|${p.round_id}`
             picksMap[key] = true
+            console.log('Pick loaded:', key)
           })
+          console.log('Setting picks state:', picksMap)
           setPicks(picksMap)
         } else {
+          console.log('No picks found, clearing state')
           setPicks({})
         }
       } else {
@@ -76,6 +87,7 @@ export default function AdvancementPickForm({ pool, rounds, teams, matchups }) {
         setPicks({})
       }
     } catch (err) {
+      console.error('Error loading entry:', err)
       setExistingEntry(null)
     }
     setLoading(false)
@@ -556,6 +568,24 @@ export default function AdvancementPickForm({ pool, rounds, teams, matchups }) {
         </span>
       </div>
 
+      {/* DEBUG: Show loaded picks (remove this later) */}
+      {Object.keys(picks).length > 0 && (
+        <div style={{
+          padding: 12,
+          background: '#f0f9ff',
+          border: '1px solid #0ea5e9',
+          borderRadius: 8,
+          marginBottom: 16,
+          fontSize: 12,
+          fontFamily: 'monospace'
+        }}>
+          <strong>DEBUG - Loaded {Object.keys(picks).length} picks:</strong>
+          <pre style={{ margin: '8px 0 0 0', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+            {JSON.stringify(picks, null, 2)}
+          </pre>
+        </div>
+      )}
+
       {/* Rounds */}
       {sortedRounds.map((round, idx) => (
         <RoundSection
@@ -638,6 +668,10 @@ function RoundSection({
   teams
 }) {
   const required = getRequiredPicks(round.round_order)
+  
+  // Debug: Check if any picks match this round
+  const picksForThisRound = Object.keys(picks).filter(key => key.endsWith(`|${round.id}`))
+  console.log(`Round ${round.name} (${round.id}): ${picksForThisRound.length} picks found`, picksForThisRound)
 
   return (
     <div style={{
