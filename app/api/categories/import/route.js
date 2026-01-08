@@ -38,8 +38,7 @@ export async function POST(request) {
           event_id: eventId,
           name: category.name,
           order_index: startIndex++,
-          type: 'single_select',
-          points: 1
+          type: 'single_select'
         })
         .select()
         .single()
