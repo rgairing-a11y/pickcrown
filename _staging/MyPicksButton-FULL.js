@@ -74,17 +74,16 @@ export default function MyPicksButton({
         style={{
           display: 'inline-flex',
           alignItems: 'center',
-          gap: 'var(--spacing-2)',
-          padding: 'var(--spacing-3) var(--spacing-5)',
-          background: 'var(--color-success)',
+          gap: 8,
+          padding: '12px 20px',
+          background: '#10b981',
           color: 'white',
-          borderRadius: 'var(--radius-lg)',
+          borderRadius: 8,
           textDecoration: 'none',
-          fontWeight: 'var(--font-semibold)',
+          fontWeight: 'bold',
           border: 'none',
           cursor: 'pointer',
-          fontSize: 'var(--font-size-base)',
-          transition: 'all var(--transition-fast)'
+          fontSize: 14
         }}
       >
         🎯 My Picks
@@ -99,45 +98,34 @@ export default function MyPicksButton({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 'var(--z-modal)',
-          padding: 'var(--spacing-6)'
+          zIndex: 50,
+          padding: 24
         }}>
           <div style={{
-            background: 'var(--color-white)',
-            borderRadius: 'var(--radius-xl)',
-            padding: 'var(--spacing-6)',
+            background: 'white',
+            borderRadius: 12,
+            padding: 24,
             maxWidth: 500,
             width: '100%',
             maxHeight: '80vh',
             overflow: 'auto',
-            boxShadow: 'var(--shadow-xl)'
+            boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
           }}>
             <div style={{ 
               display: 'flex', 
               justifyContent: 'space-between', 
               alignItems: 'center',
-              marginBottom: 'var(--spacing-5)'
+              marginBottom: 20
             }}>
-              <h2 style={{ 
-                margin: 0, 
-                fontSize: 'var(--font-size-xl)',
-                fontWeight: 'var(--font-semibold)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 'var(--spacing-2)'
-              }}>
-                🎯 My Picks
-              </h2>
+              <h2 style={{ margin: 0, fontSize: 20 }}>🎯 My Picks</h2>
               <button
                 onClick={handleClose}
                 style={{
                   background: 'none',
                   border: 'none',
-                  fontSize: 'var(--font-size-2xl)',
+                  fontSize: 24,
                   cursor: 'pointer',
-                  color: 'var(--color-text-muted)',
-                  padding: 'var(--spacing-1)',
-                  lineHeight: 1
+                  color: '#6b7280'
                 }}
               >
                 ×
@@ -147,8 +135,8 @@ export default function MyPicksButton({
             {/* Email Input */}
             <div style={{ 
               display: 'flex', 
-              gap: 'var(--spacing-3)', 
-              marginBottom: 'var(--spacing-5)'
+              gap: 12, 
+              marginBottom: 20
             }}>
               <input
                 type="email"
@@ -158,26 +146,24 @@ export default function MyPicksButton({
                 placeholder="Enter your email"
                 style={{
                   flex: 1,
-                  padding: 'var(--spacing-3) var(--spacing-4)',
-                  border: '1px solid var(--color-border)',
-                  borderRadius: 'var(--radius-lg)',
-                  fontSize: 'var(--font-size-base)',
-                  background: 'var(--color-white)'
+                  padding: '10px 14px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: 8,
+                  fontSize: 14
                 }}
               />
               <button
                 onClick={handleSearch}
                 style={{
-                  padding: 'var(--spacing-3) var(--spacing-5)',
-                  background: 'var(--color-primary)',
+                  padding: '10px 20px',
+                  background: '#3b82f6',
                   color: 'white',
                   border: 'none',
-                  borderRadius: 'var(--radius-lg)',
+                  borderRadius: 8,
                   cursor: 'pointer',
-                  fontSize: 'var(--font-size-base)',
-                  fontWeight: 'var(--font-semibold)',
-                  whiteSpace: 'nowrap',
-                  transition: 'all var(--transition-fast)'
+                  fontSize: 14,
+                  fontWeight: 600,
+                  whiteSpace: 'nowrap'
                 }}
               >
                 Find
@@ -187,10 +173,10 @@ export default function MyPicksButton({
             {/* Results */}
             {searched && !myEntry && email && (
               <div style={{
-                padding: 'var(--spacing-4)',
-                background: 'var(--color-danger-light)',
-                borderRadius: 'var(--radius-lg)',
-                color: 'var(--color-danger)'
+                padding: 16,
+                background: '#fef2f2',
+                borderRadius: 8,
+                color: '#dc2626'
               }}>
                 No entry found for "{email}" in this pool.
               </div>
@@ -202,40 +188,33 @@ export default function MyPicksButton({
                   display: 'flex', 
                   justifyContent: 'space-between', 
                   alignItems: 'center',
-                  marginBottom: 'var(--spacing-4)',
-                  padding: 'var(--spacing-3) var(--spacing-4)',
-                  background: 'var(--color-success-light)',
-                  borderRadius: 'var(--radius-lg)'
+                  marginBottom: 16,
+                  padding: 12,
+                  background: '#f0fdf4',
+                  borderRadius: 8
                 }}>
                   <div>
-                    <div style={{ 
-                      fontWeight: 'var(--font-semibold)', 
-                      fontSize: 'var(--font-size-lg)', 
-                      color: 'var(--color-success-dark)' 
-                    }}>
+                    <div style={{ fontWeight: 600, fontSize: 16, color: '#166534' }}>
                       {myEntry.entry_name}
                     </div>
-                    <div style={{ 
-                      fontSize: 'var(--font-size-xs)', 
-                      color: 'var(--color-text-muted)' 
-                    }}>
+                    <div style={{ fontSize: 12, color: '#6b7280' }}>
                       {myEntry.email}
                     </div>
                   </div>
                   <div style={{ 
-                    background: 'var(--color-success)', 
-                    padding: 'var(--spacing-2) var(--spacing-3)', 
-                    borderRadius: 'var(--radius-md)',
-                    fontWeight: 'var(--font-semibold)',
-                    fontSize: 'var(--font-size-sm)',
-                    color: 'white'
+                    background: '#dcfce7', 
+                    padding: '6px 12px', 
+                    borderRadius: 6,
+                    fontWeight: 600,
+                    fontSize: 13,
+                    color: '#166534'
                   }}>
                     {myPicks.length} picks
                   </div>
                 </div>
 
                 {/* Picks List */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-2)' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {matchups?.filter(m => picksByMatchup[m.id]).map(matchup => {
                     const pick = picksByMatchup[matchup.id]
                     // Use picked_team from the pick data (works even when matchup teams are null)
@@ -252,33 +231,25 @@ export default function MyPicksButton({
                           display: 'flex',
                           justifyContent: 'space-between',
                           alignItems: 'center',
-                          padding: 'var(--spacing-3) var(--spacing-4)',
-                          background: isCorrect 
-                            ? 'var(--color-success-light)' 
-                            : isWrong 
-                              ? 'var(--color-danger-light)' 
-                              : 'var(--color-background)',
-                          borderRadius: 'var(--radius-md)',
-                          fontSize: 'var(--font-size-sm)'
+                          padding: '8px 12px',
+                          background: isCorrect ? '#dcfce7' : isWrong ? '#fee2e2' : '#f9fafb',
+                          borderRadius: 6,
+                          fontSize: 14
                         }}
                       >
                         <div>
-                          <span style={{ 
-                            fontSize: 'var(--font-size-xs)', 
-                            color: 'var(--color-text-muted)', 
-                            marginRight: 'var(--spacing-2)' 
-                          }}>
+                          <span style={{ fontSize: 11, color: '#9ca3af', marginRight: 6 }}>
                             {roundNames?.[matchup.round_id] || 'Round'}:
                           </span>
-                          <span style={{ fontWeight: 'var(--font-medium)' }}>
+                          <span style={{ fontWeight: 500 }}>
                             {pickedTeam?.seed && `#${pickedTeam.seed} `}
                             {pickedTeam?.name || 'Unknown'}
                           </span>
                         </div>
-                        <div style={{ fontSize: 'var(--font-size-sm)' }}>
-                          {isCorrect && <span style={{ color: 'var(--color-success)' }}>✓</span>}
-                          {isWrong && <span style={{ color: 'var(--color-danger)' }}>✗</span>}
-                          {isPending && <span style={{ color: 'var(--color-text-muted)' }}>—</span>}
+                        <div style={{ fontSize: 13 }}>
+                          {isCorrect && <span style={{ color: '#16a34a' }}>✓</span>}
+                          {isWrong && <span style={{ color: '#dc2626' }}>✗</span>}
+                          {isPending && <span style={{ color: '#9ca3af' }}>—</span>}
                         </div>
                       </div>
                     )
