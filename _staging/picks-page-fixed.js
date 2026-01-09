@@ -1,4 +1,3 @@
-import React from 'react'
 import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
 
@@ -236,9 +235,9 @@ export default async function PicksMatrixPage({ params }) {
               {eventType === 'bracket' && roundGroups ? (
                 // Grouped by round for bracket events
                 roundGroups.map((group, groupIdx) => (
-                  <React.Fragment key={`round-${group.name}`}>
+                  <>
                     {/* Round Header Row */}
-                    <tr style={{ background: '#e0e7ff' }}>
+                    <tr key={`header-${group.name}`} style={{ background: '#e0e7ff' }}>
                       <td 
                         colSpan={1 + (entries?.length || 0)} 
                         style={{ 
@@ -317,7 +316,7 @@ export default async function PicksMatrixPage({ params }) {
                         </tr>
                       )
                     })}
-                  </React.Fragment>
+                  </>
                 ))
               ) : (
                 // Flat list for category events
