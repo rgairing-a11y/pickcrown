@@ -57,53 +57,6 @@ export default async function StandingsPage({ params }) {
   const isCompleted = pool.event?.status === 'completed'
 
   // =====================================================
-  // GET LAST RESULT TIMESTAMP
-  // =====================================================
-  let lastResultTime = null
-  
-  if (eventConfig.hasTeamEliminations) {
-    // NFL-style: get last elimination entry
-    const { data: lastElim } = await supabase
-      .from('team_eliminations')
-      .select('created_at')
-      .eq('event_id', pool.event.id)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single()
-    lastResultTime = lastElim?.created_at
-  } else if (eventConfig.hasCategories) {
-    // Category-based: get categories for this event, then find last result
-    const { data: categories } = await supabase
-      .from('categories')
-      .select('id')
-      .eq('event_id', pool.event.id)
-    
-    if (categories && categories.length > 0) {
-      const categoryIds = categories.map(c => c.id)
-      const { data: lastResult } = await supabase
-        .from('category_options')
-        .select('updated_at')
-        .in('category_id', categoryIds)
-        .eq('is_correct', true)
-        .order('updated_at', { ascending: false })
-        .limit(1)
-        .single()
-      lastResultTime = lastResult?.updated_at
-    }
-  } else if (eventConfig.hasMatchups) {
-    // Bracket-based: get last matchup with winner set
-    const { data: lastMatchup } = await supabase
-      .from('matchups')
-      .select('updated_at')
-      .eq('event_id', pool.event.id)
-      .not('winner_team_id', 'is', null)
-      .order('updated_at', { ascending: false })
-      .limit(1)
-      .single()
-    lastResultTime = lastMatchup?.updated_at
-  }
-
-  // =====================================================
   // CONDITIONAL DATA LOADING (based on event type)
   // =====================================================
 
@@ -141,37 +94,15 @@ export default async function StandingsPage({ params }) {
   // RENDER
   // =====================================================
 
-  // Format last result timestamp for display
-  const updatedAt = lastResultTime 
-    ? new Date(lastResultTime).toLocaleString('en-US', {
-        month: 'numeric',
-        day: 'numeric',
-        year: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true
-      })
-    : null
-
   return (
     <div style={{ padding: 24, maxWidth: 900, margin: '0 auto' }}>
       {/* Header */}
       <h1 style={{ fontSize: '28px', marginBottom: 8 }}>
         {pool.name} — Standings
       </h1>
-      <p style={{ color: '#666', marginBottom: 8 }}>
+      <p style={{ color: '#666', marginBottom: 24 }}>
         {pool.event.name} {pool.event.year}
       </p>
-      {updatedAt && (
-        <p style={{ color: '#9ca3af', fontSize: 13, marginBottom: 24 }}>
-          📊 Results updated {updatedAt}
-        </p>
-      )}
-      {!updatedAt && isLocked && (
-        <p style={{ color: '#9ca3af', fontSize: 13, marginBottom: 24 }}>
-          ⏳ No results entered yet
-        </p>
-      )}
 
       {/* Action Buttons */}
       <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: 24 }}>
@@ -401,26 +332,12 @@ async function loadPopularAdvancementPicks(eventId, poolId, supabase) {
     .select('round_id, team_id')
     .in('pool_entry_id', entryIds)
 
-  // Load eliminations WITH defeated_by_team_id to know winners
   const { data: eliminations } = await supabase
     .from('team_eliminations')
-    .select('team_id, eliminated_in_round_id, defeated_by_team_id')
+    .select('team_id, eliminated_in_round_id')
     .eq('event_id', eventId)
 
-  // Map of team_id -> round they were eliminated in (losers)
   const elimMap = Object.fromEntries((eliminations || []).map(e => [e.team_id, e.eliminated_in_round_id]))
-  
-  // Map of team_id -> round they won in (winners via defeated_by_team_id)
-  const winnerMap = {}
-  ;(eliminations || []).forEach(e => {
-    if (e.defeated_by_team_id) {
-      if (!winnerMap[e.defeated_by_team_id]) {
-        winnerMap[e.defeated_by_team_id] = []
-      }
-      winnerMap[e.defeated_by_team_id].push(e.eliminated_in_round_id)
-    }
-  })
-  
   const teamMap = Object.fromEntries((teams || []).map(t => [t.id, t]))
   const totalEntries = entryIds.length
 
@@ -441,12 +358,10 @@ async function loadPopularAdvancementPicks(eventId, poolId, supabase) {
       .map(([teamId, count]) => {
         const team = teamMap[teamId]
         const elimRoundId = elimMap[teamId]
-        const wonRoundIds = winnerMap[teamId] || []
         
-        // Determine status based on what we know for certain
+        // Determine status based ONLY on what we know for certain
         let status = 'pending' // Default: no result yet
         
-        // Check if team was eliminated
         if (elimRoundId) {
           const elimRoundOrder = roundOrderMap[elimRoundId]
           if (elimRoundOrder === round.round_order) {
@@ -456,15 +371,11 @@ async function loadPopularAdvancementPicks(eventId, poolId, supabase) {
             // Team was eliminated in a LATER round = they advanced past this round
             status = 'advanced'
           }
+          // If eliminated in earlier round, status stays 'pending' for this round
+          // (shouldn't happen in normal bracket logic)
         }
-        
-        // Check if team WON a game in this round (via defeated_by_team_id)
-        if (status === 'pending' && wonRoundIds.length > 0) {
-          const wonThisRound = wonRoundIds.some(roundId => roundOrderMap[roundId] === round.round_order)
-          if (wonThisRound) {
-            status = 'advanced'
-          }
-        }
+        // If team not in elimMap, we DON'T know if they advanced or just haven't played
+        // So status stays 'pending' - no checkmark, no X
         
         return {
           teamId,

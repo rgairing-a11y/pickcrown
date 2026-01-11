@@ -6,7 +6,17 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 
-export default function MyPicksButton({ pool, userEmail }) {
+export default function MyPicksButton({ 
+  // New props
+  pool, 
+  poolId: propPoolId, 
+  userEmail,
+  // Legacy props (from existing standings page)
+  poolEntries,
+  bracketPicks,
+  matchups: legacyMatchups,
+  roundNames
+}) {
   const [isOpen, setIsOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [entry, setEntry] = useState(null)
@@ -21,16 +31,43 @@ export default function MyPicksButton({ pool, userEmail }) {
   const [searchedEmail, setSearchedEmail] = useState('')
   const [jsonPicks, setJsonPicks] = useState(null) // For picks stored in JSON column
 
-  // Safely get pool and event IDs
-  const poolId = pool?.id
-  const eventId = pool?.event?.id || pool?.event_id
-  const usesReseeding = pool?.event?.uses_reseeding === true
+  // Determine if using legacy mode (data passed in) vs new mode (fetch data)
+  // Check for actual data, not just truthy arrays (empty arrays are truthy!)
+  const isLegacyMode = !!(
+    poolEntries && poolEntries.length > 0 && 
+    bracketPicks && bracketPicks.length > 0 && 
+    legacyMatchups && legacyMatchups.length > 0
+  )
+
+  // Safely get pool and event IDs - accept poolId prop as fallback
+  const poolId = pool?.id || propPoolId
+  const [eventData, setEventData] = useState(pool?.event || null)
+  const eventId = eventData?.id || pool?.event?.id || pool?.event_id
+  const usesReseeding = eventData?.uses_reseeding || pool?.event?.uses_reseeding === true
+
+  // Legacy mode: render old style component
+  if (isLegacyMode) {
+    return (
+      <LegacyMyPicksButton
+        poolEntries={poolEntries}
+        bracketPicks={bracketPicks}
+        matchups={legacyMatchups}
+        roundNames={roundNames}
+      />
+    )
+  }
 
   const loadPicks = async (email) => {
     if (!email || !poolId) {
       console.error('Missing email or poolId', { email, poolId })
       return
     }
+    
+    console.log('=== MyPicksButton Debug ===')
+    console.log('Pool:', pool)
+    console.log('Pool ID:', poolId)
+    console.log('Event Data:', eventData)
+    console.log('Event ID:', eventId)
     setLoading(true)
     setSearchedEmail(email)
 
@@ -59,8 +96,30 @@ export default function MyPicksButton({ pool, userEmail }) {
         setJsonPicks(entryData.picks)
       }
 
-      if (!eventId) {
-        console.error('Missing eventId')
+      // Fetch event data if we don't have it
+      let currentEventId = eventId
+      let isReseeding = eventData?.uses_reseeding || false
+      
+      if (!currentEventId) {
+        console.log('Fetching event ID from pool...')
+        const { data: poolData } = await supabase
+          .from('pools')
+          .select('event_id, event:events(id, name, uses_reseeding, start_time)')
+          .eq('id', poolId)
+          .single()
+        
+        if (poolData?.event) {
+          setEventData(poolData.event)
+          currentEventId = poolData.event.id
+          isReseeding = poolData.event.uses_reseeding || false
+        } else if (poolData?.event_id) {
+          currentEventId = poolData.event_id
+        }
+        console.log('Fetched event ID:', currentEventId, 'uses_reseeding:', isReseeding)
+      }
+
+      if (!currentEventId) {
+        console.error('Missing eventId after fetch attempt')
         setLoading(false)
         return
       }
@@ -69,31 +128,36 @@ export default function MyPicksButton({ pool, userEmail }) {
       const { data: roundsData } = await supabase
         .from('rounds')
         .select('*')
-        .eq('event_id', eventId)
+        .eq('event_id', currentEventId)
         .order('round_order')
       setRounds(roundsData || [])
+      console.log('Rounds:', roundsData?.length)
 
       // Get teams
       const { data: teamsData } = await supabase
         .from('teams')
         .select('*')
-        .eq('event_id', eventId)
+        .eq('event_id', currentEventId)
         .order('seed')
       setTeams(teamsData || [])
+      console.log('Teams:', teamsData?.length)
 
-      if (usesReseeding) {
+      console.log('Uses reseeding:', isReseeding)
+
+      if (isReseeding) {
         // NFL-style: Load advancement picks
         const { data: advPicks } = await supabase
           .from('advancement_picks')
           .select('*')
           .eq('pool_entry_id', entryData.id)
         setPicks(advPicks || [])
+        console.log('Advancement picks:', advPicks?.length)
 
         // Get eliminations for correct/incorrect display
         const { data: elimData } = await supabase
           .from('team_eliminations')
           .select('*')
-          .eq('event_id', eventId)
+          .eq('event_id', currentEventId)
         
         const elimMap = {}
         elimData?.forEach(e => {
@@ -106,18 +170,22 @@ export default function MyPicksButton({ pool, userEmail }) {
         const { data: matchupsData } = await supabase
           .from('matchups')
           .select('*, round:rounds(name, round_order, points)')
-          .eq('event_id', eventId)
+          .eq('event_id', currentEventId)
           .order('bracket_position')
         setMatchups(matchupsData || [])
+        console.log('Matchups:', matchupsData?.length)
 
         const { data: bracketPicks } = await supabase
           .from('bracket_picks')
           .select('*')
           .eq('pool_entry_id', entryData.id)
         
+        console.log('Bracket picks:', bracketPicks?.length)
+        
         // If bracket_picks table has data, use it
         if (bracketPicks && bracketPicks.length > 0) {
-          setPicks(bracketPicks)
+          // Note: bracket_picks uses picked_team_id column
+          setPicks(bracketPicks.map(p => ({ ...p, team_id: p.picked_team_id })))
         } else {
           // Otherwise picks might be in JSON column (handled above)
           setPicks([])
@@ -127,7 +195,7 @@ export default function MyPicksButton({ pool, userEmail }) {
         const { data: catsData } = await supabase
           .from('categories')
           .select('*, options:category_options(*)')
-          .eq('event_id', eventId)
+          .eq('event_id', currentEventId)
           .order('order_index')
         setCategories(catsData || [])
 
@@ -849,5 +917,252 @@ function StandardPicksDisplay({ picks, matchups, teams, teamMap, categories, cat
         </div>
       )}
     </div>
+  )
+}
+
+// Legacy MyPicksButton - matches the original API from standings page
+function LegacyMyPicksButton({ poolEntries, bracketPicks, matchups, roundNames }) {
+  const [isOpen, setIsOpen] = useState(false)
+  const [email, setEmail] = useState('')
+  const [foundEntries, setFoundEntries] = useState([])
+
+  // Pre-fill from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('pickcrown_email')
+    if (saved) {
+      setEmail(saved)
+      findEntries(saved)
+    }
+  }, [])
+
+  const findEntries = (searchEmail) => {
+    if (!searchEmail) {
+      setFoundEntries([])
+      return
+    }
+    const matches = poolEntries.filter(e => 
+      e.email?.toLowerCase() === searchEmail.toLowerCase()
+    )
+    setFoundEntries(matches)
+  }
+
+  const handleFind = () => {
+    findEntries(email)
+    localStorage.setItem('pickcrown_email', email.toLowerCase())
+  }
+
+  // Group matchups by round
+  const matchupsByRound = {}
+  matchups?.forEach(m => {
+    const roundName = roundNames?.[m.round_id] || 'Unknown'
+    if (!matchupsByRound[m.round_id]) {
+      matchupsByRound[m.round_id] = { name: roundName, matchups: [] }
+    }
+    matchupsByRound[m.round_id].matchups.push(m)
+  })
+
+  return (
+    <>
+      <button
+        onClick={() => setIsOpen(true)}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          padding: '12px 20px',
+          background: '#3b82f6',
+          color: 'white',
+          border: 'none',
+          borderRadius: 8,
+          cursor: 'pointer',
+          fontWeight: 'bold',
+          fontSize: 14
+        }}
+      >
+        🎯 My Picks
+      </button>
+
+      {isOpen && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 50,
+          padding: 16
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: 12,
+            maxWidth: 600,
+            width: '100%',
+            maxHeight: '90vh',
+            overflow: 'auto'
+          }}>
+            {/* Header */}
+            <div style={{
+              padding: 20,
+              borderBottom: '1px solid #e5e7eb',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <h2 style={{ margin: 0, fontSize: 20 }}>🎯 My Picks</h2>
+              <button
+                onClick={() => setIsOpen(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: 24,
+                  cursor: 'pointer',
+                  color: '#666'
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Email Search */}
+            <div style={{ padding: 20, borderBottom: '1px solid #e5e7eb', background: '#f9fafb' }}>
+              <div style={{ display: 'flex', gap: 12 }}>
+                <input
+                  type="email"
+                  placeholder="Enter your email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleFind()}
+                  style={{
+                    flex: 1,
+                    padding: '10px 14px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: 8,
+                    fontSize: 14
+                  }}
+                />
+                <button
+                  onClick={handleFind}
+                  style={{
+                    padding: '10px 24px',
+                    background: '#22c55e',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: 8,
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Find
+                </button>
+              </div>
+
+              {foundEntries.length > 0 && (
+                <div style={{ marginTop: 12 }}>
+                  {foundEntries.map(entry => (
+                    <div key={entry.id} style={{
+                      padding: '8px 12px',
+                      background: '#dcfce7',
+                      borderRadius: 6,
+                      marginBottom: 8,
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center'
+                    }}>
+                      <div>
+                        <strong>{entry.entry_name}</strong>
+                        <span style={{ color: '#666', marginLeft: 8 }}>{entry.email}</span>
+                      </div>
+                      <span style={{
+                        padding: '2px 8px',
+                        background: '#3b82f6',
+                        color: 'white',
+                        borderRadius: 12,
+                        fontSize: 12
+                      }}>
+                        {bracketPicks?.filter(p => p.pool_entry_id === entry.id).length || 0} picks
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Picks Display */}
+            <div style={{ padding: 20 }}>
+              {foundEntries.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: 40, color: '#666' }}>
+                  Enter your email to view your picks
+                </div>
+              ) : (
+                foundEntries.map(entry => {
+                  const entryPicks = bracketPicks?.filter(p => p.pool_entry_id === entry.id) || []
+                  const pickMap = Object.fromEntries(entryPicks.map(p => [p.matchup_id, p.picked_team_id]))
+
+                  return (
+                    <div key={entry.id}>
+                      <h3 style={{ marginBottom: 16 }}>{entry.entry_name}</h3>
+                      
+                      {Object.entries(matchupsByRound).map(([roundId, roundData]) => (
+                        <div key={roundId} style={{ marginBottom: 20 }}>
+                          <h4 style={{
+                            fontSize: 14,
+                            padding: '8px 12px',
+                            background: '#eff6ff',
+                            borderRadius: 6,
+                            marginBottom: 8
+                          }}>
+                            {roundData.name}
+                          </h4>
+                          
+                          {roundData.matchups.map(matchup => {
+                            const pickedTeamId = pickMap[matchup.id]
+                            const teamA = matchup.team_a
+                            const teamB = matchup.team_b
+                            const winner = matchup.winner_team_id
+                            
+                            let pickedTeamName = '—'
+                            if (pickedTeamId === teamA?.id) pickedTeamName = teamA?.name
+                            else if (pickedTeamId === teamB?.id) pickedTeamName = teamB?.name
+                            
+                            const isCorrect = winner && pickedTeamId === winner
+                            const isWrong = winner && pickedTeamId && pickedTeamId !== winner
+
+                            return (
+                              <div key={matchup.id} style={{
+                                padding: 10,
+                                marginBottom: 6,
+                                background: isCorrect ? '#dcfce7' : isWrong ? '#fee2e2' : '#f9fafb',
+                                borderRadius: 6,
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                fontSize: 13
+                              }}>
+                                <span style={{ color: '#666' }}>
+                                  {teamA?.seed ? `#${teamA.seed} ` : ''}{teamA?.name || 'TBD'} vs {teamB?.seed ? `#${teamB.seed} ` : ''}{teamB?.name || 'TBD'}
+                                </span>
+                                <span style={{
+                                  fontWeight: 600,
+                                  color: isCorrect ? '#16a34a' : isWrong ? '#dc2626' : '#374151'
+                                }}>
+                                  {pickedTeamName}
+                                  {isCorrect && ' ✓'}
+                                  {isWrong && ' ✗'}
+                                </span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      ))}
+                    </div>
+                  )
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   )
 }

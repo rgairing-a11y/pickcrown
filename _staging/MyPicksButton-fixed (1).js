@@ -23,14 +23,21 @@ export default function MyPicksButton({ pool, userEmail }) {
 
   // Safely get pool and event IDs
   const poolId = pool?.id
-  const eventId = pool?.event?.id || pool?.event_id
-  const usesReseeding = pool?.event?.uses_reseeding === true
+  const [eventData, setEventData] = useState(pool?.event || null)
+  const eventId = eventData?.id || pool?.event?.id || pool?.event_id
+  const usesReseeding = eventData?.uses_reseeding || pool?.event?.uses_reseeding === true
 
   const loadPicks = async (email) => {
     if (!email || !poolId) {
       console.error('Missing email or poolId', { email, poolId })
       return
     }
+    
+    console.log('=== MyPicksButton Debug ===')
+    console.log('Pool:', pool)
+    console.log('Pool ID:', poolId)
+    console.log('Event Data:', eventData)
+    console.log('Event ID:', eventId)
     setLoading(true)
     setSearchedEmail(email)
 
@@ -59,8 +66,30 @@ export default function MyPicksButton({ pool, userEmail }) {
         setJsonPicks(entryData.picks)
       }
 
-      if (!eventId) {
-        console.error('Missing eventId')
+      // Fetch event data if we don't have it
+      let currentEventId = eventId
+      let isReseeding = eventData?.uses_reseeding || false
+      
+      if (!currentEventId) {
+        console.log('Fetching event ID from pool...')
+        const { data: poolData } = await supabase
+          .from('pools')
+          .select('event_id, event:events(id, name, uses_reseeding, start_time)')
+          .eq('id', poolId)
+          .single()
+        
+        if (poolData?.event) {
+          setEventData(poolData.event)
+          currentEventId = poolData.event.id
+          isReseeding = poolData.event.uses_reseeding || false
+        } else if (poolData?.event_id) {
+          currentEventId = poolData.event_id
+        }
+        console.log('Fetched event ID:', currentEventId, 'uses_reseeding:', isReseeding)
+      }
+
+      if (!currentEventId) {
+        console.error('Missing eventId after fetch attempt')
         setLoading(false)
         return
       }
@@ -69,31 +98,36 @@ export default function MyPicksButton({ pool, userEmail }) {
       const { data: roundsData } = await supabase
         .from('rounds')
         .select('*')
-        .eq('event_id', eventId)
+        .eq('event_id', currentEventId)
         .order('round_order')
       setRounds(roundsData || [])
+      console.log('Rounds:', roundsData?.length)
 
       // Get teams
       const { data: teamsData } = await supabase
         .from('teams')
         .select('*')
-        .eq('event_id', eventId)
+        .eq('event_id', currentEventId)
         .order('seed')
       setTeams(teamsData || [])
+      console.log('Teams:', teamsData?.length)
 
-      if (usesReseeding) {
+      console.log('Uses reseeding:', isReseeding)
+
+      if (isReseeding) {
         // NFL-style: Load advancement picks
         const { data: advPicks } = await supabase
           .from('advancement_picks')
           .select('*')
           .eq('pool_entry_id', entryData.id)
         setPicks(advPicks || [])
+        console.log('Advancement picks:', advPicks?.length)
 
         // Get eliminations for correct/incorrect display
         const { data: elimData } = await supabase
           .from('team_eliminations')
           .select('*')
-          .eq('event_id', eventId)
+          .eq('event_id', currentEventId)
         
         const elimMap = {}
         elimData?.forEach(e => {
@@ -106,18 +140,22 @@ export default function MyPicksButton({ pool, userEmail }) {
         const { data: matchupsData } = await supabase
           .from('matchups')
           .select('*, round:rounds(name, round_order, points)')
-          .eq('event_id', eventId)
+          .eq('event_id', currentEventId)
           .order('bracket_position')
         setMatchups(matchupsData || [])
+        console.log('Matchups:', matchupsData?.length)
 
         const { data: bracketPicks } = await supabase
           .from('bracket_picks')
           .select('*')
           .eq('pool_entry_id', entryData.id)
         
+        console.log('Bracket picks:', bracketPicks?.length)
+        
         // If bracket_picks table has data, use it
         if (bracketPicks && bracketPicks.length > 0) {
-          setPicks(bracketPicks)
+          // Note: bracket_picks uses picked_team_id column
+          setPicks(bracketPicks.map(p => ({ ...p, team_id: p.picked_team_id })))
         } else {
           // Otherwise picks might be in JSON column (handled above)
           setPicks([])
@@ -127,7 +165,7 @@ export default function MyPicksButton({ pool, userEmail }) {
         const { data: catsData } = await supabase
           .from('categories')
           .select('*, options:category_options(*)')
-          .eq('event_id', eventId)
+          .eq('event_id', currentEventId)
           .order('order_index')
         setCategories(catsData || [])
 

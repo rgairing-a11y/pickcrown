@@ -102,23 +102,9 @@ export default async function AllPicksPage({ params }) {
       .select('*')
       .eq('event_id', pool.event.id)
 
-    // Track losers (eliminated teams) by round
     elimData?.forEach(e => {
       eliminations[e.team_id] = e.eliminated_in_round_id
     })
-    
-    // Track winners (defeated_by_team_id) by round
-    const winners = {}
-    elimData?.forEach(e => {
-      if (e.defeated_by_team_id) {
-        if (!winners[e.defeated_by_team_id]) {
-          winners[e.defeated_by_team_id] = []
-        }
-        winners[e.defeated_by_team_id].push(e.eliminated_in_round_id)
-      }
-    })
-    // Store winners in eliminations object with special key
-    eliminations._winners = winners
 
   } else {
     // Standard bracket: Load bracket_picks and matchups
@@ -143,7 +129,7 @@ export default async function AllPicksPage({ params }) {
       if (!picksData[pick.pool_entry_id]) {
         picksData[pick.pool_entry_id] = {}
       }
-      picksData[pick.pool_entry_id][pick.matchup_id] = pick.picked_team_id
+      picksData[pick.pool_entry_id][pick.matchup_id] = pick.team_id
     })
   }
 
@@ -280,34 +266,19 @@ export default async function AllPicksPage({ params }) {
                                   const team = teamMap[teamId]
                                   if (!team) return null
 
-                                  // Check if correct using both eliminations and winners
+                                  // Check if correct
                                   const elimRoundId = eliminations[teamId]
-                                  const winners = eliminations._winners || {}
-                                  const wonRoundIds = winners[teamId] || []
                                   let isCorrect = null
                                   
                                   if (elimRoundId) {
                                     const elimRound = rounds?.find(r => r.id === elimRoundId)
                                     if (elimRound) {
-                                      if (elimRound.round_order === round.round_order) {
-                                        // Team was eliminated IN THIS ROUND = wrong
-                                        isCorrect = false
-                                      } else if (elimRound.round_order > round.round_order) {
-                                        // Team advanced past this round if eliminated in later round
-                                        isCorrect = true
-                                      }
+                                      // Team advanced past this round if eliminated in later round
+                                      isCorrect = elimRound.round_order > round.round_order
                                     }
-                                  }
-                                  
-                                  // Check if team WON a game in this round
-                                  if (isCorrect === null && wonRoundIds.length > 0) {
-                                    const wonThisRound = wonRoundIds.some(roundId => {
-                                      const wonRound = rounds?.find(r => r.id === roundId)
-                                      return wonRound && wonRound.round_order === round.round_order
-                                    })
-                                    if (wonThisRound) {
-                                      isCorrect = true
-                                    }
+                                  } else if (Object.keys(eliminations).length > 0) {
+                                    // Team still alive = correct for rounds before current
+                                    isCorrect = true
                                   }
 
                                   const bgColor = isCorrect === true 

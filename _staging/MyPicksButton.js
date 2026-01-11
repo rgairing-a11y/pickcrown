@@ -1,5 +1,5 @@
 // components/MyPicksButton.js
-// Fixed version that handles pool structure and both bracket_picks table AND picks JSON column
+// Unified My Picks button that handles both standard brackets and NFL reseeding
 
 'use client'
 
@@ -19,57 +19,36 @@ export default function MyPicksButton({ pool, userEmail }) {
   const [eliminations, setEliminations] = useState({})
   const [emailInput, setEmailInput] = useState(userEmail || '')
   const [searchedEmail, setSearchedEmail] = useState('')
-  const [jsonPicks, setJsonPicks] = useState(null) // For picks stored in JSON column
 
-  // Safely get pool and event IDs
-  const poolId = pool?.id
-  const eventId = pool?.event?.id || pool?.event_id
   const usesReseeding = pool?.event?.uses_reseeding === true
 
   const loadPicks = async (email) => {
-    if (!email || !poolId) {
-      console.error('Missing email or poolId', { email, poolId })
-      return
-    }
+    if (!email) return
     setLoading(true)
     setSearchedEmail(email)
 
     try {
-      // Get user's entry (including picks JSON column if it exists)
-      const { data: entryData, error: entryError } = await supabase
+      // Get user's entry
+      const { data: entryData } = await supabase
         .from('pool_entries')
         .select('*')
-        .eq('pool_id', poolId)
+        .eq('pool_id', pool.id)
         .eq('email', email.toLowerCase().trim())
         .single()
 
-      if (entryError || !entryData) {
-        console.log('No entry found:', entryError)
+      if (!entryData) {
         setEntry(null)
         setPicks([])
-        setJsonPicks(null)
         setLoading(false)
         return
       }
       setEntry(entryData)
-      
-      // Check if picks are stored in JSON column
-      if (entryData.picks && typeof entryData.picks === 'object') {
-        console.log('Found JSON picks:', entryData.picks)
-        setJsonPicks(entryData.picks)
-      }
-
-      if (!eventId) {
-        console.error('Missing eventId')
-        setLoading(false)
-        return
-      }
 
       // Get rounds
       const { data: roundsData } = await supabase
         .from('rounds')
         .select('*')
-        .eq('event_id', eventId)
+        .eq('event_id', pool.event.id)
         .order('round_order')
       setRounds(roundsData || [])
 
@@ -77,7 +56,7 @@ export default function MyPicksButton({ pool, userEmail }) {
       const { data: teamsData } = await supabase
         .from('teams')
         .select('*')
-        .eq('event_id', eventId)
+        .eq('event_id', pool.event.id)
         .order('seed')
       setTeams(teamsData || [])
 
@@ -93,7 +72,7 @@ export default function MyPicksButton({ pool, userEmail }) {
         const { data: elimData } = await supabase
           .from('team_eliminations')
           .select('*')
-          .eq('event_id', eventId)
+          .eq('event_id', pool.event.id)
         
         const elimMap = {}
         elimData?.forEach(e => {
@@ -102,11 +81,11 @@ export default function MyPicksButton({ pool, userEmail }) {
         setEliminations(elimMap)
 
       } else {
-        // Standard bracket - try bracket_picks table first
+        // Standard bracket
         const { data: matchupsData } = await supabase
           .from('matchups')
           .select('*, round:rounds(name, round_order, points)')
-          .eq('event_id', eventId)
+          .eq('event_id', pool.event.id)
           .order('bracket_position')
         setMatchups(matchupsData || [])
 
@@ -114,20 +93,13 @@ export default function MyPicksButton({ pool, userEmail }) {
           .from('bracket_picks')
           .select('*')
           .eq('pool_entry_id', entryData.id)
-        
-        // If bracket_picks table has data, use it
-        if (bracketPicks && bracketPicks.length > 0) {
-          setPicks(bracketPicks)
-        } else {
-          // Otherwise picks might be in JSON column (handled above)
-          setPicks([])
-        }
+        setPicks(bracketPicks || [])
 
         // Also load category picks if any
         const { data: catsData } = await supabase
           .from('categories')
           .select('*, options:category_options(*)')
-          .eq('event_id', eventId)
+          .eq('event_id', pool.event.id)
           .order('order_index')
         setCategories(catsData || [])
 
@@ -191,29 +163,6 @@ export default function MyPicksButton({ pool, userEmail }) {
     incorrect: picks.filter(p => isPickCorrect(p.team_id, p.round_id) === false).length,
     pending: picks.filter(p => isPickCorrect(p.team_id, p.round_id) === null).length,
   } : null
-
-  // Check if we have any picks data
-  const hasPicksData = picks.length > 0 || (jsonPicks && Object.keys(jsonPicks).length > 0)
-
-  if (!poolId) {
-    return (
-      <button
-        disabled
-        style={{
-          padding: '10px 20px',
-          background: '#9ca3af',
-          color: 'white',
-          border: 'none',
-          borderRadius: 8,
-          cursor: 'not-allowed',
-          fontWeight: 600,
-          fontSize: 14
-        }}
-      >
-        🎯 My Picks (Error: No pool)
-      </button>
-    )
-  }
 
   return (
     <>
@@ -365,7 +314,7 @@ export default function MyPicksButton({ pool, userEmail }) {
                 <div style={{ textAlign: 'center', padding: 40, color: '#666' }}>
                   No entry found for {searchedEmail}
                 </div>
-              ) : !hasPicksData ? (
+              ) : picks.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: 40, color: '#666' }}>
                   No picks submitted yet
                 </div>
@@ -381,17 +330,8 @@ export default function MyPicksButton({ pool, userEmail }) {
                   isPickCorrect={isPickCorrect}
                   nflStats={nflStats}
                 />
-              ) : jsonPicks && Object.keys(jsonPicks).length > 0 ? (
-                // JSON column picks display (for CFB and older events)
-                <JSONPicksDisplay
-                  picks={jsonPicks}
-                  matchups={matchups}
-                  teams={teams}
-                  teamMap={teamMap}
-                  categories={categories}
-                />
               ) : (
-                // Standard Bracket Picks Display (bracket_picks table)
+                // Standard Bracket Picks Display
                 <StandardPicksDisplay
                   picks={picks}
                   matchups={matchups}
@@ -613,128 +553,7 @@ function NFLPicksDisplay({ picks, rounds, teams, teamMap, roundMap, eliminations
   )
 }
 
-// JSON Column Picks Display (for CFB and older events)
-function JSONPicksDisplay({ picks, matchups, teams, teamMap, categories }) {
-  // picks is an object like { matchup_id: team_id, ... } or { bracket: {...}, categories: {...} }
-  
-  // Handle different JSON structures
-  const bracketPicks = picks.bracket || picks
-  const catPicks = picks.categories || {}
-
-  // Group matchups by round
-  const matchupsByRound = {}
-  matchups.forEach(m => {
-    const roundName = m.round?.name || 'Unknown'
-    const roundOrder = m.round?.round_order || 0
-    if (!matchupsByRound[roundOrder]) {
-      matchupsByRound[roundOrder] = { name: roundName, points: m.round?.points || 0, matchups: [] }
-    }
-    matchupsByRound[roundOrder].matchups.push(m)
-  })
-
-  return (
-    <div>
-      {/* Bracket Picks */}
-      {Object.entries(matchupsByRound)
-        .sort(([a], [b]) => Number(a) - Number(b))
-        .map(([roundOrder, roundData]) => (
-          <div key={roundOrder} style={{ marginBottom: 24 }}>
-            <h3 style={{
-              fontSize: 14,
-              padding: '8px 12px',
-              background: '#eff6ff',
-              borderRadius: 6,
-              marginBottom: 12
-            }}>
-              {roundData.name}
-              <span style={{ fontWeight: 'normal', color: '#666', marginLeft: 8 }}>
-                ({roundData.points} pts)
-              </span>
-            </h3>
-
-            {roundData.matchups.map(matchup => {
-              const pickedTeamId = bracketPicks[matchup.id]
-              const pickedTeam = pickedTeamId ? teamMap[pickedTeamId] : null
-              const winner = matchup.winner_team_id
-              const isCorrect = winner && pickedTeamId === winner
-              const isWrong = winner && pickedTeamId && pickedTeamId !== winner
-              const teamA = teamMap[matchup.team_a_id]
-              const teamB = teamMap[matchup.team_b_id]
-
-              return (
-                <div key={matchup.id} style={{
-                  padding: 12,
-                  marginBottom: 8,
-                  background: isCorrect ? '#dcfce7' : isWrong ? '#fee2e2' : '#f9fafb',
-                  borderRadius: 6,
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center'
-                }}>
-                  <div style={{ color: '#666', fontSize: 13 }}>
-                    {teamA && teamB ? (
-                      `(${teamA.seed}) ${teamA.name} vs (${teamB.seed}) ${teamB.name}`
-                    ) : 'TBD'}
-                  </div>
-                  <div style={{
-                    fontWeight: 600,
-                    color: isCorrect ? '#16a34a' : isWrong ? '#dc2626' : '#374151'
-                  }}>
-                    {pickedTeam ? pickedTeam.name : '—'}
-                    {winner && (isCorrect ? ' ✓' : isWrong ? ' ✗' : '')}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        ))}
-
-      {/* Category Picks from JSON */}
-      {categories.length > 0 && Object.keys(catPicks).length > 0 && (
-        <div style={{ marginTop: 24 }}>
-          <h3 style={{ 
-            fontSize: 14, 
-            borderBottom: '2px solid #e5e7eb',
-            paddingBottom: 8,
-            marginBottom: 16
-          }}>
-            Category Picks
-          </h3>
-          {categories.map(cat => {
-            const pickedOptionId = catPicks[cat.id]
-            const pickedOption = cat.options?.find(o => o.id === pickedOptionId)
-            const correctOption = cat.options?.find(o => o.is_correct)
-            const isCorrect = correctOption && pickedOptionId === correctOption.id
-            const isWrong = correctOption && pickedOptionId && pickedOptionId !== correctOption.id
-
-            return (
-              <div key={cat.id} style={{
-                padding: 12,
-                marginBottom: 8,
-                background: isCorrect ? '#dcfce7' : isWrong ? '#fee2e2' : '#f9fafb',
-                borderRadius: 6,
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center'
-              }}>
-                <div style={{ color: '#666', fontSize: 13 }}>{cat.name}</div>
-                <div style={{
-                  fontWeight: 600,
-                  color: isCorrect ? '#16a34a' : isWrong ? '#dc2626' : '#374151'
-                }}>
-                  {pickedOption ? pickedOption.name : '—'}
-                  {correctOption && (isCorrect ? ' ✓' : isWrong ? ' ✗' : '')}
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// Standard Bracket Picks Component (bracket_picks table)
+// Standard Bracket Picks Component
 function StandardPicksDisplay({ picks, matchups, teams, teamMap, categories, categoryPicks }) {
   // Group matchups by round
   const matchupsByRound = {}

@@ -57,53 +57,6 @@ export default async function StandingsPage({ params }) {
   const isCompleted = pool.event?.status === 'completed'
 
   // =====================================================
-  // GET LAST RESULT TIMESTAMP
-  // =====================================================
-  let lastResultTime = null
-  
-  if (eventConfig.hasTeamEliminations) {
-    // NFL-style: get last elimination entry
-    const { data: lastElim } = await supabase
-      .from('team_eliminations')
-      .select('created_at')
-      .eq('event_id', pool.event.id)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single()
-    lastResultTime = lastElim?.created_at
-  } else if (eventConfig.hasCategories) {
-    // Category-based: get categories for this event, then find last result
-    const { data: categories } = await supabase
-      .from('categories')
-      .select('id')
-      .eq('event_id', pool.event.id)
-    
-    if (categories && categories.length > 0) {
-      const categoryIds = categories.map(c => c.id)
-      const { data: lastResult } = await supabase
-        .from('category_options')
-        .select('updated_at')
-        .in('category_id', categoryIds)
-        .eq('is_correct', true)
-        .order('updated_at', { ascending: false })
-        .limit(1)
-        .single()
-      lastResultTime = lastResult?.updated_at
-    }
-  } else if (eventConfig.hasMatchups) {
-    // Bracket-based: get last matchup with winner set
-    const { data: lastMatchup } = await supabase
-      .from('matchups')
-      .select('updated_at')
-      .eq('event_id', pool.event.id)
-      .not('winner_team_id', 'is', null)
-      .order('updated_at', { ascending: false })
-      .limit(1)
-      .single()
-    lastResultTime = lastMatchup?.updated_at
-  }
-
-  // =====================================================
   // CONDITIONAL DATA LOADING (based on event type)
   // =====================================================
 
@@ -141,37 +94,15 @@ export default async function StandingsPage({ params }) {
   // RENDER
   // =====================================================
 
-  // Format last result timestamp for display
-  const updatedAt = lastResultTime 
-    ? new Date(lastResultTime).toLocaleString('en-US', {
-        month: 'numeric',
-        day: 'numeric',
-        year: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true
-      })
-    : null
-
   return (
     <div style={{ padding: 24, maxWidth: 900, margin: '0 auto' }}>
       {/* Header */}
       <h1 style={{ fontSize: '28px', marginBottom: 8 }}>
         {pool.name} — Standings
       </h1>
-      <p style={{ color: '#666', marginBottom: 8 }}>
+      <p style={{ color: '#666', marginBottom: 24 }}>
         {pool.event.name} {pool.event.year}
       </p>
-      {updatedAt && (
-        <p style={{ color: '#9ca3af', fontSize: 13, marginBottom: 24 }}>
-          📊 Results updated {updatedAt}
-        </p>
-      )}
-      {!updatedAt && isLocked && (
-        <p style={{ color: '#9ca3af', fontSize: 13, marginBottom: 24 }}>
-          ⏳ No results entered yet
-        </p>
-      )}
 
       {/* Action Buttons */}
       <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: 24 }}>
@@ -401,31 +332,14 @@ async function loadPopularAdvancementPicks(eventId, poolId, supabase) {
     .select('round_id, team_id')
     .in('pool_entry_id', entryIds)
 
-  // Load eliminations WITH defeated_by_team_id to know winners
   const { data: eliminations } = await supabase
     .from('team_eliminations')
-    .select('team_id, eliminated_in_round_id, defeated_by_team_id')
+    .select('team_id, eliminated_in_round_id')
     .eq('event_id', eventId)
 
-  // Map of team_id -> round they were eliminated in (losers)
   const elimMap = Object.fromEntries((eliminations || []).map(e => [e.team_id, e.eliminated_in_round_id]))
-  
-  // Map of team_id -> round they won in (winners via defeated_by_team_id)
-  const winnerMap = {}
-  ;(eliminations || []).forEach(e => {
-    if (e.defeated_by_team_id) {
-      if (!winnerMap[e.defeated_by_team_id]) {
-        winnerMap[e.defeated_by_team_id] = []
-      }
-      winnerMap[e.defeated_by_team_id].push(e.eliminated_in_round_id)
-    }
-  })
-  
   const teamMap = Object.fromEntries((teams || []).map(t => [t.id, t]))
   const totalEntries = entryIds.length
-
-  // Build round order lookup
-  const roundOrderMap = Object.fromEntries((rounds || []).map(r => [r.id, r.round_order]))
 
   return (rounds || []).map(round => {
     const roundPicks = advancementPicks?.filter(p => p.round_id === round.id) || []
@@ -441,29 +355,16 @@ async function loadPopularAdvancementPicks(eventId, poolId, supabase) {
       .map(([teamId, count]) => {
         const team = teamMap[teamId]
         const elimRoundId = elimMap[teamId]
-        const wonRoundIds = winnerMap[teamId] || []
-        
-        // Determine status based on what we know for certain
-        let status = 'pending' // Default: no result yet
-        
-        // Check if team was eliminated
+        let status = 'pending'
         if (elimRoundId) {
-          const elimRoundOrder = roundOrderMap[elimRoundId]
-          if (elimRoundOrder === round.round_order) {
-            // Team was eliminated IN THIS ROUND = wrong pick
+          const elimRound = rounds.find(r => r.id === elimRoundId)
+          if (elimRound && elimRound.round_order <= round.round_order) {
             status = 'eliminated'
-          } else if (elimRoundOrder > round.round_order) {
-            // Team was eliminated in a LATER round = they advanced past this round
+          } else {
             status = 'advanced'
           }
-        }
-        
-        // Check if team WON a game in this round (via defeated_by_team_id)
-        if (status === 'pending' && wonRoundIds.length > 0) {
-          const wonThisRound = wonRoundIds.some(roundId => roundOrderMap[roundId] === round.round_order)
-          if (wonThisRound) {
-            status = 'advanced'
-          }
+        } else if (Object.keys(elimMap).length > 0) {
+          status = 'alive'
         }
         
         return {
@@ -618,6 +519,9 @@ function StandingsTable({ standings, eventConfig }) {
           <tr style={{ borderBottom: '2px solid #e5e7eb' }}>
             <th style={{ textAlign: 'left', padding: '12px 8px', color: '#6b7280', fontSize: 12, textTransform: 'uppercase' }}>Rank</th>
             <th style={{ textAlign: 'left', padding: '12px 8px', color: '#6b7280', fontSize: 12, textTransform: 'uppercase' }}>Entry Name</th>
+            {eventConfig.hasTeamEliminations && (
+              <th style={{ textAlign: 'center', padding: '12px 8px', color: '#6b7280', fontSize: 12, textTransform: 'uppercase' }}>Status</th>
+            )}
             <th style={{ textAlign: 'right', padding: '12px 8px', color: '#6b7280', fontSize: 12, textTransform: 'uppercase' }}>Points</th>
           </tr>
         </thead>
@@ -628,6 +532,9 @@ function StandingsTable({ standings, eventConfig }) {
                 {entry.rank <= 3 ? ['🥇', '🥈', '🥉'][entry.rank - 1] : ''} #{entry.rank}
               </td>
               <td style={{ padding: '12px 8px', fontWeight: 600 }}>{entry.entry_name}</td>
+              {eventConfig.hasTeamEliminations && (
+                <td style={{ padding: '12px 8px', textAlign: 'center' }}>—</td>
+              )}
               <td style={{ padding: '12px 8px', textAlign: 'right', fontWeight: 'bold', fontSize: 18 }}>
                 {entry.total_points}
               </td>
@@ -804,43 +711,36 @@ function PopularAdvancementPicksSection({ picks }) {
             </span>
           </h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {round.teams.slice(0, 10).map(team => {
-              // Only color if we have definitive results
-              const isEliminated = team.status === 'eliminated'
-              const isAdvanced = team.status === 'advanced'
-              const hasResult = isEliminated || isAdvanced
-              
-              return (
-                <div key={team.teamId} style={{
-                  padding: '10px 14px',
-                  background: isEliminated ? '#fee2e2'
-                    : isAdvanced ? '#dcfce7'
-                    : '#f9fafb',  // No color for pending
-                  borderRadius: 6,
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center'
-                }}>
-                  <div>
-                    <span style={{
-                      fontSize: 11,
-                      color: team.conference === 'AFC' ? '#dc2626' : '#2563eb',
-                      marginRight: 6
-                    }}>
-                      {team.conference}
-                    </span>
-                    <span style={{
-                      color: isEliminated ? '#991b1b' : '#374151'
-                    }}>
-                      {team.name}
-                    </span>
-                    {isEliminated && <span style={{ marginLeft: 6 }}>❌</span>}
-                    {isAdvanced && <span style={{ marginLeft: 6 }}>✅</span>}
-                  </div>
-                  <span style={{ color: '#6b7280', fontWeight: 600 }}>{team.percentage}%</span>
+            {round.teams.slice(0, 10).map(team => (
+              <div key={team.teamId} style={{
+                padding: '10px 14px',
+                background: team.status === 'eliminated' ? '#fee2e2'
+                  : team.status === 'advanced' || team.status === 'alive' ? '#dcfce7'
+                  : '#f9fafb',
+                borderRadius: 6,
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
+                <div>
+                  <span style={{
+                    fontSize: 11,
+                    color: team.conference === 'AFC' ? '#dc2626' : '#2563eb',
+                    marginRight: 6
+                  }}>
+                    {team.conference}
+                  </span>
+                  <span style={{
+                    color: team.status === 'eliminated' ? '#991b1b' : '#374151'
+                  }}>
+                    {team.name}
+                  </span>
+                  {team.status === 'eliminated' && <span style={{ marginLeft: 6 }}>❌</span>}
+                  {(team.status === 'advanced' || team.status === 'alive') && <span style={{ marginLeft: 6 }}>✅</span>}
                 </div>
-              )
-            })}
+                <span style={{ color: '#6b7280', fontWeight: 600 }}>{team.percentage}%</span>
+              </div>
+            ))}
           </div>
         </div>
       ))}

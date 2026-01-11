@@ -57,53 +57,6 @@ export default async function StandingsPage({ params }) {
   const isCompleted = pool.event?.status === 'completed'
 
   // =====================================================
-  // GET LAST RESULT TIMESTAMP
-  // =====================================================
-  let lastResultTime = null
-  
-  if (eventConfig.hasTeamEliminations) {
-    // NFL-style: get last elimination entry
-    const { data: lastElim } = await supabase
-      .from('team_eliminations')
-      .select('created_at')
-      .eq('event_id', pool.event.id)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single()
-    lastResultTime = lastElim?.created_at
-  } else if (eventConfig.hasCategories) {
-    // Category-based: get categories for this event, then find last result
-    const { data: categories } = await supabase
-      .from('categories')
-      .select('id')
-      .eq('event_id', pool.event.id)
-    
-    if (categories && categories.length > 0) {
-      const categoryIds = categories.map(c => c.id)
-      const { data: lastResult } = await supabase
-        .from('category_options')
-        .select('updated_at')
-        .in('category_id', categoryIds)
-        .eq('is_correct', true)
-        .order('updated_at', { ascending: false })
-        .limit(1)
-        .single()
-      lastResultTime = lastResult?.updated_at
-    }
-  } else if (eventConfig.hasMatchups) {
-    // Bracket-based: get last matchup with winner set
-    const { data: lastMatchup } = await supabase
-      .from('matchups')
-      .select('updated_at')
-      .eq('event_id', pool.event.id)
-      .not('winner_team_id', 'is', null)
-      .order('updated_at', { ascending: false })
-      .limit(1)
-      .single()
-    lastResultTime = lastMatchup?.updated_at
-  }
-
-  // =====================================================
   // CONDITIONAL DATA LOADING (based on event type)
   // =====================================================
 
@@ -141,17 +94,15 @@ export default async function StandingsPage({ params }) {
   // RENDER
   // =====================================================
 
-  // Format last result timestamp for display
-  const updatedAt = lastResultTime 
-    ? new Date(lastResultTime).toLocaleString('en-US', {
-        month: 'numeric',
-        day: 'numeric',
-        year: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true
-      })
-    : null
+  // Generate timestamp for display
+  const updatedAt = new Date().toLocaleString('en-US', {
+    month: 'numeric',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  })
 
   return (
     <div style={{ padding: 24, maxWidth: 900, margin: '0 auto' }}>
@@ -162,16 +113,9 @@ export default async function StandingsPage({ params }) {
       <p style={{ color: '#666', marginBottom: 8 }}>
         {pool.event.name} {pool.event.year}
       </p>
-      {updatedAt && (
-        <p style={{ color: '#9ca3af', fontSize: 13, marginBottom: 24 }}>
-          📊 Results updated {updatedAt}
-        </p>
-      )}
-      {!updatedAt && isLocked && (
-        <p style={{ color: '#9ca3af', fontSize: 13, marginBottom: 24 }}>
-          ⏳ No results entered yet
-        </p>
-      )}
+      <p style={{ color: '#9ca3af', fontSize: 13, marginBottom: 24 }}>
+        📊 Results as of {updatedAt}
+      </p>
 
       {/* Action Buttons */}
       <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: 24 }}>
