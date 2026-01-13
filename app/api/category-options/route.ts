@@ -1,10 +1,10 @@
-import { NextResponse } from 'next/server'
-import { supabaseAdmin } from '../../../lib/supabase-admin'
+import { NextResponse, NextRequest } from 'next/server'
+import { getAdminClient } from '../../../lib/supabase/clients'
 
-export async function POST(request) {
+export async function POST(request: NextRequest) {
   const body = await request.json()
-  
-  const { data, error } = await supabaseAdmin
+
+  const { data, error } = await getAdminClient()
     .from('category_options')
     .insert(body)
     .select()
@@ -17,11 +17,11 @@ export async function POST(request) {
   return NextResponse.json(data)
 }
 
-export async function PUT(request) {
+export async function PUT(request: NextRequest) {
   const body = await request.json()
   const { id, ...updates } = body
 
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await getAdminClient()
     .from('category_options')
     .update(updates)
     .eq('id', id)
@@ -35,11 +35,11 @@ export async function PUT(request) {
   return NextResponse.json(data)
 }
 
-export async function DELETE(request) {
+export async function DELETE(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const id = searchParams.get('id')
 
-  const { error } = await supabaseAdmin
+  const { error } = await getAdminClient()
     .from('category_options')
     .delete()
     .eq('id', id)

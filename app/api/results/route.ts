@@ -1,18 +1,18 @@
-import { NextResponse } from 'next/server'
-import { supabaseAdmin } from '../../../lib/supabase-admin'
+import { NextResponse, NextRequest } from 'next/server'
+import { getAdminClient } from '../../../lib/supabase/clients'
 
-export async function PUT(request) {
+export async function PUT(request: NextRequest) {
   const body = await request.json()
   const { categoryId, optionId } = body
 
   // Unmark all options in category
-  await supabaseAdmin
+  await getAdminClient()
     .from('category_options')
     .update({ is_correct: false })
     .eq('category_id', categoryId)
 
   // Mark correct option
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await getAdminClient()
     .from('category_options')
     .update({ is_correct: true })
     .eq('id', optionId)
