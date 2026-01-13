@@ -59,7 +59,7 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: 'Team ID required' }, { status: 400 })
   }
 
-  const updates = {}
+  const updates: Record<string, any> = {}
   if (name !== undefined) updates.name = name
   if (seed !== undefined) updates.seed = seed || null
   if (conference !== undefined) updates.conference = conference || null
