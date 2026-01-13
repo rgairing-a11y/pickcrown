@@ -45,10 +45,12 @@ export async function getPoolPublicInfo(poolId: string): Promise<PoolPublicInfo 
   if (!pool) return null
 
   // Only return public metadata
+  // Note: Supabase relation queries return arrays, so we access the first element
+  const event = Array.isArray(pool.event) ? pool.event[0] : pool.event
   return {
-    eventName: pool.event?.name,
-    eventDate: pool.event?.start_time,
-    eventStatus: pool.event?.status
+    eventName: event?.name,
+    eventDate: event?.start_time,
+    eventStatus: event?.status
   }
 }
 
