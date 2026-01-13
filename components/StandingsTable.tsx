@@ -38,7 +38,8 @@ export default function StandingsTable({
   }
 
   // Medal colors for top 3
-  const getMedalStyle = (rank: number): MedalStyle | null => {
+  const getMedalStyle = (rank: number | undefined): MedalStyle | null => {
+    if (!rank) return null
     switch (rank) {
       case 1:
         return {
