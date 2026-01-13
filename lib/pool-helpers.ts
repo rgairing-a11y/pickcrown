@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
+import { getServerClient } from './supabase/clients'
 import type { PoolPublicInfo, PodiumEntry } from './types'
 
 /**
@@ -7,11 +7,8 @@ import type { PoolPublicInfo, PodiumEntry } from './types'
  */
 export async function isPoolParticipant(poolId: string, email: string | null | undefined): Promise<boolean> {
   if (!email) return false
-  
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY
-  )
+
+  const supabase = getServerClient()
 
   const { data } = await supabase
     .from('pool_entries')
@@ -28,10 +25,7 @@ export async function isPoolParticipant(poolId: string, email: string | null | u
  * Returns only public metadata per product foundation
  */
 export async function getPoolPublicInfo(poolId: string): Promise<PoolPublicInfo | null> {
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY
-  )
+  const supabase = getServerClient()
 
   const { data: pool } = await supabase
     .from('pools')
@@ -63,10 +57,7 @@ export async function getPoolPublicInfo(poolId: string): Promise<PoolPublicInfo 
  * Per product foundation: read-only, post-event only, celebratory
  */
 export async function getEventPodium(eventId: string): Promise<PodiumEntry[]> {
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY
-  )
+  const supabase = getServerClient()
 
   // Get all pools for this event
   const { data: pools } = await supabase

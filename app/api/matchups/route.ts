@@ -1,12 +1,9 @@
-import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { NextResponse, NextRequest } from 'next/server'
+import { getAdminClient } from '@/lib/supabase/clients'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-)
+const supabase = getAdminClient()
 
-export async function GET(request) {
+export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const eventId = searchParams.get('eventId')
 
@@ -33,7 +30,7 @@ export async function GET(request) {
   return NextResponse.json(data)
 }
 
-export async function POST(request) {
+export async function POST(request: NextRequest) {
   const body = await request.json()
   const { eventId, roundId, teamAId, teamBId, bracketPosition } = body
 
@@ -71,7 +68,7 @@ export async function POST(request) {
   return NextResponse.json(data)
 }
 
-export async function PUT(request) {
+export async function PUT(request: NextRequest) {
   const body = await request.json()
   const { id, winnerTeamId } = body
 
@@ -129,7 +126,7 @@ export async function PUT(request) {
 
 // Advance winner to the next round's matchup
 // SUPPORTS BYES: If a slot is already filled (bye team), fills the other slot
-async function advanceWinnerToNextRound(eventId, currentRoundOrder, bracketPosition, winnerTeamId) {
+async function advanceWinnerToNextRound(eventId: string, currentRoundOrder: number, bracketPosition: number, winnerTeamId: string) {
   console.log(`[ADVANCE] Round ${currentRoundOrder}, Pos ${bracketPosition} -> Winner: ${winnerTeamId}`)
   
   // Get the next round
@@ -210,7 +207,7 @@ async function advanceWinnerToNextRound(eventId, currentRoundOrder, bracketPosit
 }
 
 // Clear team from next round when winner is unset
-async function clearFromNextRound(eventId, currentRoundOrder, bracketPosition) {
+async function clearFromNextRound(eventId: string, currentRoundOrder: number, bracketPosition: number) {
   // Get the next round
   const { data: nextRound } = await supabase
     .from('rounds')
@@ -254,7 +251,7 @@ async function clearFromNextRound(eventId, currentRoundOrder, bracketPosition) {
   }
 }
 
-export async function DELETE(request) {
+export async function DELETE(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const id = searchParams.get('id')
 
