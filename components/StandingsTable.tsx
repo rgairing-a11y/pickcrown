@@ -162,7 +162,7 @@ export default function StandingsTable({
                     textAlign: 'center',
                     padding: 'var(--spacing-4)',
                     borderBottom: '1px solid var(--color-border-light)',
-                    fontWeight: entry.rank <= 3 ? 'var(--font-bold)' : 'var(--font-normal)'
+                    fontWeight: entry.rank && entry.rank <= 3 ? 'var(--font-bold)' : 'var(--font-normal)'
                   }}>
                     {medal ? (
                       <span style={{ fontSize: '1.25rem' }}>{medal.icon}</span>
@@ -176,7 +176,7 @@ export default function StandingsTable({
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-2)' }}>
                       <span style={{
-                        fontWeight: entry.rank <= 3 ? 'var(--font-semibold)' : 'var(--font-normal)',
+                        fontWeight: entry.rank && entry.rank <= 3 ? 'var(--font-semibold)' : 'var(--font-normal)',
                         color: isHighlighted ? 'var(--color-primary-dark)' : 'var(--color-text)'
                       }}>
                         {entry.entry_name || entry.display_name || 'Anonymous'}
@@ -201,7 +201,7 @@ export default function StandingsTable({
                       borderBottom: '1px solid var(--color-border-light)',
                       fontWeight: 'var(--font-semibold)',
                       fontVariantNumeric: 'tabular-nums',
-                      fontSize: entry.rank <= 3 ? 'var(--font-size-lg)' : 'var(--font-size-base)'
+                      fontSize: entry.rank && entry.rank <= 3 ? 'var(--font-size-lg)' : 'var(--font-size-base)'
                     }}>
                       {entry.total_points ?? entry.points ?? 0}
                     </td>
@@ -315,7 +315,7 @@ export default function StandingsTable({
               {showPoints && (
                 <div style={{
                   fontWeight: 'var(--font-bold)',
-                  fontSize: entry.rank <= 3 ? 'var(--font-size-xl)' : 'var(--font-size-lg)',
+                  fontSize: entry.rank && entry.rank <= 3 ? 'var(--font-size-xl)' : 'var(--font-size-lg)',
                   color: isHighlighted ? 'var(--color-primary-dark)' : 'var(--color-text)',
                   fontVariantNumeric: 'tabular-nums'
                 }}>
