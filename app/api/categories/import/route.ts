@@ -1,12 +1,7 @@
-import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { NextResponse, NextRequest } from 'next/server'
+import { getAdminClient } from '@/lib/supabase/clients'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-)
-
-export async function POST(request) {
+export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     
@@ -22,7 +17,7 @@ export async function POST(request) {
     }
 
     // Validate event exists
-    const { data: event, error: eventError } = await supabase
+    const { data: event, error: eventError } = await getAdminClient()
       .from('events')
       .select('id, name')
       .eq('id', eventId)
@@ -37,10 +32,10 @@ export async function POST(request) {
 
     let categoriesCreated = 0
     let optionsCreated = 0
-    const errors = []
+    const errors: string[] = []
 
     // Get existing max order_index for this event
-    const { data: existingCats } = await supabase
+    const { data: existingCats } = await getAdminClient()
       .from('categories')
       .select('order_index')
       .eq('event_id', eventId)
@@ -62,7 +57,7 @@ export async function POST(request) {
       }
 
       // Create category
-      const { data: newCategory, error: catError } = await supabase
+      const { data: newCategory, error: catError } = await getAdminClient()
         .from('categories')
         .insert({
           event_id: eventId,
@@ -91,7 +86,7 @@ export async function POST(request) {
         }))
 
       if (optionsToInsert.length > 0) {
-        const { error: optError } = await supabase
+        const { error: optError } = await getAdminClient()
           .from('category_options')
           .insert(optionsToInsert)
 
@@ -118,7 +113,7 @@ export async function POST(request) {
     }
 
     return NextResponse.json(result)
-  } catch (error) {
+  } catch (error: any) {
     console.error('Import error:', error)
     return NextResponse.json(
       { error: 'Import failed: ' + error.message },
@@ -128,7 +123,7 @@ export async function POST(request) {
 }
 
 // GET endpoint to preview what would be imported
-export async function GET(request) {
+export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const eventId = searchParams.get('event_id')
 
@@ -137,7 +132,7 @@ export async function GET(request) {
   }
 
   // Get existing categories for this event
-  const { data: categories, error } = await supabase
+  const { data: categories, error } = await getAdminClient()
     .from('categories')
     .select(`
       id,
