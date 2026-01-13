@@ -1,11 +1,11 @@
 import { NextResponse, NextRequest } from 'next/server'
-import { supabaseAdmin } from '../../../lib/supabase-admin'
+import { getAdminClient } from '../../../lib/supabase/clients'
 import type { CreateEventRequest, UpdateEventRequest, Event, ApiErrorResponse } from '../../../lib/types'
 
 export async function POST(request: NextRequest): Promise<NextResponse<Event | ApiErrorResponse>> {
   const body = await request.json() as CreateEventRequest
-  
-  const { data, error } = await supabaseAdmin
+
+  const { data, error } = await getAdminClient()
     .from('events')
     .insert(body)
     .select()
@@ -22,7 +22,7 @@ export async function PUT(request: NextRequest): Promise<NextResponse<Event | Ap
   const body = await request.json() as UpdateEventRequest
   const { id, ...updates } = body
 
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await getAdminClient()
     .from('events')
     .update(updates)
     .eq('id', id)
@@ -39,15 +39,15 @@ export async function PUT(request: NextRequest): Promise<NextResponse<Event | Ap
 export async function GET(request: NextRequest): Promise<NextResponse<Event | Event[] | ApiErrorResponse>> {
   const { searchParams } = new URL(request.url)
   const id = searchParams.get('id')
-  
+
   // If no id, return all events (or handle as needed)
   if (!id) {
-    const { data } = await supabaseAdmin.from('events').select('*')
+    const { data } = await getAdminClient().from('events').select('*')
     return Response.json(data)
   }
-  
+
   // Get specific event
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await getAdminClient()
     .from('events')
     .select('*')
     .eq('id', id)

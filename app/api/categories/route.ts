@@ -1,11 +1,11 @@
 import { NextResponse, NextRequest } from 'next/server'
-import { supabaseAdmin } from '../../../lib/supabase-admin'
+import { getAdminClient } from '../../../lib/supabase/clients'
 import type { CreateCategoryRequest, Category, ApiErrorResponse, ApiSuccessResponse } from '../../../lib/types'
 
 export async function POST(request: NextRequest): Promise<NextResponse<Category | ApiErrorResponse>> {
   const body = await request.json() as CreateCategoryRequest
-  
-  const { data, error } = await supabaseAdmin
+
+  const { data, error } = await getAdminClient()
     .from('categories')
     .insert(body)
     .select()
@@ -22,7 +22,7 @@ export async function DELETE(request: NextRequest): Promise<NextResponse<ApiSucc
   const { searchParams } = new URL(request.url)
   const id = searchParams.get('id')
 
-  const { error } = await supabaseAdmin
+  const { error } = await getAdminClient()
     .from('categories')
     .delete()
     .eq('id', id)

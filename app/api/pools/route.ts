@@ -1,11 +1,11 @@
 import { NextResponse, NextRequest } from 'next/server'
-import { supabaseAdmin } from '../../../lib/supabase-admin'
+import { getAdminClient } from '../../../lib/supabase/clients'
 import type { CreatePoolRequest, UpdatePoolRequest, Pool, ApiErrorResponse, ApiSuccessResponse } from '../../../lib/types'
 
 export async function POST(request: NextRequest): Promise<NextResponse<Pool | ApiErrorResponse>> {
   const body = await request.json() as CreatePoolRequest
-  
-  const { data, error } = await supabaseAdmin
+
+  const { data, error } = await getAdminClient()
     .from('pools')
     .insert(body)
     .select()
@@ -22,7 +22,7 @@ export async function PUT(request: NextRequest): Promise<NextResponse<Pool | Api
   const body = await request.json() as UpdatePoolRequest
   const { id, ...updates } = body
 
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await getAdminClient()
     .from('pools')
     .update(updates)
     .eq('id', id)
@@ -40,7 +40,7 @@ export async function DELETE(request: NextRequest): Promise<NextResponse<ApiSucc
   const { searchParams } = new URL(request.url)
   const id = searchParams.get('id')
 
-  const { error } = await supabaseAdmin
+  const { error } = await getAdminClient()
     .from('pools')
     .delete()
     .eq('id', id)
