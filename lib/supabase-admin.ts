@@ -6,6 +6,4 @@
  * New code should use: import { getAdminClient } from '@/lib/supabase/clients'
  */
 
-import { getAdminClient } from './supabase/clients'
-
-export const supabaseAdmin = getAdminClient()
+export { getAdminClient as supabaseAdmin } from './supabase/clients'

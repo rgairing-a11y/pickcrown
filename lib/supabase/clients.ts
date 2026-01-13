@@ -91,8 +91,6 @@ export function getBrowserClient(): SupabaseClient {
 }
 
 // Backwards compatibility exports
-export const supabaseAdmin = getAdminClient()
-
 /**
  * @deprecated Use getAdminClient() instead
  */
