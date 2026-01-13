@@ -279,7 +279,7 @@ export default function StandingsTable({
               {/* Name */}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{
-                  fontWeight: entry.rank <= 3 ? 'var(--font-semibold)' : 'var(--font-normal)',
+                  fontWeight: entry.rank && entry.rank <= 3 ? 'var(--font-semibold)' : 'var(--font-normal)',
                   color: isHighlighted ? 'var(--color-primary-dark)' : 'var(--color-text)',
                   whiteSpace: 'nowrap',
                   overflow: 'hidden',
