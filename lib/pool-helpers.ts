@@ -1,10 +1,11 @@
 import { createClient } from '@supabase/supabase-js'
+import type { PoolPublicInfo, PodiumEntry } from './types'
 
 /**
  * Check if an email is a participant in a pool
  * Used to determine if they should see pool content or "This pool is private" message
  */
-export async function isPoolParticipant(poolId, email) {
+export async function isPoolParticipant(poolId: string, email: string | null | undefined): Promise<boolean> {
   if (!email) return false
   
   const supabase = createClient(
@@ -26,7 +27,7 @@ export async function isPoolParticipant(poolId, email) {
  * Get basic pool info (for non-participants)
  * Returns only public metadata per product foundation
  */
-export async function getPoolPublicInfo(poolId) {
+export async function getPoolPublicInfo(poolId: string): Promise<PoolPublicInfo | null> {
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -61,7 +62,7 @@ export async function getPoolPublicInfo(poolId) {
  * Calculate event podium (Top 3 across all pools)
  * Per product foundation: read-only, post-event only, celebratory
  */
-export async function getEventPodium(eventId) {
+export async function getEventPodium(eventId: string): Promise<PodiumEntry[]> {
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -76,8 +77,8 @@ export async function getEventPodium(eventId) {
   if (!pools || pools.length === 0) return []
 
   // Get standings from all pools
-  const allEntries = []
-  
+  const allEntries: Array<{ entry_name: string; total_points: number }> = []
+
   for (const pool of pools) {
     const { data } = await supabase.rpc('calculate_standings', { p_pool_id: pool.id })
     if (data) {
@@ -86,7 +87,7 @@ export async function getEventPodium(eventId) {
   }
 
   // Sort by total_points descending
-  allEntries.sort((a, b) => {
+  allEntries.sort((a: { entry_name: string; total_points: number }, b: { entry_name: string; total_points: number }) => {
     if (b.total_points !== a.total_points) {
       return b.total_points - a.total_points
     }

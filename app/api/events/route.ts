@@ -1,8 +1,9 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, NextRequest } from 'next/server'
 import { supabaseAdmin } from '../../../lib/supabase-admin'
+import type { CreateEventRequest, UpdateEventRequest, Event, ApiErrorResponse } from '../../../lib/types'
 
-export async function POST(request) {
-  const body = await request.json()
+export async function POST(request: NextRequest): Promise<NextResponse<Event | ApiErrorResponse>> {
+  const body = await request.json() as CreateEventRequest
   
   const { data, error } = await supabaseAdmin
     .from('events')
@@ -17,8 +18,8 @@ export async function POST(request) {
   return NextResponse.json(data)
 }
 
-export async function PUT(request) {
-  const body = await request.json()
+export async function PUT(request: NextRequest): Promise<NextResponse<Event | ApiErrorResponse>> {
+  const body = await request.json() as UpdateEventRequest
   const { id, ...updates } = body
 
   const { data, error } = await supabaseAdmin
@@ -35,7 +36,7 @@ export async function PUT(request) {
   return NextResponse.json(data)
 }
 
-export async function GET(request) {
+export async function GET(request: NextRequest): Promise<NextResponse<Event | Event[] | ApiErrorResponse>> {
   const { searchParams } = new URL(request.url)
   const id = searchParams.get('id')
   

@@ -1,7 +1,8 @@
 import './globals.css'
 import Header from '../components/Header'
+import type { Metadata } from 'next'
 
-export const metadata = {
+export const metadata: Metadata = {
   title: 'PickCrown — Prediction Pools',
   description: 'A simple, no-nonsense prediction pool for sharing picks with friends — no accounts, no clutter.',
   icons: {

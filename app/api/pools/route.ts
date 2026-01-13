@@ -1,8 +1,9 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, NextRequest } from 'next/server'
 import { supabaseAdmin } from '../../../lib/supabase-admin'
+import type { CreatePoolRequest, UpdatePoolRequest, Pool, ApiErrorResponse, ApiSuccessResponse } from '../../../lib/types'
 
-export async function POST(request) {
-  const body = await request.json()
+export async function POST(request: NextRequest): Promise<NextResponse<Pool | ApiErrorResponse>> {
+  const body = await request.json() as CreatePoolRequest
   
   const { data, error } = await supabaseAdmin
     .from('pools')
@@ -17,8 +18,8 @@ export async function POST(request) {
   return NextResponse.json(data)
 }
 
-export async function PUT(request) {
-  const body = await request.json()
+export async function PUT(request: NextRequest): Promise<NextResponse<Pool | ApiErrorResponse>> {
+  const body = await request.json() as UpdatePoolRequest
   const { id, ...updates } = body
 
   const { data, error } = await supabaseAdmin
@@ -35,7 +36,7 @@ export async function PUT(request) {
   return NextResponse.json(data)
 }
 
-export async function DELETE(request) {
+export async function DELETE(request: NextRequest): Promise<NextResponse<ApiSuccessResponse | ApiErrorResponse>> {
   const { searchParams } = new URL(request.url)
   const id = searchParams.get('id')
 
