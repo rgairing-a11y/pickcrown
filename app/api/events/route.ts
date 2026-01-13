@@ -42,8 +42,11 @@ export async function GET(request: NextRequest): Promise<NextResponse<Event | Ev
 
   // If no id, return all events (or handle as needed)
   if (!id) {
-    const { data } = await getAdminClient().from('events').select('*')
-    return NextResponse.json(data)
+    const { data, error } = await getAdminClient().from('events').select('*')
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+    return NextResponse.json(data || [])
   }
 
   // Get specific event
