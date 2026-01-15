@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
       .eq('event_id', eventId)
       .order('round_order')
 
-    const roundIdMap = {}
+    const roundIdMap: Record<string, string> = {}
 
     if (sourceRounds && sourceRounds.length > 0) {
       for (const round of sourceRounds) {
@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
       .eq('event_id', eventId)
       .order('seed')
 
-    const teamIdMap = {}
+    const teamIdMap: Record<string, string> = {}
 
     if (sourceTeams && sourceTeams.length > 0) {
       for (const team of sourceTeams) {
