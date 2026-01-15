@@ -1,16 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-)
-
 // Bye Team Setup Component
-function ByeTeamSetup({ eventId, rounds, matchups, teams, onUpdate }) {
+function ByeTeamSetup({ eventId, rounds, matchups, teams, onUpdate, supabase }) {
   const [saving, setSaving] = useState(false)
   const [selectedRound, setSelectedRound] = useState('')
   const [selectedMatchup, setSelectedMatchup] = useState('')
@@ -252,6 +247,11 @@ function ByeTeamSetup({ eventId, rounds, matchups, teams, onUpdate }) {
 }
 
 export default function BracketSetupPage({ params }) {
+  const supabase = useMemo(() => createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  ), [])
+
   const [eventId, setEventId] = useState(null)
   const [event, setEvent] = useState(null)
   const [rounds, setRounds] = useState([])
@@ -622,12 +622,13 @@ export default function BracketSetupPage({ params }) {
 
       {/* BYE TEAM SETUP */}
       {rounds.length > 1 && teams.length > 0 && (
-        <ByeTeamSetup 
+        <ByeTeamSetup
           eventId={eventId}
           rounds={rounds}
           matchups={matchups}
           teams={teams}
           onUpdate={loadData}
+          supabase={supabase}
         />
       )}
 
