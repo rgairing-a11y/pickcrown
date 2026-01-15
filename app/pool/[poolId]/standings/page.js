@@ -11,18 +11,17 @@ import { getEventTypeConfig, getScoringFunction, hasFeature } from '../../../../
 import ScenarioSimulator from '../../../../components/ScenarioSimulator'
 import MyPicksButton from '../../../../components/MyPicksButton'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-)
-
 export default async function StandingsPage({ params }) {
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  )
   const { poolId } = await params
 
   // =====================================================
   // CORE DATA LOADING (same for all event types)
   // =====================================================
-  
+
   const { data: pool } = await supabase
     .from('pools')
     .select(`
