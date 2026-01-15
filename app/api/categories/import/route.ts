@@ -82,8 +82,8 @@ export async function POST(request: NextRequest) {
 
       // Create options for this category
       const optionsToInsert = category.options
-        .filter(opt => opt && typeof opt === 'string' && opt.trim())
-        .map((optionName, idx) => ({
+        .filter((opt: any) => opt && typeof opt === 'string' && opt.trim())
+        .map((optionName: string, idx: number) => ({
           category_id: newCategory.id,
           name: optionName.trim(),
           order_index: idx + 1
