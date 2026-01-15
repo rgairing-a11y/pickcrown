@@ -30,7 +30,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     // Build CSV
     const headers = ['Rank', 'Entry Name', 'Email', 'Points']
-    const rows = standings.map(entry => [
+    const rows = standings.map((entry: any) => [
       entry.rank,
       `"${entry.entry_name}"`,
       `"${entry.email || ''}"`,
@@ -42,7 +42,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       `# Exported: ${new Date().toISOString()}`,
       '',
       headers.join(','),
-      ...rows.map(row => row.join(','))
+      ...rows.map((row: any) => row.join(','))
     ].join('\n')
 
     // Return as downloadable CSV
