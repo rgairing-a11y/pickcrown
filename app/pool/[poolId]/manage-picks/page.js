@@ -16,7 +16,6 @@ export default function ManageBracketPicksPage({ params }) {
     }
     return createClient(url, key)
   }, [])
-  ), [])
 
   const [poolId, setPoolId] = useState(null)
   const [pool, setPool] = useState(null)

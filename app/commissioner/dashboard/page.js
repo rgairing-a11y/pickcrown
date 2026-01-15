@@ -17,7 +17,6 @@ export default function CommissionerDashboardPage() {
     }
     return createClient(url, key)
   }, [])
-  ), [])
 
   const [loading, setLoading] = useState(true)
   const [email, setEmail] = useState(null)

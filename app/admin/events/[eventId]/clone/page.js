@@ -17,7 +17,6 @@ export default function CloneEventPage({ params }) {
     }
     return createClient(url, key)
   }, [])
-  ), [])
 
   const router = useRouter()
   const [eventId, setEventId] = useState(null)

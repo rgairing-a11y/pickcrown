@@ -16,7 +16,6 @@ export default function ImportBracketPage({ params }) {
     }
     return createClient(url, key)
   }, [])
-  ), [])
 
   const [eventId, setEventId] = useState(null)
   const [event, setEvent] = useState(null)

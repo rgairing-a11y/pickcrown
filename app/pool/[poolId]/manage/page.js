@@ -16,7 +16,6 @@ export default function ManagePoolPage({ params }) {
     }
     return createClient(url, key)
   }, [])
-  ), [])
 
   const [pool, setPool] = useState(null)
   const [entries, setEntries] = useState([])
