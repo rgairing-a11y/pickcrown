@@ -1,11 +1,14 @@
 import { NextResponse, NextRequest } from 'next/server'
-import { getAdminClient } from '../../../lib/supabase/clients'
+import { createClient } from '@supabase/supabase-js'
 import type { CreatePoolRequest, UpdatePoolRequest, Pool, ApiErrorResponse, ApiSuccessResponse } from '../../../lib/types'
 
 export async function POST(request: NextRequest): Promise<NextResponse<Pool | ApiErrorResponse>> {
   const body = await request.json() as CreatePoolRequest
 
-  const { data, error } = await getAdminClient()
+  const { data, error } = await createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
     .from('pools')
     .insert(body)
     .select()
@@ -22,7 +25,10 @@ export async function PUT(request: NextRequest): Promise<NextResponse<Pool | Api
   const body = await request.json() as UpdatePoolRequest
   const { id, ...updates } = body
 
-  const { data, error } = await getAdminClient()
+  const { data, error } = await createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
     .from('pools')
     .update(updates)
     .eq('id', id)
@@ -40,7 +46,10 @@ export async function DELETE(request: NextRequest): Promise<NextResponse<ApiSucc
   const { searchParams } = new URL(request.url)
   const id = searchParams.get('id')
 
-  const { error } = await getAdminClient()
+  const { error } = await createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
     .from('pools')
     .delete()
     .eq('id', id)

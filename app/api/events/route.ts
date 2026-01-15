@@ -1,11 +1,14 @@
 import { NextResponse, NextRequest } from 'next/server'
-import { getAdminClient } from '../../../lib/supabase/clients'
+import { createClient } from '@supabase/supabase-js'
 import type { CreateEventRequest, UpdateEventRequest, Event, ApiErrorResponse } from '../../../lib/types'
 
 export async function POST(request: NextRequest): Promise<NextResponse<Event | ApiErrorResponse>> {
   const body = await request.json() as CreateEventRequest
 
-  const { data, error } = await getAdminClient()
+  const { data, error } = await createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
     .from('events')
     .insert(body)
     .select()
@@ -22,7 +25,10 @@ export async function PUT(request: NextRequest): Promise<NextResponse<Event | Ap
   const body = await request.json() as UpdateEventRequest
   const { id, ...updates } = body
 
-  const { data, error } = await getAdminClient()
+  const { data, error } = await createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
     .from('events')
     .update(updates)
     .eq('id', id)
@@ -42,7 +48,10 @@ export async function GET(request: NextRequest): Promise<NextResponse<Event | Ev
 
   // If no id, return all events (or handle as needed)
   if (!id) {
-    const { data, error } = await getAdminClient().from('events').select('*')
+    const { data, error } = await createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  ).from('events').select('*')
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
@@ -50,7 +59,10 @@ export async function GET(request: NextRequest): Promise<NextResponse<Event | Ev
   }
 
   // Get specific event
-  const { data, error } = await getAdminClient()
+  const { data, error } = await createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
     .from('events')
     .select('*')
     .eq('id', id)

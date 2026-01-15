@@ -1,10 +1,15 @@
 import { NextResponse, NextRequest } from 'next/server'
-import { getAdminClient } from '../../../lib/supabase/clients'
+import { createClient } from '@supabase/supabase-js'
 
 export async function POST(request: NextRequest) {
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+
   const body = await request.json()
 
-  const { data, error } = await getAdminClient()
+  const { data, error } = await supabaseAdmin
     .from('category_options')
     .insert(body)
     .select()
@@ -18,10 +23,15 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+
   const body = await request.json()
   const { id, ...updates } = body
 
-  const { data, error } = await getAdminClient()
+  const { data, error } = await supabaseAdmin
     .from('category_options')
     .update(updates)
     .eq('id', id)
@@ -36,10 +46,15 @@ export async function PUT(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+
   const { searchParams } = new URL(request.url)
   const id = searchParams.get('id')
 
-  const { error } = await getAdminClient()
+  const { error } = await supabaseAdmin
     .from('category_options')
     .delete()
     .eq('id', id)
