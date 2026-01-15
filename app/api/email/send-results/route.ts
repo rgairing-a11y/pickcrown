@@ -39,7 +39,7 @@ async function getEventPodium(eventId: string) {
   }
 
   // Sort by total_points descending, then by entry_name
-  allEntries.sort((a, b) => {
+  allEntries.sort((a: any, b: any) => {
     if (b.total_points !== a.total_points) {
       return b.total_points - a.total_points
     }
@@ -47,7 +47,7 @@ async function getEventPodium(eventId: string) {
   })
 
   // Return top 3 only (the podium)
-  return allEntries.slice(0, 3).map((entry, idx) => ({
+  return allEntries.slice(0, 3).map((entry: any, idx: number) => ({
     ...entry,
     position: idx + 1, // 1, 2, 3
     medal: idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'
@@ -138,7 +138,7 @@ export async function POST(request: NextRequest) {
       const standings = await getPoolStandings(pool.id)
       
       // Find pool champion
-      const champion = standings.find(s => s.rank === 1)
+      const champion = standings.find((s: any) => s.rank === 1)
 
       // Send email to each entry
       for (const entry of standings) {
@@ -176,7 +176,7 @@ export async function POST(request: NextRequest) {
                 <h3 style="margin: 0 0 16px; color: #7c3aed;">🏆 PickCrown Event Podium</h3>
                 <p style="color: #666; font-size: 14px; margin-bottom: 16px;">Top 3 across all pools for this event:</p>
                 <div style="background: #f9fafb; padding: 16px; border-radius: 8px;">
-                  ${eventPodium.map(p => `
+                  ${eventPodium.map((p: any) => `
                     <div style="display: flex; align-items: center; padding: 8px 0; ${p.position < 3 ? 'border-bottom: 1px solid #e5e7eb;' : ''}">
                       <span style="font-size: 24px; margin-right: 12px;">${p.medal}</span>
                       <span style="font-weight: ${p.position === 1 ? 'bold' : 'normal'};">${p.entry_name}</span>
