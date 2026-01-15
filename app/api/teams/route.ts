@@ -1,9 +1,12 @@
 import { NextResponse, NextRequest } from 'next/server'
-import { getAdminClient } from '@/lib/supabase/clients'
-
-const supabase = getAdminClient()
+import { createClient } from '@supabase/supabase-js'
 
 export async function GET(request: NextRequest) {
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+
   const { searchParams } = new URL(request.url)
   const eventId = searchParams.get('eventId')
 
@@ -11,7 +14,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Event ID required' }, { status: 400 })
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('teams')
     .select('*')
     .eq('event_id', eventId)
@@ -26,6 +29,11 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+
   const body = await request.json()
   const { eventId, name, seed, conference } = body
 
@@ -33,7 +41,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Event ID and name required' }, { status: 400 })
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('teams')
     .insert({
       event_id: eventId,
@@ -52,6 +60,11 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+
   const body = await request.json()
   const { id, name, seed, conference } = body
 
@@ -64,7 +77,7 @@ export async function PUT(request: NextRequest) {
   if (seed !== undefined) updates.seed = seed || null
   if (conference !== undefined) updates.conference = conference || null
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('teams')
     .update(updates)
     .eq('id', id)
@@ -79,6 +92,11 @@ export async function PUT(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+
   const { searchParams } = new URL(request.url)
   const id = searchParams.get('id')
 
@@ -86,7 +104,7 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: 'Team ID required' }, { status: 400 })
   }
 
-  const { error } = await supabase
+  const { error } = await supabaseAdmin
     .from('teams')
     .delete()
     .eq('id', id)
