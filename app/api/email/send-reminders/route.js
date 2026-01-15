@@ -2,15 +2,15 @@ import { NextResponse } from 'next/server'
 import sgMail from '@sendgrid/mail'
 import { createClient } from '@supabase/supabase-js'
 
-sgMail.setApiKey(process.env.SENDGRID_API_KEY)
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-)
-
 export async function POST(request) {
   try {
+    sgMail.setApiKey(process.env.SENDGRID_API_KEY)
+
+    const supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY
+    )
+
     const { poolId } = await request.json()
 
     if (!poolId) {
