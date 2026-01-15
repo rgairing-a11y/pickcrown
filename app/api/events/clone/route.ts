@@ -1,12 +1,7 @@
-import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { NextResponse, NextRequest } from 'next/server'
+import { getAdminClient } from '@/lib/supabase/clients'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-)
-
-export async function POST(request) {
+export async function POST(request: NextRequest) {
   try {
     const { eventId, newYear, newStartTime, newName } = await request.json()
 
@@ -15,7 +10,7 @@ export async function POST(request) {
     }
 
     // Get source event with categories and options
-    const { data: sourceEvent, error: fetchError } = await supabase
+    const { data: sourceEvent, error: fetchError } = await getAdminClient()
       .from('events')
       .select(`
         *,
@@ -32,7 +27,7 @@ export async function POST(request) {
     }
 
     // Create new event
-    const { data: newEvent, error: eventError } = await supabase
+    const { data: newEvent, error: eventError } = await getAdminClient()
       .from('events')
       .insert({
         name: newName || sourceEvent.name,
@@ -62,7 +57,7 @@ export async function POST(request) {
     const sortedCategories = (sourceEvent.categories || []).sort((a, b) => a.order_index - b.order_index)
 
     for (const category of sortedCategories) {
-      const { data: newCategory, error: catError } = await supabase
+      const { data: newCategory, error: catError } = await getAdminClient()
         .from('categories')
         .insert({
           event_id: newEvent.id,
@@ -87,12 +82,12 @@ export async function POST(request) {
       }))
 
       if (options.length > 0) {
-        await supabase.from('category_options').insert(options)
+        await getAdminClient().from('category_options').insert(options)
       }
     }
 
     // Clone rounds (for bracket events)
-    const { data: sourceRounds } = await supabase
+    const { data: sourceRounds } = await getAdminClient()
       .from('rounds')
       .select('*')
       .eq('event_id', eventId)
@@ -102,7 +97,7 @@ export async function POST(request) {
 
     if (sourceRounds && sourceRounds.length > 0) {
       for (const round of sourceRounds) {
-        const { data: newRound } = await supabase
+        const { data: newRound } = await getAdminClient()
           .from('rounds')
           .insert({
             event_id: newEvent.id,
@@ -121,7 +116,7 @@ export async function POST(request) {
     }
 
     // Clone teams
-    const { data: sourceTeams } = await supabase
+    const { data: sourceTeams } = await getAdminClient()
       .from('teams')
       .select('*')
       .eq('event_id', eventId)
@@ -131,7 +126,7 @@ export async function POST(request) {
 
     if (sourceTeams && sourceTeams.length > 0) {
       for (const team of sourceTeams) {
-        const { data: newTeam } = await supabase
+        const { data: newTeam } = await getAdminClient()
           .from('teams')
           .insert({
             event_id: newEvent.id,
@@ -150,14 +145,14 @@ export async function POST(request) {
     }
 
     // Clone matchups (without results)
-    const { data: sourceMatchups } = await supabase
+    const { data: sourceMatchups } = await getAdminClient()
       .from('matchups')
       .select('*')
       .eq('event_id', eventId)
 
     if (sourceMatchups && sourceMatchups.length > 0) {
       for (const matchup of sourceMatchups) {
-        await supabase
+        await getAdminClient()
           .from('matchups')
           .insert({
             event_id: newEvent.id,
@@ -177,7 +172,7 @@ export async function POST(request) {
       cloned: clonedCounts
     })
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Clone event error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }

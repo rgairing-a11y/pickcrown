@@ -1,15 +1,12 @@
-import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { NextResponse, NextRequest } from 'next/server'
+import { getAdminClient } from '@/lib/supabase/clients'
 import sgMail from '@sendgrid/mail'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-)
-
-sgMail.setApiKey(process.env.SENDGRID_API_KEY)
-
-export async function POST(request) {
+export async function POST(request: NextRequest) {
+  // Initialize SendGrid with API key at runtime
+  if (process.env.SENDGRID_API_KEY) {
+    sgMail.setApiKey(process.env.SENDGRID_API_KEY)
+  }
   try {
     const { emails, targetPoolId } = await request.json()
 
@@ -22,7 +19,7 @@ export async function POST(request) {
     }
 
     // Get target pool details
-    const { data: pool, error: poolError } = await supabase
+    const { data: pool, error: poolError } = await getAdminClient()
       .from('pools')
       .select('*, event:events(name, start_time)')
       .eq('id', targetPoolId)
@@ -94,7 +91,7 @@ export async function POST(request) {
         })
 
         // Log the email
-        await supabase.from('email_log').insert({
+        await getAdminClient().from('email_log').insert({
           pool_id: targetPoolId,
           email_type: 'invite',
           recipient_email: email
@@ -113,7 +110,7 @@ export async function POST(request) {
       errors: errors.length > 0 ? errors : undefined
     })
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Send invites error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }

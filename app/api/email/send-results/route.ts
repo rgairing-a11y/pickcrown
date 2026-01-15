@@ -1,17 +1,10 @@
-import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { NextResponse, NextRequest } from 'next/server'
+import { getAdminClient } from '@/lib/supabase/clients'
 import sgMail from '@sendgrid/mail'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-)
-
-sgMail.setApiKey(process.env.SENDGRID_API_KEY)
-
 // Calculate standings for a pool
-async function getPoolStandings(poolId) {
-  const { data, error } = await supabase.rpc('calculate_standings', { p_pool_id: poolId })
+async function getPoolStandings(poolId: string) {
+  const { data, error } = await getAdminClient().rpc('calculate_standings', { p_pool_id: poolId })
   if (error) {
     console.error('Error calculating standings:', error)
     return []
@@ -20,9 +13,9 @@ async function getPoolStandings(poolId) {
 }
 
 // Calculate overall event podium (Top 3 across ALL pools)
-async function getEventPodium(eventId) {
+async function getEventPodium(eventId: string) {
   // Get all pools for this event
-  const { data: pools } = await supabase
+  const { data: pools } = await getAdminClient()
     .from('pools')
     .select('id')
     .eq('event_id', eventId)
@@ -53,7 +46,12 @@ async function getEventPodium(eventId) {
   }))
 }
 
-export async function POST(request) {
+export async function POST(request: NextRequest) {
+  // Initialize SendGrid with API key at runtime
+  if (process.env.SENDGRID_API_KEY) {
+    sgMail.setApiKey(process.env.SENDGRID_API_KEY)
+  }
+
   try {
     const { eventId, poolId } = await request.json()
 
@@ -65,14 +63,14 @@ export async function POST(request) {
     // Get event details
     let event
     if (eventId) {
-      const { data } = await supabase
+      const { data } = await getAdminClient()
         .from('events')
         .select('*')
         .eq('id', eventId)
         .single()
       event = data
     } else {
-      const { data: poolData } = await supabase
+      const { data: poolData } = await getAdminClient()
         .from('pools')
         .select('*, event:events(*)')
         .eq('id', poolId)
@@ -94,13 +92,13 @@ export async function POST(request) {
     // Get pools to send results for
     let pools
     if (poolId) {
-      const { data } = await supabase
+      const { data } = await getAdminClient()
         .from('pools')
         .select('*')
         .eq('id', poolId)
       pools = data
     } else {
-      const { data } = await supabase
+      const { data } = await getAdminClient()
         .from('pools')
         .select('*')
         .eq('event_id', event.id)
@@ -141,7 +139,7 @@ export async function POST(request) {
         }
 
         // Check if we already sent a results email to this person for this event
-        const { data: existingLog } = await supabase
+        const { data: existingLog } = await getAdminClient()
           .from('email_log')
           .select('id')
           .eq('recipient_email', email)
@@ -243,7 +241,7 @@ export async function POST(request) {
           })
 
           // Log the email
-          await supabase.from('email_log').insert({
+          await getAdminClient().from('email_log').insert({
             pool_id: pool.id,
             email_type: 'results',
             recipient_email: email
@@ -266,7 +264,7 @@ export async function POST(request) {
       podiumEntries: eventPodium.length
     })
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Send results error:', error)
     return NextResponse.json({ error: 'Server error: ' + error.message }, { status: 500 })
   }
