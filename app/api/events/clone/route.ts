@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Clone categories and options (for pick-one/hybrid events)
-    const sortedCategories = (sourceEvent.categories || []).sort((a, b) => a.order_index - b.order_index)
+    const sortedCategories = (sourceEvent.categories || []).sort((a: any, b: any) => a.order_index - b.order_index)
 
     for (const category of sortedCategories) {
       const { data: newCategory, error: catError } = await supabaseAdmin
@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
 
       clonedCounts.categories++
 
-      const options = (category.options || []).map(opt => ({
+      const options = (category.options || []).map((opt: any) => ({
         category_id: newCategory.id,
         name: opt.name,
         is_correct: null
