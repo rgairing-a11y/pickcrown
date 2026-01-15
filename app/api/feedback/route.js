@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server'
 import sgMail from '@sendgrid/mail'
 
-sgMail.setApiKey(process.env.SENDGRID_API_KEY)
-
 export async function POST(request) {
   try {
     const { message, email } = await request.json()
@@ -15,6 +13,8 @@ export async function POST(request) {
     if (!process.env.SENDGRID_API_KEY) {
       return NextResponse.json({ error: 'SendGrid API key not configured' }, { status: 500 })
     }
+
+    sgMail.setApiKey(process.env.SENDGRID_API_KEY)
 
     await sgMail.send({
       from: process.env.EMAIL_FROM || 'rgairing@gmail.com',
