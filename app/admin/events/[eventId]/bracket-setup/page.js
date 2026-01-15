@@ -249,9 +249,15 @@ function ByeTeamSetup({ eventId, rounds, matchups, teams, onUpdate, supabase }) 
 }
 
 export default function BracketSetupPage({ params }) {
-  const supabase = useMemo(() => createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const supabase = useMemo(() => {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    if (!url || !key) {
+      console.error('Missing Supabase environment variables')
+      return null
+    }
+    return createClient(url, key)
+  }, [])
   ), [])
 
   const [eventId, setEventId] = useState(null)

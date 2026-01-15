@@ -26,10 +26,15 @@ function isPoolVisible(pool) {
 }
 
 export default function HomePage() {
-  const supabase = useMemo(() => createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  ), [])
+  const supabase = useMemo(() => {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    if (!url || !key) {
+      console.error('Missing Supabase environment variables')
+      return null
+    }
+    return createClient(url, key)
+  }, [])
 
   const [email, setEmail] = useState('')
   const [entries, setEntries] = useState([])
@@ -46,7 +51,7 @@ export default function HomePage() {
   }, [])
 
   async function loadUserData(userEmail) {
-    if (!userEmail) return
+    if (!userEmail || !supabase) return
     setLoading(true)
     setHasSearched(true)
 

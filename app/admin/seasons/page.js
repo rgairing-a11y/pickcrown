@@ -7,10 +7,15 @@ import Link from 'next/link'
 import { createClient } from '@supabase/supabase-js'
 
 export default function SeasonsAdminPage() {
-  const supabase = useMemo(() => createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  ), [])
+  const supabase = useMemo(() => {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    if (!url || !key) {
+      console.error('Missing Supabase environment variables')
+      return null
+    }
+    return createClient(url, key)
+  }, [])
 
   const [seasons, setSeasons] = useState([])
   const [loading, setLoading] = useState(true)
@@ -20,6 +25,7 @@ export default function SeasonsAdminPage() {
   }, [])
 
   async function loadSeasons() {
+    if (!supabase) return
     const { data } = await supabase
       .from('seasons')
       .select(`
