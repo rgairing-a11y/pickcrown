@@ -1,17 +1,12 @@
-import { createClient } from '@supabase/supabase-js'
-import { NextResponse } from 'next/server'
+import { NextResponse, NextRequest } from 'next/server'
+import { getAdminClient } from '@/lib/supabase/clients'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-)
-
-export async function GET(request, { params }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ poolId: string }> }) {
   try {
     const { poolId } = await params
 
     // Get pool info
-    const { data: pool } = await supabase
+    const { data: pool } = await getAdminClient()
       .from('pools')
       .select('name, event:events(name, year)')
       .eq('id', poolId)
@@ -22,7 +17,7 @@ export async function GET(request, { params }) {
     }
 
     // Get standings
-    const { data: standings, error } = await supabase
+    const { data: standings, error } = await getAdminClient()
       .rpc('calculate_standings', { p_pool_id: poolId })
 
     if (error) {
@@ -55,7 +50,7 @@ export async function GET(request, { params }) {
         'Content-Disposition': `attachment; filename="${filename}"`
       }
     })
-  } catch (err) {
+  } catch (err: any) {
     console.error('CSV export error:', err)
     return NextResponse.json({ error: 'Export failed' }, { status: 500 })
   }
