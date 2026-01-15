@@ -104,7 +104,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Return result
-    const result = {
+    const result: {
+      success: boolean
+      categories_created: number
+      options_created: number
+      event_id: any
+      event_name: any
+      warnings?: string[]
+    } = {
       success: categoriesCreated > 0,
       categories_created: categoriesCreated,
       options_created: optionsCreated,
