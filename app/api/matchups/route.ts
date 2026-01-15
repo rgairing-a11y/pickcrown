@@ -1,9 +1,12 @@
 import { NextResponse, NextRequest } from 'next/server'
-import { getAdminClient } from '@/lib/supabase/clients'
-
-const supabase = getAdminClient()
+import { createClient } from '@supabase/supabase-js'
 
 export async function GET(request: NextRequest) {
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+
   const { searchParams } = new URL(request.url)
   const eventId = searchParams.get('eventId')
 
@@ -11,7 +14,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Event ID required' }, { status: 400 })
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('matchups')
     .select(`
       *,
@@ -31,6 +34,11 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+
   const body = await request.json()
   const { eventId, roundId, teamAId, teamBId, bracketPosition } = body
 
@@ -39,17 +47,17 @@ export async function POST(request: NextRequest) {
   }
 
   // Get existing matchups in this round to auto-assign bracket position
-  const { data: existingMatchups } = await supabase
+  const { data: existingMatchups } = await supabaseAdmin
     .from('matchups')
     .select('bracket_position')
     .eq('round_id', roundId)
     .order('bracket_position', { ascending: false })
     .limit(1)
 
-  const nextPosition = bracketPosition || 
+  const nextPosition = bracketPosition ||
     (existingMatchups?.[0]?.bracket_position ? existingMatchups[0].bracket_position + 1 : 1)
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('matchups')
     .insert({
       event_id: eventId,
@@ -69,6 +77,11 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+
   const body = await request.json()
   const { id, winnerTeamId } = body
 
@@ -77,7 +90,7 @@ export async function PUT(request: NextRequest) {
   }
 
   // Get the matchup with its round info
-  const { data: matchup, error: matchupError } = await supabase
+  const { data: matchup, error: matchupError } = await supabaseAdmin
     .from('matchups')
     .select(`
       *,
@@ -91,7 +104,7 @@ export async function PUT(request: NextRequest) {
   }
 
   // Update the winner
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('matchups')
     .update({ winner_team_id: winnerTeamId || null })
     .eq('id', id)
@@ -105,6 +118,7 @@ export async function PUT(request: NextRequest) {
   // BRACKET ADVANCEMENT: Advance winner to next round
   if (winnerTeamId && matchup.round?.round_order) {
     await advanceWinnerToNextRound(
+      supabaseAdmin,
       matchup.event_id,
       matchup.round.round_order,
       matchup.bracket_position,
@@ -115,6 +129,7 @@ export async function PUT(request: NextRequest) {
   // If clearing winner, also clear from next round
   if (!winnerTeamId && matchup.round?.round_order) {
     await clearFromNextRound(
+      supabaseAdmin,
       matchup.event_id,
       matchup.round.round_order,
       matchup.bracket_position
@@ -126,11 +141,11 @@ export async function PUT(request: NextRequest) {
 
 // Advance winner to the next round's matchup
 // SUPPORTS BYES: If a slot is already filled (bye team), fills the other slot
-async function advanceWinnerToNextRound(eventId: string, currentRoundOrder: number, bracketPosition: number, winnerTeamId: string) {
+async function advanceWinnerToNextRound(supabaseAdmin: any, eventId: string, currentRoundOrder: number, bracketPosition: number, winnerTeamId: string) {
   console.log(`[ADVANCE] Round ${currentRoundOrder}, Pos ${bracketPosition} -> Winner: ${winnerTeamId}`)
-  
+
   // Get the next round
-  const { data: nextRound, error: nextRoundError } = await supabase
+  const { data: nextRound, error: nextRoundError } = await supabaseAdmin
     .from('rounds')
     .select('id, name, round_order')
     .eq('event_id', eventId)
@@ -155,7 +170,7 @@ async function advanceWinnerToNextRound(eventId: string, currentRoundOrder: numb
   console.log(`[ADVANCE] Looking for Round ${nextRound.round_order}, Position ${nextBracketPosition}`)
 
   // Find the existing next round matchup
-  const { data: nextMatchup, error: matchupError } = await supabase
+  const { data: nextMatchup, error: matchupError } = await supabaseAdmin
     .from('matchups')
     .select('*')
     .eq('round_id', nextRound.id)
@@ -194,7 +209,7 @@ async function advanceWinnerToNextRound(eventId: string, currentRoundOrder: numb
       : { team_b_id: winnerTeamId }
   }
 
-  const { error: updateError } = await supabase
+  const { error: updateError } = await supabaseAdmin
     .from('matchups')
     .update(updateData)
     .eq('id', nextMatchup.id)
@@ -207,9 +222,9 @@ async function advanceWinnerToNextRound(eventId: string, currentRoundOrder: numb
 }
 
 // Clear team from next round when winner is unset
-async function clearFromNextRound(eventId: string, currentRoundOrder: number, bracketPosition: number) {
+async function clearFromNextRound(supabaseAdmin: any, eventId: string, currentRoundOrder: number, bracketPosition: number) {
   // Get the next round
-  const { data: nextRound } = await supabase
+  const { data: nextRound } = await supabaseAdmin
     .from('rounds')
     .select('id')
     .eq('event_id', eventId)
@@ -222,7 +237,7 @@ async function clearFromNextRound(eventId: string, currentRoundOrder: number, br
   const isTeamA = bracketPosition % 2 === 1
 
   // Find the next round matchup
-  const { data: nextMatchup } = await supabase
+  const { data: nextMatchup } = await supabaseAdmin
     .from('matchups')
     .select('*')
     .eq('round_id', nextRound.id)
@@ -231,12 +246,12 @@ async function clearFromNextRound(eventId: string, currentRoundOrder: number, br
 
   if (nextMatchup) {
     // Clear the appropriate team slot
-    const updateData = isTeamA 
+    const updateData = isTeamA
       ? { team_a_id: null }
       : { team_b_id: null }
-    
+
     // Also clear the winner if it was this team
-    await supabase
+    await supabaseAdmin
       .from('matchups')
       .update({
         ...updateData,
@@ -246,12 +261,17 @@ async function clearFromNextRound(eventId: string, currentRoundOrder: number, br
 
     // Recursively clear from subsequent rounds
     if (nextMatchup.winner_team_id) {
-      await clearFromNextRound(eventId, currentRoundOrder + 1, nextBracketPosition)
+      await clearFromNextRound(supabaseAdmin, eventId, currentRoundOrder + 1, nextBracketPosition)
     }
   }
 }
 
 export async function DELETE(request: NextRequest) {
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+
   const { searchParams } = new URL(request.url)
   const id = searchParams.get('id')
 
@@ -259,7 +279,7 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: 'Matchup ID required' }, { status: 400 })
   }
 
-  const { error } = await supabase
+  const { error } = await supabaseAdmin
     .from('matchups')
     .delete()
     .eq('id', id)
