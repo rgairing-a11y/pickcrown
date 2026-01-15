@@ -1,8 +1,11 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient } from '@supabase/supabase-js'
 
 export default async function AuditLogPage() {
-  const supabase = createClient()
-  
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  )
+
   const { data: logs } = await supabase
     .from('audit_log')
     .select('*')
