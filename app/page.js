@@ -1,13 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-)
 
 // SORTING RULE: Locked beats open. Seasons beat events. Now beats later.
 
@@ -16,19 +11,24 @@ const supabase = createClient(
 function isPoolVisible(pool) {
   if (!pool) return false
   if (pool.status === 'archived') return false
-  
+
   const now = new Date()
-  
+
   // Check open_date (if set and in future, not visible yet)
   if (pool.open_date && new Date(pool.open_date) > now) return false
-  
+
   // Check archive_date (if set and in past, auto-archived)
   if (pool.archive_date && new Date(pool.archive_date) < now) return false
-  
+
   return true
 }
 
 export default function HomePage() {
+  const supabase = useMemo(() => createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  ), [])
+
   const [email, setEmail] = useState('')
   const [entries, setEntries] = useState([])
   const [managedPools, setManagedPools] = useState([])
