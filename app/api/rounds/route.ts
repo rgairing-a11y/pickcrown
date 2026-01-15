@@ -1,7 +1,11 @@
 import { NextResponse, NextRequest } from 'next/server'
-import { getAdminClient } from '@/lib/supabase/clients'
+import { createClient } from '@supabase/supabase-js'
 
 export async function GET(request: NextRequest) {
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
   const { searchParams } = new URL(request.url)
   const eventId = searchParams.get('eventId')
 
@@ -9,7 +13,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Event ID required' }, { status: 400 })
   }
 
-  const { data, error } = await getAdminClient()
+  const { data, error } = await supabaseAdmin
     .from('rounds')
     .select('*')
     .eq('event_id', eventId)
@@ -23,6 +27,10 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
   const body = await request.json()
   const { eventId, name, round_order, points } = body
 
@@ -30,7 +38,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'All fields required' }, { status: 400 })
   }
 
-  const { data, error } = await getAdminClient()
+  const { data, error } = await supabaseAdmin
     .from('rounds')
     .insert({
       event_id: eventId,
@@ -49,6 +57,10 @@ export async function POST(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
   const { searchParams } = new URL(request.url)
   const id = searchParams.get('id')
 
@@ -56,7 +68,7 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: 'Round ID required' }, { status: 400 })
   }
 
-  const { error } = await getAdminClient()
+  const { error } = await supabaseAdmin
     .from('rounds')
     .delete()
     .eq('id', id)

@@ -1,18 +1,22 @@
 import { NextResponse, NextRequest } from 'next/server'
-import { getAdminClient } from '@/lib/supabase/clients'
+import { createClient } from '@supabase/supabase-js'
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ poolId: string }> }) {
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
   try {
     const { poolId } = await params
     
     // First delete pool entries (picks will cascade from entries)
-    await getAdminClient()
+    await supabaseAdmin
       .from('pool_entries')
       .delete()
       .eq('pool_id', poolId)
     
     // Then delete the pool itself
-    const { error } = await getAdminClient()
+    const { error } = await supabaseAdmin
       .from('pools')
       .delete()
       .eq('id', poolId)
@@ -30,11 +34,15 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
 }
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ poolId: string }> }) {
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
   try {
     const { poolId } = await params
     const body = await request.json()
     
-    const { error } = await getAdminClient()
+    const { error } = await supabaseAdmin
       .from('pools')
       .update(body)
       .eq('id', poolId)

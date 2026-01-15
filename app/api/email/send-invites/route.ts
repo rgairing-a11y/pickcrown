@@ -1,8 +1,12 @@
 import { NextResponse, NextRequest } from 'next/server'
-import { getAdminClient } from '@/lib/supabase/clients'
+import { createClient } from '@supabase/supabase-js'
 import sgMail from '@sendgrid/mail'
 
 export async function POST(request: NextRequest) {
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
   // Initialize SendGrid with API key at runtime
   if (process.env.SENDGRID_API_KEY) {
     sgMail.setApiKey(process.env.SENDGRID_API_KEY)
@@ -19,7 +23,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get target pool details
-    const { data: pool, error: poolError } = await getAdminClient()
+    const { data: pool, error: poolError } = await supabaseAdmin
       .from('pools')
       .select('*, event:events(name, start_time)')
       .eq('id', targetPoolId)
@@ -91,7 +95,7 @@ export async function POST(request: NextRequest) {
         })
 
         // Log the email
-        await getAdminClient().from('email_log').insert({
+        await supabaseAdmin.from('email_log').insert({
           pool_id: targetPoolId,
           email_type: 'invite',
           recipient_email: email

@@ -1,7 +1,11 @@
 import { NextResponse, NextRequest } from 'next/server'
-import { getAdminClient } from '@/lib/supabase/clients'
+import { createClient } from '@supabase/supabase-js'
 
 export async function POST(request: NextRequest) {
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
   try {
     const body = await request.json()
     
@@ -17,7 +21,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate event exists
-    const { data: event, error: eventError } = await getAdminClient()
+    const { data: event, error: eventError } = await supabaseAdmin
       .from('events')
       .select('id, name')
       .eq('id', eventId)
@@ -35,7 +39,7 @@ export async function POST(request: NextRequest) {
     const errors: string[] = []
 
     // Get existing max order_index for this event
-    const { data: existingCats } = await getAdminClient()
+    const { data: existingCats } = await supabaseAdmin
       .from('categories')
       .select('order_index')
       .eq('event_id', eventId)
@@ -57,7 +61,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Create category
-      const { data: newCategory, error: catError } = await getAdminClient()
+      const { data: newCategory, error: catError } = await supabaseAdmin
         .from('categories')
         .insert({
           event_id: eventId,
@@ -86,7 +90,7 @@ export async function POST(request: NextRequest) {
         }))
 
       if (optionsToInsert.length > 0) {
-        const { error: optError } = await getAdminClient()
+        const { error: optError } = await supabaseAdmin
           .from('category_options')
           .insert(optionsToInsert)
 
@@ -124,6 +128,10 @@ export async function POST(request: NextRequest) {
 
 // GET endpoint to preview what would be imported
 export async function GET(request: NextRequest) {
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
   const { searchParams } = new URL(request.url)
   const eventId = searchParams.get('event_id')
 
@@ -132,7 +140,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Get existing categories for this event
-  const { data: categories, error } = await getAdminClient()
+  const { data: categories, error } = await supabaseAdmin
     .from('categories')
     .select(`
       id,

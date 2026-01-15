@@ -1,19 +1,19 @@
 import { NextResponse, NextRequest } from 'next/server'
-import { getAdminClient } from '@/lib/supabase/clients'
+import { createClient } from '@supabase/supabase-js'
 
 export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const type = searchParams.get('type') // 'pool' or 'event'
     const id = searchParams.get('id')
-    
+
     if (!id || !type) {
       return NextResponse.json({ error: 'Missing type or id' }, { status: 400 })
     }
 
     // Check if service role key is available
     if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      return NextResponse.json({ 
+      return NextResponse.json({
         error: 'SUPABASE_SERVICE_ROLE_KEY not configured. Add it to your environment variables.',
         hint: 'In Vercel, go to Settings → Environment Variables'
       }, { status: 500 })
@@ -35,10 +35,14 @@ export async function DELETE(request: NextRequest) {
 }
 
 async function deletePool(poolId: string) {
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
   const errors: string[] = []
-  
+
   // 1. Get pool entries
-  const { data: entries, error: entriesError } = await getAdminClient()
+  const { data: entries, error: entriesError } = await supabaseAdmin
     .from('pool_entries')
     .select('id')
     .eq('pool_id', poolId)
@@ -51,14 +55,14 @@ async function deletePool(poolId: string) {
     const entryIds = entries.map(e => e.id)
     
     // Delete bracket picks
-    const { error: bpError } = await getAdminClient()
+    const { error: bpError } = await supabaseAdmin
       .from('bracket_picks')
       .delete()
       .in('pool_entry_id', entryIds)
     if (bpError) errors.push(`bracket_picks: ${bpError.message}`)
     
     // Delete category picks
-    const { error: cpError } = await getAdminClient()
+    const { error: cpError } = await supabaseAdmin
       .from('category_picks')
       .delete()
       .in('pool_entry_id', entryIds)
@@ -66,14 +70,14 @@ async function deletePool(poolId: string) {
   }
   
   // Delete pool entries
-  const { error: peError } = await getAdminClient()
+  const { error: peError } = await supabaseAdmin
     .from('pool_entries')
     .delete()
     .eq('pool_id', poolId)
   if (peError) errors.push(`pool_entries: ${peError.message}`)
   
   // Delete pool
-  const { error: poolError } = await getAdminClient()
+  const { error: poolError } = await supabaseAdmin
     .from('pools')
     .delete()
     .eq('id', poolId)
@@ -91,10 +95,14 @@ async function deletePool(poolId: string) {
 }
 
 async function deleteEvent(eventId: string) {
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
   const errors: string[] = []
-  
+
   // 1. Get pools for this event
-  const { data: pools } = await getAdminClient()
+  const { data: pools } = await supabaseAdmin
     .from('pools')
     .select('id')
     .eq('event_id', eventId)
@@ -111,21 +119,21 @@ async function deleteEvent(eventId: string) {
   }
   
   // 2. Delete matchups
-  const { error: matchupError } = await getAdminClient()
+  const { error: matchupError } = await supabaseAdmin
     .from('matchups')
     .delete()
     .eq('event_id', eventId)
   if (matchupError) errors.push(`matchups: ${matchupError.message}`)
   
   // 3. Get categories and delete options
-  const { data: categories } = await getAdminClient()
+  const { data: categories } = await supabaseAdmin
     .from('categories')
     .select('id')
     .eq('event_id', eventId)
   
   if (categories && categories.length > 0) {
     const catIds = categories.map(c => c.id)
-    const { error: optError } = await getAdminClient()
+    const { error: optError } = await supabaseAdmin
       .from('category_options')
       .delete()
       .in('category_id', catIds)
@@ -133,35 +141,35 @@ async function deleteEvent(eventId: string) {
   }
   
   // 4. Delete categories
-  const { error: catError } = await getAdminClient()
+  const { error: catError } = await supabaseAdmin
     .from('categories')
     .delete()
     .eq('event_id', eventId)
   if (catError) errors.push(`categories: ${catError.message}`)
   
   // 5. Delete teams
-  const { error: teamError } = await getAdminClient()
+  const { error: teamError } = await supabaseAdmin
     .from('teams')
     .delete()
     .eq('event_id', eventId)
   if (teamError) errors.push(`teams: ${teamError.message}`)
   
   // 6. Delete rounds
-  const { error: roundError } = await getAdminClient()
+  const { error: roundError } = await supabaseAdmin
     .from('rounds')
     .delete()
     .eq('event_id', eventId)
   if (roundError) errors.push(`rounds: ${roundError.message}`)
   
   // 7. Delete phases
-  const { error: phaseError } = await getAdminClient()
+  const { error: phaseError } = await supabaseAdmin
     .from('phases')
     .delete()
     .eq('event_id', eventId)
   if (phaseError) errors.push(`phases: ${phaseError.message}`)
   
   // 8. Delete event
-  const { error: eventError } = await getAdminClient()
+  const { error: eventError } = await supabaseAdmin
     .from('events')
     .delete()
     .eq('id', eventId)

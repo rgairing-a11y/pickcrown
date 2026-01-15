@@ -1,13 +1,17 @@
 import { NextResponse, NextRequest } from 'next/server'
-import { getAdminClient } from '@/lib/supabase/clients'
+import { createClient } from '@supabase/supabase-js'
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ poolId: string }> }) {
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
   try {
     const { poolId } = await params
     const { status } = await request.json()
     
     // Update pool status
-    const { error } = await getAdminClient()
+    const { error } = await supabaseAdmin
       .from('pools')
       .update({ status })
       .eq('id', poolId)

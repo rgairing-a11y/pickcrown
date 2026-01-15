@@ -1,12 +1,16 @@
 import { NextResponse, NextRequest } from 'next/server'
-import { getAdminClient } from '@/lib/supabase/clients'
+import { createClient } from '@supabase/supabase-js'
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ poolId: string }> }) {
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
   try {
     const { poolId } = await params
 
     // Get pool info
-    const { data: pool } = await getAdminClient()
+    const { data: pool } = await supabaseAdmin
       .from('pools')
       .select('name, event:events(name, year)')
       .eq('id', poolId)
@@ -17,7 +21,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     // Get standings
-    const { data: standings, error } = await getAdminClient()
+    const { data: standings, error } = await supabaseAdmin
       .rpc('calculate_standings', { p_pool_id: poolId })
 
     if (error) {
