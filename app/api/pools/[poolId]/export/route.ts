@@ -14,7 +14,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       .from('pools')
       .select('name, event:events(name, year)')
       .eq('id', poolId)
-      .single()
+      .single() as { data: { name: string; event: { name: string; year: number } } | null }
 
     if (!pool) {
       return NextResponse.json({ error: 'Pool not found' }, { status: 404 })
