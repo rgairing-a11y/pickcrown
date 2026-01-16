@@ -1,10 +1,15 @@
 export const dynamic = 'force-dynamic'
 
-import { supabase } from '../../../lib/supabase'
+import { createClient } from '@supabase/supabase-js'
 import BracketView from '../../../components/BracketView'
 import Link from 'next/link'
 
 export default async function BracketPage({ params }) {
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  )
+
   const { eventId } = await params
 
   const { data: event } = await supabase

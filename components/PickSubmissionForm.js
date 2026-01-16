@@ -1,52 +1,77 @@
 'use client'
 
-import { useState } from 'react'
-import { supabase } from '../lib/supabase'
-import { Button, Alert, FormField } from './ui'
-import { sortByOrderIndex, getErrorMessage } from '../lib/utils'
-import { getPhaseStatus, isPhaseUnlocked } from '../lib/phases'
-import Link from 'next/link'
+import { useState, useEffect } from 'react'
+import { createClient } from '@supabase/supabase-js'
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+)
 
 export default function PickSubmissionForm({ pool }) {
   const [entryName, setEntryName] = useState('')
+  const [displayName, setDisplayName] = useState('')
   const [email, setEmail] = useState('')
   const [tieBreaker, setTieBreaker] = useState('')
   const [picks, setPicks] = useState({})
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState('')
+  
+  // Edit mode state
+  const [existingEntry, setExistingEntry] = useState(null)
+  const [isEditMode, setIsEditMode] = useState(false)
+  const [loadingEntry, setLoadingEntry] = useState(true)
 
   const requiresTiebreaker = pool.config?.requires_tiebreaker || false
-  const phases = (pool.event.phases || []).sort((a, b) => a.phase_order - b.phase_order)
-  const hasPhases = phases.length > 0
+  const tiebreakerLabel = pool.config?.tiebreaker_label || 'Tie Breaker'
 
-  // Get categories for a specific phase
-  const getCategoriesForPhase = (phaseId) => {
-    return sortByOrderIndex(
-      (pool.event.categories || []).filter(c => c.phase_id === phaseId)
-    )
-  }
-
-  // Categories without a phase (backward compatibility)
-  const standaloneCats = sortByOrderIndex(
-    (pool.event.categories || []).filter(c => !c.phase_id)
+  const categories = (pool.event?.categories || []).sort(
+    (a, b) => a.order_index - b.order_index
   )
 
-  // Get all categories user can submit to right now
-  const getSubmittableCategories = () => {
-    if (!hasPhases) return standaloneCats
+  // Check for existing entry on mount
+  useEffect(() => {
+    async function checkExistingEntry() {
+      const savedEmail = localStorage.getItem('pickcrown_email')
+      if (savedEmail) {
+        setEmail(savedEmail)
+        
+        // Check if this email has an entry in this pool
+        const { data: entry } = await supabase
+          .from('pool_entries')
+          .select('*')
+          .eq('pool_id', pool.id)
+          .ilike('email', savedEmail)
+          .single()
 
-    const openPhases = phases.filter(p => 
-      getPhaseStatus(p) === 'open' && isPhaseUnlocked(p, phases)
-    )
-    
-    return [
-      ...standaloneCats,
-      ...openPhases.flatMap(p => getCategoriesForPhase(p.id))
-    ]
-  }
+        if (entry) {
+          setExistingEntry(entry)
+          setEntryName(entry.entry_name)
+          setDisplayName(entry.display_name || '')
+          setTieBreaker(entry.tie_breaker_value?.toString() || '')
+          setIsEditMode(true)
 
-  const submittableCats = getSubmittableCategories()
+          // Load existing picks
+          const { data: existingPicks } = await supabase
+            .from('category_picks')
+            .select('category_id, option_id')
+            .eq('pool_entry_id', entry.id)
+
+          if (existingPicks) {
+            const picksMap = {}
+            existingPicks.forEach(p => {
+              picksMap[p.category_id] = p.option_id
+            })
+            setPicks(picksMap)
+          }
+        }
+      }
+      setLoadingEntry(false)
+    }
+
+    checkExistingEntry()
+  }, [pool.id])
 
   const handlePick = (categoryId, optionId) => {
     setPicks(prev => ({
@@ -59,8 +84,7 @@ export default function PickSubmissionForm({ pool }) {
     entryName.trim() &&
     email.trim() &&
     (!requiresTiebreaker || tieBreaker) &&
-    submittableCats.length > 0 &&
-    submittableCats.every(cat => picks[cat.id])
+    Object.keys(picks).length === categories.length
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -70,25 +94,62 @@ export default function PickSubmissionForm({ pool }) {
     setError('')
 
     try {
-      const { data: entry, error: entryError } = await supabase
-        .from('pool_entries')
-        .insert({
-          pool_id: pool.id,
-          entry_name: entryName.trim(),
-          email: email.toLowerCase().trim(),
-          tie_breaker_value: requiresTiebreaker ? parseInt(tieBreaker) : null
-        })
-        .select()
-        .single()
+      let entryId
 
-      if (entryError) {
-        setError(getErrorMessage(entryError))
-        setSubmitting(false)
-        return
+      if (isEditMode && existingEntry) {
+        // UPDATE existing entry
+        const { error: updateError } = await supabase
+          .from('pool_entries')
+          .update({
+            display_name: displayName.trim() || null,
+            tie_breaker_value: requiresTiebreaker ? parseInt(tieBreaker) : null
+          })
+          .eq('id', existingEntry.id)
+
+        if (updateError) {
+          setError('Error updating entry: ' + updateError.message)
+          setSubmitting(false)
+          return
+        }
+
+        entryId = existingEntry.id
+
+        // Delete old picks
+        await supabase
+          .from('category_picks')
+          .delete()
+          .eq('pool_entry_id', entryId)
+
+      } else {
+        // CREATE new entry
+        const { data: entry, error: entryError } = await supabase
+          .from('pool_entries')
+          .insert({
+            pool_id: pool.id,
+            entry_name: entryName.trim(),
+            display_name: displayName.trim() || null,
+            email: email.toLowerCase().trim(),
+            tie_breaker_value: requiresTiebreaker ? parseInt(tieBreaker) : null
+          })
+          .select()
+          .single()
+
+        if (entryError) {
+          if (entryError.code === '23505') {
+            setError('This email or entry name is already used in this pool. If this is you, your picks should load automatically.')
+          } else {
+            setError(entryError.message)
+          }
+          setSubmitting(false)
+          return
+        }
+
+        entryId = entry.id
       }
 
+      // Insert picks
       const pickInserts = Object.entries(picks).map(([categoryId, optionId]) => ({
-        pool_entry_id: entry.id,
+        pool_entry_id: entryId,
         category_id: categoryId,
         option_id: optionId
       }))
@@ -103,6 +164,9 @@ export default function PickSubmissionForm({ pool }) {
         return
       }
 
+      // Save email to localStorage
+      localStorage.setItem('pickcrown_email', email.toLowerCase().trim())
+
       setSubmitted(true)
     } catch (err) {
       setError('Unexpected error: ' + err.message)
@@ -110,202 +174,217 @@ export default function PickSubmissionForm({ pool }) {
     }
   }
 
-  // Render a phase section
-  const renderPhaseSection = (phase) => {
-    const status = getPhaseStatus(phase)
-    const unlocked = isPhaseUnlocked(phase, phases)
-    const categories = getCategoriesForPhase(phase.id)
-
-    // Phase not yet unlocked (waiting for previous phase results)
-    if (!unlocked) {
-      return (
-        <div key={phase.id} style={{
-          marginBottom: 'var(--spacing-xl)',
-          padding: 'var(--spacing-lg)',
-          background: 'var(--color-background-alt)',
-          borderRadius: 'var(--radius-md)',
-          opacity: 0.7
-        }}>
-          <h4 style={{ margin: 0, color: 'var(--color-text-light)' }}>
-            🔒 {phase.name}
-          </h4>
-          <p style={{ color: 'var(--color-text-light)', marginBottom: 0, marginTop: 'var(--spacing-sm)' }}>
-            Waiting for previous phase results...
-          </p>
-        </div>
-      )
-    }
-
-    // Phase locked or completed
-    if (status === 'locked' || status === 'completed') {
-      return (
-        <div key={phase.id} style={{
-          marginBottom: 'var(--spacing-xl)',
-          padding: 'var(--spacing-lg)',
-          background: 'var(--color-background-alt)',
-          borderRadius: 'var(--radius-md)'
-        }}>
-          <h4 style={{ margin: 0 }}>
-            {status === 'completed' ? '✓' : '🔒'} {phase.name}
-          </h4>
-          <p style={{ color: 'var(--color-text-light)', marginBottom: 0, marginTop: 'var(--spacing-sm)' }}>
-            {status === 'completed' ? 'Results entered' : 'Picks locked'}
-          </p>
-        </div>
-      )
-    }
-
-    // Phase open - show picks
-    return (
-      <div key={phase.id} style={{ marginBottom: 'var(--spacing-xl)' }}>
-        <h4 style={{
-          borderBottom: '2px solid var(--color-primary)',
-          paddingBottom: 'var(--spacing-sm)',
-          marginBottom: 'var(--spacing-lg)'
-        }}>
-          {phase.name}
-        </h4>
-        {categories.map(category => (
-          <FormField key={category.id} label={category.name} required>
-            <select
-              value={picks[category.id] || ''}
-              onChange={(e) => handlePick(category.id, e.target.value)}
-              required
-            >
-              <option value="">-- Select --</option>
-              {category.options?.map(option => (
-                <option key={option.id} value={option.id}>
-                  {option.name}
-                </option>
-              ))}
-            </select>
-          </FormField>
-        ))}
-      </div>
-    )
+  if (loadingEntry) {
+    return <div style={{ padding: 24, textAlign: 'center', color: '#666' }}>Loading...</div>
   }
 
   if (submitted) {
     return (
-      <div style={{
-        padding: 'var(--spacing-xl)',
-        background: 'var(--color-success-light)',
-        borderRadius: 'var(--radius-lg)',
-        border: '1px solid var(--color-success)',
-        textAlign: 'center'
-      }}>
-        <div style={{ fontSize: 48, marginBottom: 'var(--spacing-md)' }}>
-          {'✅'}
-        </div>
-        <h3 style={{ marginTop: 0 }}>Picks Submitted!</h3>
-        <p>Entry name: <strong>{entryName}</strong></p>
-        <p style={{ color: 'var(--color-text-light)' }}>
-          We will email results to: {email}
+      <div
+        style={{
+          padding: 24,
+          background: '#d4edda',
+          borderRadius: 8,
+          border: '1px solid #c3e6cb'
+        }}
+      >
+        <h3 style={{ marginTop: 0 }}>
+          {isEditMode ? '✅ Picks Updated!' : '✅ Picks Submitted!'}
+        </h3>
+        <p>
+          Entry name: <strong>{entryName}</strong>
         </p>
-        <Link
-          href={'/pool/' + pool.id + '/standings'}
-          style={{
-            display: 'inline-block',
-            marginTop: 'var(--spacing-lg)',
-            padding: 'var(--spacing-md) var(--spacing-xl)',
-            background: 'var(--color-primary)',
-            color: 'white',
-            borderRadius: 'var(--radius-md)',
-            fontWeight: 'bold'
-          }}
-        >
-          View Standings
-        </Link>
+        <p>We'll email results to: {email}</p>
+        <a href={`/pool/${pool.id}/standings`}>View Standings →</a>
       </div>
     )
   }
 
   return (
     <form onSubmit={handleSubmit}>
-      {error && (
-        <Alert variant="danger" style={{ marginBottom: 'var(--spacing-lg)' }}>
-          {error}
-        </Alert>
+      {/* Edit Mode Banner */}
+      {isEditMode && (
+        <div style={{
+          padding: 16,
+          marginBottom: 24,
+          background: '#dbeafe',
+          border: '1px solid #93c5fd',
+          borderRadius: 8,
+          color: '#1e40af'
+        }}>
+          <strong>✏️ Edit Mode</strong>
+          <p style={{ margin: '8px 0 0', fontSize: '14px' }}>
+            You already have picks for this pool. Make changes below and click "Update Picks" to save.
+          </p>
+        </div>
       )}
 
-      <FormField label="Entry Name" required hint="Cannot be changed after submission">
+      {error && (
+        <div
+          style={{
+            padding: 16,
+            marginBottom: 24,
+            background: '#f8d7da',
+            border: '1px solid #f5c6cb',
+            borderRadius: 8,
+            color: '#721c24'
+          }}
+        >
+          {error}
+        </div>
+      )}
+
+      <div style={{ marginBottom: 16 }}>
+        <label
+          style={{ display: 'block', marginBottom: 8, fontWeight: 'bold' }}
+        >
+          Entry Name *
+        </label>
         <input
           type="text"
           value={entryName}
           onChange={(e) => setEntryName(e.target.value)}
           placeholder="e.g., Rich's Picks"
           required
+          disabled={isEditMode} // Can't change name after first submit
+          style={{
+            width: '100%',
+            padding: 12,
+            fontSize: 16,
+            border: '1px solid #ccc',
+            borderRadius: 4,
+            background: isEditMode ? '#f3f4f6' : 'white'
+          }}
         />
-      </FormField>
+        {isEditMode && (
+          <small style={{ color: '#666' }}>Entry name cannot be changed</small>
+        )}
+      </div>
 
-      <FormField label="Email" required>
+      <div style={{ marginBottom: 16 }}>
+        <label
+          style={{ display: 'block', marginBottom: 8, fontWeight: 'bold' }}
+        >
+          Email *
+        </label>
         <input
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="your@email.com"
           required
+          disabled={isEditMode} // Can't change email after first submit
+          style={{
+            width: '100%',
+            padding: 12,
+            fontSize: 16,
+            border: '1px solid #ccc',
+            borderRadius: 4,
+            background: isEditMode ? '#f3f4f6' : 'white'
+          }}
         />
-      </FormField>
+        <small style={{ color: '#666' }}>We'll use this for reminders and results</small>
+      </div>
+
+      <div style={{ marginBottom: 16 }}>
+        <label
+          style={{ display: 'block', marginBottom: 8, fontWeight: 'bold' }}
+        >
+          What should we call you?
+        </label>
+        <input
+          type="text"
+          value={displayName}
+          onChange={(e) => setDisplayName(e.target.value)}
+          placeholder={email ? email.split('@')[0] : 'Your name'}
+          style={{
+            width: '100%',
+            padding: 12,
+            fontSize: 16,
+            border: '1px solid #ccc',
+            borderRadius: 4
+          }}
+        />
+        <small style={{ color: '#666' }}>This is how you'll appear on standings</small>
+      </div>
 
       {requiresTiebreaker && (
-        <FormField label={pool.config.tiebreaker_label || 'Tie-breaker'} required>
+        <div style={{ marginBottom: 16 }}>
+          <label
+            style={{ display: 'block', marginBottom: 8, fontWeight: 'bold' }}
+          >
+            {tiebreakerLabel} *
+          </label>
           <input
             type="number"
             value={tieBreaker}
             onChange={(e) => setTieBreaker(e.target.value)}
             required
+            style={{
+              width: '100%',
+              padding: 12,
+              fontSize: 16,
+              border: '1px solid #ccc',
+              borderRadius: 4
+            }}
           />
-        </FormField>
+        </div>
       )}
 
-      <hr style={{
-        margin: 'var(--spacing-xl) 0',
-        border: 'none',
-        borderTop: '1px solid var(--color-border)'
-      }} />
+      <hr style={{ margin: '24px 0' }} />
 
-      <h3 style={{ marginBottom: 'var(--spacing-lg)' }}>Make Your Picks</h3>
+      <h3>Make Your Picks</h3>
 
-      {/* Render phases if multi-phase event */}
-      {hasPhases && phases.map(phase => renderPhaseSection(phase))}
-
-      {/* Render standalone categories (no phase) */}
-      {standaloneCats.map(category => (
-        <FormField key={category.id} label={category.name} required>
+      {categories.map((category) => (
+        <div key={category.id} style={{ marginBottom: 24 }}>
+          <label
+            style={{ display: 'block', marginBottom: 8, fontWeight: 'bold' }}
+          >
+            {category.name}
+          </label>
           <select
             value={picks[category.id] || ''}
             onChange={(e) => handlePick(category.id, e.target.value)}
             required
+            style={{ width: '100%', padding: 12, fontSize: 16 }}
           >
             <option value="">-- Select --</option>
-            {category.options?.map(option => (
+            {category.options?.map((option) => (
               <option key={option.id} value={option.id}>
                 {option.name}
               </option>
             ))}
           </select>
-        </FormField>
+        </div>
       ))}
 
-      {/* No picks available message */}
-      {submittableCats.length === 0 && hasPhases && (
-        <Alert variant="warning" style={{ textAlign: 'center' }}>
-          No picks available right now. Check back when the next phase opens!
-        </Alert>
-      )}
+      <button
+        type="submit"
+        disabled={!isComplete || submitting}
+        style={{
+          width: '100%',
+          padding: 16,
+          fontSize: 18,
+          fontWeight: 'bold',
+          background: isComplete ? (isEditMode ? '#3b82f6' : '#28a745') : '#ccc',
+          color: 'white',
+          border: 'none',
+          borderRadius: 8,
+          cursor: isComplete ? 'pointer' : 'not-allowed'
+        }}
+      >
+        {submitting 
+          ? 'Saving...' 
+          : isEditMode 
+            ? '✏️ Update Picks' 
+            : 'Submit All Picks'
+        }
+      </button>
 
-      {/* Submit button */}
-      {submittableCats.length > 0 && (
-        <Button
-          type="submit"
-          variant={isComplete ? 'success' : 'secondary'}
-          loading={submitting}
-          disabled={!isComplete}
-          style={{ width: '100%', marginTop: 'var(--spacing-lg)' }}
-        >
-          Submit All Picks
-        </Button>
+      {isEditMode && (
+        <p style={{ textAlign: 'center', marginTop: 16, color: '#666', fontSize: '14px' }}>
+          You can update your picks until the event starts.
+        </p>
       )}
     </form>
   )

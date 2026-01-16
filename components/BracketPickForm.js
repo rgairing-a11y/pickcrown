@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 import { Button, Alert, FormField, Card } from './ui'
 import { createMap, getConferences, getErrorMessage } from '../lib/utils'
@@ -8,12 +8,21 @@ import { CONFERENCE_COLORS } from '../lib/constants'
 
 export default function BracketPickForm({ pool, rounds, matchups, teams }) {
   const [entryName, setEntryName] = useState('')
+  const [displayName, setDisplayName] = useState('')
   const [email, setEmail] = useState('')
   const [tieBreaker, setTieBreaker] = useState('')
   const [picks, setPicks] = useState({}) // matchup_id -> team_id
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState('')
+
+  // Pre-fill email from localStorage
+  useEffect(() => {
+    const savedEmail = localStorage.getItem('pickcrown_email')
+    if (savedEmail) {
+      setEmail(savedEmail)
+    }
+  }, [])
 
   const requiresTiebreaker = pool.config?.requires_tiebreaker || false
   const teamMap = createMap(teams)
@@ -77,6 +86,7 @@ export default function BracketPickForm({ pool, rounds, matchups, teams }) {
         .insert({
           pool_id: pool.id,
           entry_name: entryName.trim(),
+          display_name: displayName.trim() || null,
           email: email.toLowerCase().trim(),
           tie_breaker_value: requiresTiebreaker ? parseInt(tieBreaker) : null
         })
@@ -105,6 +115,9 @@ export default function BracketPickForm({ pool, rounds, matchups, teams }) {
         setSubmitting(false)
         return
       }
+
+      // Save email to localStorage (in case they entered a new one)
+      localStorage.setItem('pickcrown_email', email.toLowerCase().trim())
 
       setSubmitted(true)
     } catch (err) {
@@ -158,13 +171,22 @@ export default function BracketPickForm({ pool, rounds, matchups, teams }) {
           />
         </FormField>
 
-        <FormField label="Email" required>
+        <FormField label="Email" required hint="For reminders and results">
           <input
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="your@email.com"
             required
+          />
+        </FormField>
+
+        <FormField label="What should we call you?" hint="This appears on standings">
+          <input
+            type="text"
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
+            placeholder={email ? email.split('@')[0] : 'Your name'}
           />
         </FormField>
 

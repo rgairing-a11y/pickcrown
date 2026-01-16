@@ -153,6 +153,17 @@ export default function CategoriesPage({ params }) {
         subtitle={event.name}
       />
 
+      {/* Import Link */}
+      <div style={{ marginBottom: 'var(--spacing-lg)', textAlign: 'right' }}>
+        <Button 
+          href={`/admin/events/${eventId}/import`}
+          variant="secondary"
+          style={{ fontSize: '14px' }}
+        >
+          📥 Import from CSV
+        </Button>
+      </div>
+
       {/* Add Category Form */}
       <Card style={{ marginBottom: 'var(--spacing-xl)' }}>
         <h3 style={{ marginTop: 0, marginBottom: 'var(--spacing-lg)' }}>Add Category</h3>
