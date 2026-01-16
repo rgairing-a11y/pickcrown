@@ -1,7 +1,9 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { supabase } from '../lib/supabase'
+import { getBrowserClient } from '@/lib/supabase/clients'
+
+const supabase = getBrowserClient()
 import { Button, Alert, FormField, Card } from './ui'
 import { createMap, getConferences, getErrorMessage } from '../lib/utils'
 import { CONFERENCE_COLORS } from '../lib/constants'

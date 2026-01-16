@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
-import { supabase } from '../../../lib/supabase'
+import { getBrowserClient } from '@/lib/supabase/clients'
+
+const supabase = getBrowserClient()
 import PickSubmissionForm from '../../../components/PickSubmissionForm'
 import BracketPickForm from '../../../components/BracketPickForm'
 import AdvancementPickForm from '../../../components/AdvancementPickForm'

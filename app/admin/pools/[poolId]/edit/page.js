@@ -1,7 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { supabase } from '../../../../../lib/supabase'
+import { getBrowserClient } from '@/lib/supabase/clients'
+
+const supabase = getBrowserClient()
 import { useRouter } from 'next/navigation'
 import { Card, PageHeader, Button, Alert, FormField, LoadingState, EmptyState } from '../../../../../components/ui'
 import Link from 'next/link'

@@ -1,7 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { supabase } from '../../../../../lib/supabase'
+import { getBrowserClient } from '@/lib/supabase/clients'
+
+const supabase = getBrowserClient()
 import { Card, PageHeader, Button, EmptyState, LoadingState, FormField } from '../../../../../components/ui'
 import { CATEGORY_TYPES, CATEGORY_TYPE_LABELS } from '../../../../../lib/constants'
 import { sortByOrderIndex } from '../../../../../lib/utils'
