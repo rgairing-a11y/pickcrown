@@ -1,0 +1,1207 @@
+// components/MyPicksButton.js
+// Fixed version that handles pool structure and both bracket_picks table AND picks JSON column
+
+'use client'
+
+import { useState, useEffect } from 'react'
+import { getBrowserClient } from '@/lib/supabase/clients'
+
+const supabase = getBrowserClient()
+
+export default function MyPicksButton({ 
+  // New props
+  pool, 
+  poolId: propPoolId, 
+  userEmail,
+  // Legacy props (from existing standings page)
+  poolEntries,
+  bracketPicks,
+  matchups: legacyMatchups,
+  roundNames
+}) {
+  const [isOpen, setIsOpen] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [entry, setEntry] = useState(null)
+  const [picks, setPicks] = useState([])
+  const [matchups, setMatchups] = useState([])
+  const [rounds, setRounds] = useState([])
+  const [teams, setTeams] = useState([])
+  const [categories, setCategories] = useState([])
+  const [categoryPicks, setCategoryPicks] = useState([])
+  const [eliminations, setEliminations] = useState({})
+  const [emailInput, setEmailInput] = useState('')
+  const [searchedEmail, setSearchedEmail] = useState('')
+  const [jsonPicks, setJsonPicks] = useState(null) // For picks stored in JSON column
+
+  // Load email from localStorage on mount
+  useEffect(() => {
+    const savedEmail = userEmail || (typeof window !== 'undefined' && localStorage.getItem('pickcrown_email')) || ''
+    setEmailInput(savedEmail)
+  }, [userEmail])
+
+  // Determine if using legacy mode (data passed in) vs new mode (fetch data)
+  // Check for actual data, not just truthy arrays (empty arrays are truthy!)
+  const isLegacyMode = !!(
+    poolEntries && poolEntries.length > 0 && 
+    bracketPicks && bracketPicks.length > 0 && 
+    legacyMatchups && legacyMatchups.length > 0
+  )
+
+  // Safely get pool and event IDs - accept poolId prop as fallback
+  const poolId = pool?.id || propPoolId
+  const [eventData, setEventData] = useState(pool?.event || null)
+  const eventId = eventData?.id || pool?.event?.id || pool?.event_id
+  const usesReseeding = eventData?.uses_reseeding || pool?.event?.uses_reseeding === true
+
+  // Legacy mode: render old style component
+  if (isLegacyMode) {
+    return (
+      <LegacyMyPicksButton
+        poolEntries={poolEntries}
+        bracketPicks={bracketPicks}
+        matchups={legacyMatchups}
+        roundNames={roundNames}
+      />
+    )
+  }
+
+  const loadPicks = async (email) => {
+    if (!email || !poolId) {
+      console.error('Missing email or poolId', { email, poolId })
+      return
+    }
+    
+    console.log('=== MyPicksButton Debug ===')
+    console.log('Pool:', pool)
+    console.log('Pool ID:', poolId)
+    console.log('Event Data:', eventData)
+    console.log('Event ID:', eventId)
+    setLoading(true)
+    setSearchedEmail(email)
+
+    try {
+      // Get user's entry (including picks JSON column if it exists)
+      const { data: entryData, error: entryError } = await supabase
+        .from('pool_entries')
+        .select('*')
+        .eq('pool_id', poolId)
+        .eq('email', email.toLowerCase().trim())
+        .single()
+
+      if (entryError || !entryData) {
+        console.log('No entry found:', entryError)
+        setEntry(null)
+        setPicks([])
+        setJsonPicks(null)
+        setLoading(false)
+        return
+      }
+      setEntry(entryData)
+      
+      // Check if picks are stored in JSON column
+      if (entryData.picks && typeof entryData.picks === 'object') {
+        console.log('Found JSON picks:', entryData.picks)
+        setJsonPicks(entryData.picks)
+      }
+
+      // Fetch event data if we don't have it
+      let currentEventId = eventId
+      let isReseeding = eventData?.uses_reseeding || false
+      
+      if (!currentEventId) {
+        console.log('Fetching event ID from pool...')
+        const { data: poolData } = await supabase
+          .from('pools')
+          .select('event_id, event:events(id, name, uses_reseeding, start_time)')
+          .eq('id', poolId)
+          .single()
+        
+        if (poolData?.event) {
+          setEventData(poolData.event)
+          currentEventId = poolData.event.id
+          isReseeding = poolData.event.uses_reseeding || false
+        } else if (poolData?.event_id) {
+          currentEventId = poolData.event_id
+        }
+        console.log('Fetched event ID:', currentEventId, 'uses_reseeding:', isReseeding)
+      }
+
+      if (!currentEventId) {
+        console.error('Missing eventId after fetch attempt')
+        setLoading(false)
+        return
+      }
+
+      // Get rounds
+      const { data: roundsData } = await supabase
+        .from('rounds')
+        .select('*')
+        .eq('event_id', currentEventId)
+        .order('round_order')
+      setRounds(roundsData || [])
+      console.log('Rounds:', roundsData?.length)
+
+      // Get teams
+      const { data: teamsData } = await supabase
+        .from('teams')
+        .select('*')
+        .eq('event_id', currentEventId)
+        .order('seed')
+      setTeams(teamsData || [])
+      console.log('Teams:', teamsData?.length)
+
+      console.log('Uses reseeding:', isReseeding)
+
+      if (isReseeding) {
+        // NFL-style: Load advancement picks
+        const { data: advPicks } = await supabase
+          .from('advancement_picks')
+          .select('*')
+          .eq('pool_entry_id', entryData.id)
+        setPicks(advPicks || [])
+        console.log('Advancement picks:', advPicks?.length)
+
+        // Get eliminations for correct/incorrect display
+        const { data: elimData } = await supabase
+          .from('team_eliminations')
+          .select('*')
+          .eq('event_id', currentEventId)
+        
+        const elimMap = {}
+        const winnersMap = {}
+        elimData?.forEach(e => {
+          // Track losers
+          elimMap[e.team_id] = e.eliminated_in_round_id
+          // Track winners
+          if (e.defeated_by_team_id) {
+            if (!winnersMap[e.defeated_by_team_id]) {
+              winnersMap[e.defeated_by_team_id] = []
+            }
+            winnersMap[e.defeated_by_team_id].push(e.eliminated_in_round_id)
+          }
+        })
+        elimMap._winners = winnersMap
+        setEliminations(elimMap)
+
+      } else {
+        // Standard bracket - try bracket_picks table first
+        const { data: matchupsData } = await supabase
+          .from('matchups')
+          .select('*, round:rounds(name, round_order, points)')
+          .eq('event_id', currentEventId)
+          .order('bracket_position')
+        setMatchups(matchupsData || [])
+        console.log('Matchups:', matchupsData?.length)
+
+        const { data: bracketPicks } = await supabase
+          .from('bracket_picks')
+          .select('*')
+          .eq('pool_entry_id', entryData.id)
+        
+        console.log('Bracket picks:', bracketPicks?.length)
+        
+        // If bracket_picks table has data, use it
+        if (bracketPicks && bracketPicks.length > 0) {
+          // Note: bracket_picks uses picked_team_id column
+          setPicks(bracketPicks.map(p => ({ ...p, team_id: p.picked_team_id })))
+        } else {
+          // Otherwise picks might be in JSON column (handled above)
+          setPicks([])
+        }
+
+        // Also load category picks if any
+        const { data: catsData } = await supabase
+          .from('categories')
+          .select('*, options:category_options(*)')
+          .eq('event_id', currentEventId)
+          .order('order_index')
+        setCategories(catsData || [])
+
+        if (catsData?.length > 0) {
+          const { data: catPicks } = await supabase
+            .from('category_picks')
+            .select('*')
+            .eq('pool_entry_id', entryData.id)
+          setCategoryPicks(catPicks || [])
+        }
+      }
+
+    } catch (err) {
+      console.error('Error loading picks:', err)
+    }
+
+    setLoading(false)
+  }
+
+  const handleOpen = () => {
+    setIsOpen(true)
+    if (emailInput) {
+      loadPicks(emailInput)
+    }
+  }
+
+  const handleFind = () => {
+    if (emailInput) {
+      // Save email to localStorage for next time
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('pickcrown_email', emailInput.toLowerCase().trim())
+      }
+      loadPicks(emailInput)
+    }
+  }
+
+  // Check if pick is correct for NFL advancement
+  const isPickCorrect = (teamId, roundId) => {
+    const round = rounds.find(r => r.id === roundId)
+    if (!round) return null
+
+    const elimRoundId = eliminations[teamId]
+    const winnersMap = eliminations._winners || {}
+    const wonRoundIds = winnersMap[teamId] || []
+    
+    // Check if team was eliminated
+    if (elimRoundId) {
+      const elimRound = rounds.find(r => r.id === elimRoundId)
+      if (elimRound) {
+        if (elimRound.round_order === round.round_order) {
+          // Team eliminated IN THIS ROUND = wrong
+          return false
+        } else if (elimRound.round_order > round.round_order) {
+          // Team advanced past this round if eliminated in a LATER round
+          return true
+        }
+      }
+    }
+    
+    // Check if team WON a game in this round
+    if (wonRoundIds.length > 0) {
+      const wonThisRound = wonRoundIds.some(roundId => {
+        const wonRound = rounds.find(r => r.id === roundId)
+        return wonRound && wonRound.round_order === round.round_order
+      })
+      if (wonThisRound) {
+        return true
+      }
+    }
+    
+    // No result yet
+    return null
+  }
+
+  const teamMap = Object.fromEntries(teams.map(t => [t.id, t]))
+  const roundMap = Object.fromEntries(rounds.map(r => [r.id, r]))
+
+  // Calculate total correct picks for NFL
+  const nflStats = usesReseeding ? {
+    total: picks.length,
+    correct: picks.filter(p => isPickCorrect(p.team_id, p.round_id) === true).length,
+    incorrect: picks.filter(p => isPickCorrect(p.team_id, p.round_id) === false).length,
+    pending: picks.filter(p => isPickCorrect(p.team_id, p.round_id) === null).length,
+  } : null
+
+  // Check if we have any picks data
+  const hasPicksData = picks.length > 0 || (jsonPicks && Object.keys(jsonPicks).length > 0)
+
+  if (!poolId) {
+    return (
+      <button
+        disabled
+        style={{
+          padding: '10px 20px',
+          background: '#9ca3af',
+          color: 'white',
+          border: 'none',
+          borderRadius: 8,
+          cursor: 'not-allowed',
+          fontWeight: 600,
+          fontSize: 14
+        }}
+      >
+        🎯 My Picks (Error: No pool)
+      </button>
+    )
+  }
+
+  return (
+    <>
+      <button
+        onClick={handleOpen}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          padding: '10px 20px',
+          background: usesReseeding ? '#dc2626' : '#3b82f6',
+          color: 'white',
+          border: 'none',
+          borderRadius: 8,
+          cursor: 'pointer',
+          fontWeight: 600,
+          fontSize: 14
+        }}
+      >
+        {usesReseeding ? '🏈' : '🎯'} My Picks
+      </button>
+
+      {/* Modal */}
+      {isOpen && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 50,
+          padding: 16
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: 12,
+            maxWidth: 700,
+            width: '100%',
+            maxHeight: '90vh',
+            overflow: 'auto'
+          }}>
+            {/* Header */}
+            <div style={{
+              padding: 20,
+              borderBottom: '1px solid #e5e7eb',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              position: 'sticky',
+              top: 0,
+              background: 'white',
+              zIndex: 1
+            }}>
+              <h2 style={{ margin: 0, fontSize: 20 }}>
+                {usesReseeding ? '🏈' : '🎯'} My Picks
+              </h2>
+              <button
+                onClick={() => setIsOpen(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: 24,
+                  cursor: 'pointer',
+                  color: '#666'
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Email Search */}
+            <div style={{
+              padding: 20,
+              borderBottom: '1px solid #e5e7eb',
+              background: '#f9fafb'
+            }}>
+              <div style={{ display: 'flex', gap: 12 }}>
+                <input
+                  type="email"
+                  placeholder="Enter your email"
+                  value={emailInput}
+                  onChange={(e) => setEmailInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleFind()}
+                  style={{
+                    flex: 1,
+                    padding: '10px 14px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: 8,
+                    fontSize: 14
+                  }}
+                />
+                <button
+                  onClick={handleFind}
+                  disabled={!emailInput || loading}
+                  style={{
+                    padding: '10px 24px',
+                    background: '#22c55e',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: 8,
+                    fontWeight: 600,
+                    cursor: emailInput ? 'pointer' : 'not-allowed',
+                    opacity: emailInput ? 1 : 0.5
+                  }}
+                >
+                  Find
+                </button>
+              </div>
+
+              {/* Entry found indicator */}
+              {entry && (
+                <div style={{
+                  marginTop: 12,
+                  padding: '8px 12px',
+                  background: '#dcfce7',
+                  borderRadius: 6,
+                  fontSize: 14
+                }}>
+                  <strong>{entry.entry_name}</strong>
+                  <span style={{ color: '#666', marginLeft: 8 }}>{entry.email}</span>
+                  {usesReseeding && nflStats && (
+                    <span style={{ 
+                      marginLeft: 12,
+                      padding: '2px 8px',
+                      background: '#3b82f6',
+                      color: 'white',
+                      borderRadius: 12,
+                      fontSize: 12
+                    }}>
+                      {nflStats.total} picks
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Content */}
+            <div style={{ padding: 20 }}>
+              {loading ? (
+                <div style={{ textAlign: 'center', padding: 40, color: '#666' }}>
+                  Loading...
+                </div>
+              ) : !searchedEmail ? (
+                <div style={{ textAlign: 'center', padding: 40, color: '#666' }}>
+                  Enter your email to view your picks
+                </div>
+              ) : !entry ? (
+                <div style={{ textAlign: 'center', padding: 40, color: '#666' }}>
+                  No entry found for {searchedEmail}
+                </div>
+              ) : !hasPicksData ? (
+                <div style={{ textAlign: 'center', padding: 40, color: '#666' }}>
+                  No picks submitted yet
+                </div>
+              ) : usesReseeding ? (
+                // NFL Advancement Picks Display
+                <NFLPicksDisplay
+                  picks={picks}
+                  rounds={rounds}
+                  teams={teams}
+                  teamMap={teamMap}
+                  roundMap={roundMap}
+                  eliminations={eliminations}
+                  isPickCorrect={isPickCorrect}
+                  nflStats={nflStats}
+                />
+              ) : jsonPicks && Object.keys(jsonPicks).length > 0 ? (
+                // JSON column picks display (for CFB and older events)
+                <JSONPicksDisplay
+                  picks={jsonPicks}
+                  matchups={matchups}
+                  teams={teams}
+                  teamMap={teamMap}
+                  categories={categories}
+                />
+              ) : (
+                // Standard Bracket Picks Display (bracket_picks table)
+                <StandardPicksDisplay
+                  picks={picks}
+                  matchups={matchups}
+                  teams={teams}
+                  teamMap={teamMap}
+                  categories={categories}
+                  categoryPicks={categoryPicks}
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
+// NFL Advancement Picks Component
+function NFLPicksDisplay({ picks, rounds, teams, teamMap, roundMap, eliminations, isPickCorrect, nflStats }) {
+  return (
+    <div>
+      {/* Legend */}
+      <div style={{
+        display: 'flex',
+        gap: 16,
+        marginBottom: 24,
+        fontSize: 13,
+        color: '#666'
+      }}>
+        <span>✅ Correct</span>
+        <span>❌ Incorrect</span>
+        <span>⏳ Pending</span>
+      </div>
+
+      {/* Stats Summary */}
+      {nflStats && Object.keys(eliminations).length > 0 && (
+        <div style={{
+          display: 'flex',
+          gap: 16,
+          marginBottom: 24,
+          padding: 16,
+          background: '#f0fdf4',
+          borderRadius: 8,
+          border: '1px solid #bbf7d0'
+        }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 24, fontWeight: 'bold', color: '#16a34a' }}>{nflStats.correct}</div>
+            <div style={{ fontSize: 12, color: '#666' }}>Correct</div>
+          </div>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 24, fontWeight: 'bold', color: '#dc2626' }}>{nflStats.incorrect}</div>
+            <div style={{ fontSize: 12, color: '#666' }}>Wrong</div>
+          </div>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 24, fontWeight: 'bold', color: '#6b7280' }}>{nflStats.pending}</div>
+            <div style={{ fontSize: 12, color: '#666' }}>Pending</div>
+          </div>
+        </div>
+      )}
+
+      {/* Rounds */}
+      {rounds.map(round => {
+        const roundPicks = picks.filter(p => p.round_id === round.id)
+        const isSuperBowl = round.round_order === rounds.length
+
+        return (
+          <div key={round.id} style={{
+            marginBottom: 24,
+            padding: 16,
+            background: isSuperBowl ? '#fef3c7' : '#f9fafb',
+            borderRadius: 8,
+            border: isSuperBowl ? '2px solid #f59e0b' : '1px solid #e5e7eb'
+          }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: 12
+            }}>
+              <h3 style={{ margin: 0, fontSize: 16 }}>
+                {isSuperBowl && '🏆 '}{round.name}
+              </h3>
+              <span style={{
+                fontSize: 13,
+                color: '#666',
+                background: '#e5e7eb',
+                padding: '2px 8px',
+                borderRadius: 12
+              }}>
+                {round.points} pts each
+              </span>
+            </div>
+
+            {roundPicks.length === 0 ? (
+              <p style={{ color: '#9ca3af', fontStyle: 'italic', margin: 0 }}>
+                No picks for this round
+              </p>
+            ) : (
+              <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+                {['AFC', 'NFC'].map(conf => {
+                  const confPicks = roundPicks.filter(p => {
+                    const team = teamMap[p.team_id]
+                    return team?.conference?.toUpperCase() === conf
+                  })
+
+                  if (confPicks.length === 0 && !isSuperBowl) return null
+
+                  return (
+                    <div key={conf} style={{ flex: 1, minWidth: 200 }}>
+                      {!isSuperBowl && (
+                        <h4 style={{
+                          margin: '0 0 8px',
+                          fontSize: 13,
+                          color: conf === 'AFC' ? '#dc2626' : '#2563eb'
+                        }}>
+                          {conf}
+                        </h4>
+                      )}
+                      <div style={{ display: 'flex', flexDirection: isSuperBowl ? 'row' : 'column', gap: 6, flexWrap: 'wrap' }}>
+                        {confPicks.map(pick => {
+                          const team = teamMap[pick.team_id]
+                          const correct = isPickCorrect(pick.team_id, pick.round_id)
+                          const hasResults = Object.keys(eliminations).length > 0
+
+                          return (
+                            <div key={pick.id || `${pick.team_id}-${pick.round_id}`} style={{
+                              padding: isSuperBowl ? '12px 20px' : '8px 12px',
+                              background: hasResults
+                                ? (correct === true ? '#dcfce7' : correct === false ? '#fee2e2' : 'white')
+                                : 'white',
+                              border: `1px solid ${
+                                hasResults
+                                  ? (correct === true ? '#16a34a' : correct === false ? '#ef4444' : '#d1d5db')
+                                  : '#d1d5db'
+                              }`,
+                              borderRadius: 6,
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              gap: 8
+                            }}>
+                              <span>
+                                {isSuperBowl && (
+                                  <span style={{
+                                    fontSize: 11,
+                                    color: team?.conference === 'AFC' ? '#dc2626' : '#2563eb',
+                                    marginRight: 6
+                                  }}>
+                                    {team?.conference}
+                                  </span>
+                                )}
+                                #{team?.seed} {team?.name}
+                              </span>
+                              <span>
+                                {hasResults 
+                                  ? (correct === true ? '✅' : correct === false ? '❌' : '⏳')
+                                  : '⏳'
+                                }
+                              </span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )
+      })}
+
+      {/* Points Summary */}
+      {Object.keys(eliminations).length > 0 && (
+        <div style={{
+          marginTop: 24,
+          padding: 16,
+          background: '#f0fdf4',
+          borderRadius: 8,
+          border: '1px solid #bbf7d0'
+        }}>
+          <h4 style={{ margin: '0 0 12px' }}>Points Summary</h4>
+          <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+            {rounds.map(round => {
+              const roundPicks = picks.filter(p => p.round_id === round.id)
+              const correctCount = roundPicks.filter(p => 
+                isPickCorrect(p.team_id, p.round_id) === true
+              ).length
+              const points = correctCount * round.points
+
+              return (
+                <div key={round.id} style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: 12, color: '#666' }}>{round.name}</div>
+                  <div style={{ fontSize: 20, fontWeight: 'bold' }}>{points}</div>
+                  <div style={{ fontSize: 11, color: '#9ca3af' }}>
+                    {correctCount}/{roundPicks.length} × {round.points}
+                  </div>
+                </div>
+              )
+            })}
+            <div style={{ 
+              textAlign: 'center',
+              paddingLeft: 24,
+              borderLeft: '2px solid #16a34a'
+            }}>
+              <div style={{ fontSize: 12, color: '#666' }}>Total</div>
+              <div style={{ fontSize: 24, fontWeight: 'bold', color: '#16a34a' }}>
+                {picks.reduce((sum, pick) => {
+                  const round = roundMap[pick.round_id]
+                  const correct = isPickCorrect(pick.team_id, pick.round_id)
+                  return sum + (correct === true ? (round?.points || 0) : 0)
+                }, 0)}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// JSON Column Picks Display (for CFB and older events)
+function JSONPicksDisplay({ picks, matchups, teams, teamMap, categories }) {
+  // picks is an object like { matchup_id: team_id, ... } or { bracket: {...}, categories: {...} }
+  
+  // Handle different JSON structures
+  const bracketPicks = picks.bracket || picks
+  const catPicks = picks.categories || {}
+
+  // Group matchups by round
+  const matchupsByRound = {}
+  matchups.forEach(m => {
+    const roundName = m.round?.name || 'Unknown'
+    const roundOrder = m.round?.round_order || 0
+    if (!matchupsByRound[roundOrder]) {
+      matchupsByRound[roundOrder] = { name: roundName, points: m.round?.points || 0, matchups: [] }
+    }
+    matchupsByRound[roundOrder].matchups.push(m)
+  })
+
+  return (
+    <div>
+      {/* Bracket Picks */}
+      {Object.entries(matchupsByRound)
+        .sort(([a], [b]) => Number(a) - Number(b))
+        .map(([roundOrder, roundData]) => (
+          <div key={roundOrder} style={{ marginBottom: 24 }}>
+            <h3 style={{
+              fontSize: 14,
+              padding: '8px 12px',
+              background: '#eff6ff',
+              borderRadius: 6,
+              marginBottom: 12
+            }}>
+              {roundData.name}
+              <span style={{ fontWeight: 'normal', color: '#666', marginLeft: 8 }}>
+                ({roundData.points} pts)
+              </span>
+            </h3>
+
+            {roundData.matchups.map(matchup => {
+              const pickedTeamId = bracketPicks[matchup.id]
+              const pickedTeam = pickedTeamId ? teamMap[pickedTeamId] : null
+              const winner = matchup.winner_team_id
+              const isCorrect = winner && pickedTeamId === winner
+              const isWrong = winner && pickedTeamId && pickedTeamId !== winner
+              const teamA = teamMap[matchup.team_a_id]
+              const teamB = teamMap[matchup.team_b_id]
+
+              return (
+                <div key={matchup.id} style={{
+                  padding: 12,
+                  marginBottom: 8,
+                  background: isCorrect ? '#dcfce7' : isWrong ? '#fee2e2' : '#f9fafb',
+                  borderRadius: 6,
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}>
+                  <div style={{ color: '#666', fontSize: 13 }}>
+                    {teamA && teamB ? (
+                      `(${teamA.seed}) ${teamA.name} vs (${teamB.seed}) ${teamB.name}`
+                    ) : 'TBD'}
+                  </div>
+                  <div style={{
+                    fontWeight: 600,
+                    color: isCorrect ? '#16a34a' : isWrong ? '#dc2626' : '#374151'
+                  }}>
+                    {pickedTeam ? pickedTeam.name : '—'}
+                    {winner && (isCorrect ? ' ✓' : isWrong ? ' ✗' : '')}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        ))}
+
+      {/* Category Picks from JSON */}
+      {categories.length > 0 && Object.keys(catPicks).length > 0 && (
+        <div style={{ marginTop: 24 }}>
+          <h3 style={{ 
+            fontSize: 14, 
+            borderBottom: '2px solid #e5e7eb',
+            paddingBottom: 8,
+            marginBottom: 16
+          }}>
+            Category Picks
+          </h3>
+          {categories.map(cat => {
+            const pickedOptionId = catPicks[cat.id]
+            const pickedOption = cat.options?.find(o => o.id === pickedOptionId)
+            const correctOption = cat.options?.find(o => o.is_correct)
+            const isCorrect = correctOption && pickedOptionId === correctOption.id
+            const isWrong = correctOption && pickedOptionId && pickedOptionId !== correctOption.id
+
+            return (
+              <div key={cat.id} style={{
+                padding: 12,
+                marginBottom: 8,
+                background: isCorrect ? '#dcfce7' : isWrong ? '#fee2e2' : '#f9fafb',
+                borderRadius: 6,
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
+                <div style={{ color: '#666', fontSize: 13 }}>{cat.name}</div>
+                <div style={{
+                  fontWeight: 600,
+                  color: isCorrect ? '#16a34a' : isWrong ? '#dc2626' : '#374151'
+                }}>
+                  {pickedOption ? pickedOption.name : '—'}
+                  {correctOption && (isCorrect ? ' ✓' : isWrong ? ' ✗' : '')}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Standard Bracket Picks Component (bracket_picks table)
+function StandardPicksDisplay({ picks, matchups, teams, teamMap, categories, categoryPicks }) {
+  // Group matchups by round
+  const matchupsByRound = {}
+  matchups.forEach(m => {
+    const roundName = m.round?.name || 'Unknown'
+    const roundOrder = m.round?.round_order || 0
+    if (!matchupsByRound[roundOrder]) {
+      matchupsByRound[roundOrder] = { name: roundName, points: m.round?.points || 0, matchups: [] }
+    }
+    matchupsByRound[roundOrder].matchups.push(m)
+  })
+
+  const pickMap = Object.fromEntries(picks.map(p => [p.matchup_id, p.team_id]))
+  const catPickMap = Object.fromEntries(categoryPicks.map(p => [p.category_id, p.option_id]))
+
+  return (
+    <div>
+      {/* Bracket Picks */}
+      {Object.entries(matchupsByRound)
+        .sort(([a], [b]) => Number(a) - Number(b))
+        .map(([roundOrder, roundData]) => (
+          <div key={roundOrder} style={{ marginBottom: 24 }}>
+            <h3 style={{
+              fontSize: 14,
+              padding: '8px 12px',
+              background: '#eff6ff',
+              borderRadius: 6,
+              marginBottom: 12
+            }}>
+              {roundData.name}
+              <span style={{ fontWeight: 'normal', color: '#666', marginLeft: 8 }}>
+                ({roundData.points} pts)
+              </span>
+            </h3>
+
+            {roundData.matchups.map(matchup => {
+              const pickedTeamId = pickMap[matchup.id]
+              const pickedTeam = pickedTeamId ? teamMap[pickedTeamId] : null
+              const winner = matchup.winner_team_id
+              const isCorrect = winner && pickedTeamId === winner
+              const isWrong = winner && pickedTeamId && pickedTeamId !== winner
+              const teamA = teamMap[matchup.team_a_id]
+              const teamB = teamMap[matchup.team_b_id]
+
+              return (
+                <div key={matchup.id} style={{
+                  padding: 12,
+                  marginBottom: 8,
+                  background: isCorrect ? '#dcfce7' : isWrong ? '#fee2e2' : '#f9fafb',
+                  borderRadius: 6,
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}>
+                  <div style={{ color: '#666', fontSize: 13 }}>
+                    {teamA && teamB ? (
+                      `(${teamA.seed}) ${teamA.name} vs (${teamB.seed}) ${teamB.name}`
+                    ) : 'TBD'}
+                  </div>
+                  <div style={{
+                    fontWeight: 600,
+                    color: isCorrect ? '#16a34a' : isWrong ? '#dc2626' : '#374151'
+                  }}>
+                    {pickedTeam ? pickedTeam.name : '—'}
+                    {winner && (isCorrect ? ' ✓' : isWrong ? ' ✗' : '')}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        ))}
+
+      {/* Category Picks */}
+      {categories.length > 0 && (
+        <div style={{ marginTop: 24 }}>
+          <h3 style={{ 
+            fontSize: 14, 
+            borderBottom: '2px solid #e5e7eb',
+            paddingBottom: 8,
+            marginBottom: 16
+          }}>
+            Category Picks
+          </h3>
+          {categories.map(cat => {
+            const pickedOptionId = catPickMap[cat.id]
+            const pickedOption = cat.options?.find(o => o.id === pickedOptionId)
+            const correctOption = cat.options?.find(o => o.is_correct)
+            const isCorrect = correctOption && pickedOptionId === correctOption.id
+            const isWrong = correctOption && pickedOptionId && pickedOptionId !== correctOption.id
+
+            return (
+              <div key={cat.id} style={{
+                padding: 12,
+                marginBottom: 8,
+                background: isCorrect ? '#dcfce7' : isWrong ? '#fee2e2' : '#f9fafb',
+                borderRadius: 6,
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
+                <div style={{ color: '#666', fontSize: 13 }}>{cat.name}</div>
+                <div style={{
+                  fontWeight: 600,
+                  color: isCorrect ? '#16a34a' : isWrong ? '#dc2626' : '#374151'
+                }}>
+                  {pickedOption ? pickedOption.name : '—'}
+                  {correctOption && (isCorrect ? ' ✓' : isWrong ? ' ✗' : '')}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Legacy MyPicksButton - matches the original API from standings page
+function LegacyMyPicksButton({ poolEntries, bracketPicks, matchups, roundNames }) {
+  const [isOpen, setIsOpen] = useState(false)
+  const [email, setEmail] = useState('')
+  const [foundEntries, setFoundEntries] = useState([])
+
+  // Pre-fill from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('pickcrown_email')
+    if (saved) {
+      setEmail(saved)
+      findEntries(saved)
+    }
+  }, [])
+
+  const findEntries = (searchEmail) => {
+    if (!searchEmail) {
+      setFoundEntries([])
+      return
+    }
+    const matches = poolEntries.filter(e => 
+      e.email?.toLowerCase() === searchEmail.toLowerCase()
+    )
+    setFoundEntries(matches)
+  }
+
+  const handleFind = () => {
+    findEntries(email)
+    localStorage.setItem('pickcrown_email', email.toLowerCase())
+  }
+
+  // Group matchups by round
+  const matchupsByRound = {}
+  matchups?.forEach(m => {
+    const roundName = roundNames?.[m.round_id] || 'Unknown'
+    if (!matchupsByRound[m.round_id]) {
+      matchupsByRound[m.round_id] = { name: roundName, matchups: [] }
+    }
+    matchupsByRound[m.round_id].matchups.push(m)
+  })
+
+  return (
+    <>
+      <button
+        onClick={() => setIsOpen(true)}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          padding: '12px 20px',
+          background: '#3b82f6',
+          color: 'white',
+          border: 'none',
+          borderRadius: 8,
+          cursor: 'pointer',
+          fontWeight: 'bold',
+          fontSize: 14
+        }}
+      >
+        🎯 My Picks
+      </button>
+
+      {isOpen && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 50,
+          padding: 16
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: 12,
+            maxWidth: 600,
+            width: '100%',
+            maxHeight: '90vh',
+            overflow: 'auto'
+          }}>
+            {/* Header */}
+            <div style={{
+              padding: 20,
+              borderBottom: '1px solid #e5e7eb',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <h2 style={{ margin: 0, fontSize: 20 }}>🎯 My Picks</h2>
+              <button
+                onClick={() => setIsOpen(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: 24,
+                  cursor: 'pointer',
+                  color: '#666'
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Email Search */}
+            <div style={{ padding: 20, borderBottom: '1px solid #e5e7eb', background: '#f9fafb' }}>
+              <div style={{ display: 'flex', gap: 12 }}>
+                <input
+                  type="email"
+                  placeholder="Enter your email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleFind()}
+                  style={{
+                    flex: 1,
+                    padding: '10px 14px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: 8,
+                    fontSize: 14
+                  }}
+                />
+                <button
+                  onClick={handleFind}
+                  style={{
+                    padding: '10px 24px',
+                    background: '#22c55e',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: 8,
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Find
+                </button>
+              </div>
+
+              {foundEntries.length > 0 && (
+                <div style={{ marginTop: 12 }}>
+                  {foundEntries.map(entry => (
+                    <div key={entry.id} style={{
+                      padding: '8px 12px',
+                      background: '#dcfce7',
+                      borderRadius: 6,
+                      marginBottom: 8,
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center'
+                    }}>
+                      <div>
+                        <strong>{entry.entry_name}</strong>
+                        <span style={{ color: '#666', marginLeft: 8 }}>{entry.email}</span>
+                      </div>
+                      <span style={{
+                        padding: '2px 8px',
+                        background: '#3b82f6',
+                        color: 'white',
+                        borderRadius: 12,
+                        fontSize: 12
+                      }}>
+                        {bracketPicks?.filter(p => p.pool_entry_id === entry.id).length || 0} picks
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Picks Display */}
+            <div style={{ padding: 20 }}>
+              {foundEntries.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: 40, color: '#666' }}>
+                  Enter your email to view your picks
+                </div>
+              ) : (
+                foundEntries.map(entry => {
+                  const entryPicks = bracketPicks?.filter(p => p.pool_entry_id === entry.id) || []
+                  const pickMap = Object.fromEntries(entryPicks.map(p => [p.matchup_id, p.picked_team_id]))
+
+                  return (
+                    <div key={entry.id}>
+                      <h3 style={{ marginBottom: 16 }}>{entry.entry_name}</h3>
+                      
+                      {Object.entries(matchupsByRound).map(([roundId, roundData]) => (
+                        <div key={roundId} style={{ marginBottom: 20 }}>
+                          <h4 style={{
+                            fontSize: 14,
+                            padding: '8px 12px',
+                            background: '#eff6ff',
+                            borderRadius: 6,
+                            marginBottom: 8
+                          }}>
+                            {roundData.name}
+                          </h4>
+                          
+                          {roundData.matchups.map(matchup => {
+                            const pickedTeamId = pickMap[matchup.id]
+                            const teamA = matchup.team_a
+                            const teamB = matchup.team_b
+                            const winner = matchup.winner_team_id
+                            
+                            let pickedTeamName = '—'
+                            if (pickedTeamId === teamA?.id) pickedTeamName = teamA?.name
+                            else if (pickedTeamId === teamB?.id) pickedTeamName = teamB?.name
+                            
+                            const isCorrect = winner && pickedTeamId === winner
+                            const isWrong = winner && pickedTeamId && pickedTeamId !== winner
+
+                            return (
+                              <div key={matchup.id} style={{
+                                padding: 10,
+                                marginBottom: 6,
+                                background: isCorrect ? '#dcfce7' : isWrong ? '#fee2e2' : '#f9fafb',
+                                borderRadius: 6,
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                fontSize: 13
+                              }}>
+                                <span style={{ color: '#666' }}>
+                                  {teamA?.seed ? `#${teamA.seed} ` : ''}{teamA?.name || 'TBD'} vs {teamB?.seed ? `#${teamB.seed} ` : ''}{teamB?.name || 'TBD'}
+                                </span>
+                                <span style={{
+                                  fontWeight: 600,
+                                  color: isCorrect ? '#16a34a' : isWrong ? '#dc2626' : '#374151'
+                                }}>
+                                  {pickedTeamName}
+                                  {isCorrect && ' ✓'}
+                                  {isWrong && ' ✗'}
+                                </span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      ))}
+                    </div>
+                  )
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
