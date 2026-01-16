@@ -71,22 +71,6 @@ export async function POST(request) {
         continue
       }
 
-<<<<<<< HEAD
-      const template = reminderEmail({
-        poolName: pool.name,
-        eventName: pool.event.name,
-        deadline,
-        poolUrl
-      })
-
-      try {
-        await sgMail.send({
-          from: process.env.EMAIL_FROM || 'picks@pickcrown.com',
-          to: entry.email,
-          subject: template.subject,
-          html: template.html,
-          text: template.text
-=======
       try {
         await sgMail.send({
           from: process.env.EMAIL_FROM || 'hello@pickcrown.app',
@@ -147,7 +131,6 @@ Good luck!
 ---
 You're receiving this because you joined a PickCrown pool. No action needed if you've already submitted.
           `.trim()
->>>>>>> origin/claude/strengthen-types-mkd2ocgzo6at2ntq-DnAPo
         })
 
         // Log success
@@ -173,21 +156,12 @@ You're receiving this because you joined a PickCrown pool. No action needed if y
       }
     }
 
-<<<<<<< HEAD
-    return NextResponse.json({ 
-      success: true, 
-      sent: results.filter(r => r.status === 'sent').length,
-      skipped: results.filter(r => r.status === 'skipped').length,
-      failed: results.filter(r => r.status === 'failed').length,
-      results 
-=======
     return NextResponse.json({
       success: true,
       sent: results.filter(r => r.status === 'sent').length,
       skipped: results.filter(r => r.status === 'skipped').length,
       failed: results.filter(r => r.status === 'failed').length,
       results
->>>>>>> origin/claude/strengthen-types-mkd2ocgzo6at2ntq-DnAPo
     })
 
   } catch (error) {
