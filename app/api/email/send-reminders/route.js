@@ -1,13 +1,16 @@
 import { NextResponse } from 'next/server'
 import sgMail from '@sendgrid/mail'
 import { createClient } from '@supabase/supabase-js'
-import { reminderEmail } from '@/lib/email-templates'
-
-
-
 
 export async function POST(request) {
   try {
+    sgMail.setApiKey(process.env.SENDGRID_API_KEY)
+
+    const supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY
+    )
+
     const { poolId } = await request.json()
     sgMail.setApiKey(process.env.SENDGRID_API_KEY)
 
@@ -68,6 +71,7 @@ export async function POST(request) {
         continue
       }
 
+<<<<<<< HEAD
       const template = reminderEmail({
         poolName: pool.name,
         eventName: pool.event.name,
@@ -82,6 +86,68 @@ export async function POST(request) {
           subject: template.subject,
           html: template.html,
           text: template.text
+=======
+      try {
+        await sgMail.send({
+          from: process.env.EMAIL_FROM || 'hello@pickcrown.app',
+          to: entry.email,
+          subject: `🎯 ${pool.name} – picks close soon!`,
+          html: `
+            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+              <h1 style="color: #1a1a1a; font-size: 24px; margin-bottom: 20px;">
+                👑 Quick Reminder
+              </h1>
+              
+              <p style="font-size: 16px; color: #333; line-height: 1.6;">
+                Hey! Just a friendly nudge – your picks for <strong>${pool.name}</strong> are due soon.
+              </p>
+              
+              <div style="background: #f8f9fa; border-radius: 8px; padding: 16px; margin: 24px 0; border-left: 4px solid #3b82f6;">
+                <p style="margin: 0 0 8px; font-size: 15px; color: #333;">
+                  <strong>${pool.event.name}</strong>
+                </p>
+                <p style="margin: 0; font-size: 14px; color: #666;">
+                  ⏰ Picks lock: <strong>${deadline}</strong>
+                </p>
+              </div>
+              
+              <p style="font-size: 15px; color: #333; line-height: 1.6; margin-bottom: 24px;">
+                <strong>What happens next:</strong> Once picks lock, you'll be able to see everyone's picks and track the standings as results come in. No pressure – just fun!
+              </p>
+              
+              <a href="${poolUrl}" style="display: inline-block; background: #3b82f6; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px;">
+                Submit Your Picks →
+              </a>
+              
+              <p style="font-size: 14px; color: #666; margin-top: 32px;">
+                Good luck! 🍀
+              </p>
+              
+              <hr style="border: none; border-top: 1px solid #eee; margin: 32px 0;">
+              
+              <p style="font-size: 12px; color: #999;">
+                You're receiving this because you joined a PickCrown pool. No action needed if you've already submitted.
+              </p>
+            </div>
+          `,
+          text: `
+Quick Reminder from PickCrown
+
+Hey! Just a friendly nudge – your picks for ${pool.name} are due soon.
+
+Event: ${pool.event.name}
+Picks lock: ${deadline}
+
+What happens next: Once picks lock, you'll be able to see everyone's picks and track the standings as results come in. No pressure – just fun!
+
+Submit your picks: ${poolUrl}
+
+Good luck!
+
+---
+You're receiving this because you joined a PickCrown pool. No action needed if you've already submitted.
+          `.trim()
+>>>>>>> origin/claude/strengthen-types-mkd2ocgzo6at2ntq-DnAPo
         })
 
         // Log success
@@ -107,12 +173,21 @@ export async function POST(request) {
       }
     }
 
+<<<<<<< HEAD
     return NextResponse.json({ 
       success: true, 
       sent: results.filter(r => r.status === 'sent').length,
       skipped: results.filter(r => r.status === 'skipped').length,
       failed: results.filter(r => r.status === 'failed').length,
       results 
+=======
+    return NextResponse.json({
+      success: true,
+      sent: results.filter(r => r.status === 'sent').length,
+      skipped: results.filter(r => r.status === 'skipped').length,
+      failed: results.filter(r => r.status === 'failed').length,
+      results
+>>>>>>> origin/claude/strengthen-types-mkd2ocgzo6at2ntq-DnAPo
     })
 
   } catch (error) {
