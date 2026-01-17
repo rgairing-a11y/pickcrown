@@ -1,8 +1,11 @@
 // app/pool/[poolId]/picks/page.js
 // Updated All Picks page that handles both standard brackets and NFL reseeding
 
+export const dynamic = 'force-dynamic'
 import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
+
+
 
 function getSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL

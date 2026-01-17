@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 
+export const dynamic = 'force-dynamic'
 export default function DeleteDiagnostic() {
   const [result, setResult] = useState(null)
   const [loading, setLoading] = useState(false)
