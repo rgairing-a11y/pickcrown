@@ -2,14 +2,21 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import sgMail from '@sendgrid/mail'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-)
+function getSupabaseAdmin() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  if (!url || !key) {
+    throw new Error('Supabase admin client missing env vars')
+  }
+
+  return createClient(url, key)
+}
 
 sgMail.setApiKey(process.env.SENDGRID_API_KEY)
 
 export async function POST(request) {
+  const supabase = getSupabaseAdmin()
   try {
     const { emails, targetPoolId } = await request.json()
 

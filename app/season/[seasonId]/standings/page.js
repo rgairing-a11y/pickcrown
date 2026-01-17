@@ -3,12 +3,19 @@ export const dynamic = 'force-dynamic'
 import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-)
+function getSupabase() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  if (!url || !key) {
+    throw new Error('Supabase client missing env vars')
+  }
+
+  return createClient(url, key)
+}
 
 export default async function SeasonStandingsPage({ params }) {
+  const supabase = getSupabase()
   const { seasonId } = await params
 
   // Get season info

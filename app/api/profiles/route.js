@@ -1,13 +1,20 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-)
+function getSupabaseAdmin() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  if (!url || !key) {
+    throw new Error('Supabase admin client missing env vars')
+  }
+
+  return createClient(url, key)
+}
 
 // GET - Fetch profile by email
 export async function GET(request) {
+  const supabaseAdmin = getSupabaseAdmin()
   const { searchParams } = new URL(request.url)
   const email = searchParams.get('email')
 
@@ -41,6 +48,7 @@ export async function GET(request) {
 
 // POST - Create or update profile (upsert)
 export async function POST(request) {
+  const supabaseAdmin = getSupabaseAdmin()
   const body = await request.json()
   const { email, display_name, avatar_emoji, avatar_color, is_commissioner, commissioner_id, notification_preferences } = body
 
@@ -77,6 +85,7 @@ export async function POST(request) {
 
 // PUT - Update profile
 export async function PUT(request) {
+  const supabaseAdmin = getSupabaseAdmin()
   const body = await request.json()
   const { email, ...updates } = body
 
@@ -100,6 +109,7 @@ export async function PUT(request) {
 
 // DELETE - Delete profile
 export async function DELETE(request) {
+  const supabaseAdmin = getSupabaseAdmin()
   const { searchParams } = new URL(request.url)
   const email = searchParams.get('email')
 

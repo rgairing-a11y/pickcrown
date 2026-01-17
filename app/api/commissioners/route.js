@@ -1,13 +1,20 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-)
+function getSupabaseAdmin() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  if (!url || !key) {
+    throw new Error('Supabase admin client missing env vars')
+  }
+
+  return createClient(url, key)
+}
 
 // GET - Fetch commissioner by email or ID
 export async function GET(request) {
+  const supabaseAdmin = getSupabaseAdmin()
   const { searchParams } = new URL(request.url)
   const email = searchParams.get('email')
   const id = searchParams.get('id')
@@ -36,6 +43,7 @@ export async function GET(request) {
 
 // POST - Create new commissioner
 export async function POST(request) {
+  const supabaseAdmin = getSupabaseAdmin()
   const body = await request.json()
   const { email, name, avatar_emoji, avatar_color, bio } = body
 
@@ -83,6 +91,7 @@ export async function POST(request) {
 
 // PUT - Update commissioner
 export async function PUT(request) {
+  const supabaseAdmin = getSupabaseAdmin()
   const body = await request.json()
   const { id, email, ...updates } = body
 

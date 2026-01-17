@@ -1,13 +1,22 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-)
+function getSupabaseAdmin() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  if (!url || !key) {
+    throw new Error('Supabase admin client missing env vars')
+  }
+
+  return createClient(url, key)
+}
 
 // Add event to season
 export async function POST(request) {
+  const supabase = getSupabaseAdmin()
   try {
     const { seasonId, eventId } = await request.json()
 
@@ -32,6 +41,7 @@ export async function POST(request) {
 
 // Remove event from season
 export async function DELETE(request) {
+  const supabase = getSupabaseAdmin()
   try {
     const { eventId } = await request.json()
 

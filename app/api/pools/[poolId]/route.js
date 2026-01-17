@@ -1,15 +1,24 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-)
+function getSupabaseAdmin() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  if (!url || !key) {
+    throw new Error('Supabase admin client missing env vars')
+  }
+
+  return createClient(url, key)
+}
 
 export async function DELETE(request, { params }) {
+  const supabase = getSupabaseAdmin()
   try {
     const { poolId } = await params
-    
+
     // First delete pool entries (picks will cascade from entries)
     await supabase
       .from('pool_entries')
@@ -35,6 +44,7 @@ export async function DELETE(request, { params }) {
 }
 
 export async function PATCH(request, { params }) {
+  const supabase = getSupabaseAdmin()
   try {
     const { poolId } = await params
     const body = await request.json()
