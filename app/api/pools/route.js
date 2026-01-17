@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server'
-import { supabaseAdmin } from '../../../lib/supabase-admin'
+import { getsupabaseAdmin } from '../../../lib/supabase-admin'
 
 export async function POST(request) {
   const body = await request.json()
   
-  const { data, error } = await supabaseAdmin
+  const supabase = getSupabaseAdmin()
+  const { data, error } = await supabase
     .from('pools')
     .insert(body)
     .select()

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { supabaseAdmin } from '../../../lib/supabase-admin'
+import { getsupabaseAdmin } from '../../../lib/supabase-admin'
 
 export async function PUT(request) {
   const body = await request.json()
@@ -12,7 +12,8 @@ export async function PUT(request) {
     .eq('category_id', categoryId)
 
   // Mark correct option
-  const { data, error } = await supabaseAdmin
+  const supabase = getSupabaseAdmin()
+  const { data, error } = await getsupabase
     .from('category_options')
     .update({ is_correct: true })
     .eq('id', optionId)
