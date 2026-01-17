@@ -1,15 +1,22 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+export const dynamic = 'force-dynamic'
+
+import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-)
-
 export default function ArchivedPage() {
+  const supabase = useMemo(() => {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    if (!url || !key) {
+      console.error('Missing Supabase environment variables')
+      return null
+    }
+    return createClient(url, key)
+  }, [])
+
   const [email, setEmail] = useState('')
   const [pools, setPools] = useState([])
   const [loading, setLoading] = useState(false)
@@ -40,7 +47,7 @@ export default function ArchivedPage() {
   }
 
   async function loadArchivedPools(userEmail) {
-    if (!userEmail) return
+    if (!userEmail || !supabase) return
     setLoading(true)
     setHasSearched(true)
 
@@ -118,7 +125,7 @@ export default function ArchivedPage() {
   }
 
   async function handleUnarchive(poolId) {
-    if (!confirm('Restore this pool to active status?')) return
+    if (!supabase || !confirm('Restore this pool to active status?')) return
 
     // Set status to active and clear archive_date
     const { error } = await supabase

@@ -1,17 +1,24 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+export const dynamic = 'force-dynamic'
+
+import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-)
 
 // SORTING RULE: Locked beats open. Seasons beat events. Now beats later.
 
 export default function AdminPage() {
+  const supabase = useMemo(() => {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    if (!url || !key) {
+      console.error('Missing Supabase environment variables')
+      return null
+    }
+    return createClient(url, key)
+  }, [])
+
   const [events, setEvents] = useState([])
   const [seasons, setSeasons] = useState([])
   const [loading, setLoading] = useState(true)
@@ -22,6 +29,7 @@ export default function AdminPage() {
   }, [])
 
   async function loadData() {
+    if (!supabase) return
     // Get all events with pools
     const { data: eventsData } = await supabase
       .from('events')

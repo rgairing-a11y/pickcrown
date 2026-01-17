@@ -1,16 +1,14 @@
-import { createClient } from '@supabase/supabase-js'
+import { getServerClient } from './supabase/clients'
+import type { PoolPublicInfo, PodiumEntry } from './types'
 
 /**
  * Check if an email is a participant in a pool
  * Used to determine if they should see pool content or "This pool is private" message
  */
-export async function isPoolParticipant(poolId, email) {
+export async function isPoolParticipant(poolId: string, email: string | null | undefined): Promise<boolean> {
   if (!email) return false
-  
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY
-  )
+
+  const supabase = getServerClient()
 
   const { data } = await supabase
     .from('pool_entries')
@@ -26,11 +24,8 @@ export async function isPoolParticipant(poolId, email) {
  * Get basic pool info (for non-participants)
  * Returns only public metadata per product foundation
  */
-export async function getPoolPublicInfo(poolId) {
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY
-  )
+export async function getPoolPublicInfo(poolId: string): Promise<PoolPublicInfo | null> {
+  const supabase = getServerClient()
 
   const { data: pool } = await supabase
     .from('pools')
@@ -50,10 +45,12 @@ export async function getPoolPublicInfo(poolId) {
   if (!pool) return null
 
   // Only return public metadata
+  // Note: Supabase relation queries return arrays, so we access the first element
+  const event = Array.isArray(pool.event) ? pool.event[0] : pool.event
   return {
-    eventName: pool.event?.name,
-    eventDate: pool.event?.start_time,
-    eventStatus: pool.event?.status
+    eventName: event?.name,
+    eventDate: event?.start_time,
+    eventStatus: event?.status
   }
 }
 
@@ -61,11 +58,8 @@ export async function getPoolPublicInfo(poolId) {
  * Calculate event podium (Top 3 across all pools)
  * Per product foundation: read-only, post-event only, celebratory
  */
-export async function getEventPodium(eventId) {
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY
-  )
+export async function getEventPodium(eventId: string): Promise<PodiumEntry[]> {
+  const supabase = getServerClient()
 
   // Get all pools for this event
   const { data: pools } = await supabase
@@ -76,8 +70,8 @@ export async function getEventPodium(eventId) {
   if (!pools || pools.length === 0) return []
 
   // Get standings from all pools
-  const allEntries = []
-  
+  const allEntries: Array<{ entry_name: string; total_points: number }> = []
+
   for (const pool of pools) {
     const { data } = await supabase.rpc('calculate_standings', { p_pool_id: pool.id })
     if (data) {
@@ -86,7 +80,7 @@ export async function getEventPodium(eventId) {
   }
 
   // Sort by total_points descending
-  allEntries.sort((a, b) => {
+  allEntries.sort((a: { entry_name: string; total_points: number }, b: { entry_name: string; total_points: number }) => {
     if (b.total_points !== a.total_points) {
       return b.total_points - a.total_points
     }

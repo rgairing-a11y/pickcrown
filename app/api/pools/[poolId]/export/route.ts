@@ -1,28 +1,27 @@
+import { NextResponse, NextRequest } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { NextResponse } from 'next/server'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-)
-
-export async function GET(request, { params }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ poolId: string }> }) {
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
   try {
     const { poolId } = await params
 
     // Get pool info
-    const { data: pool } = await supabase
+    const { data: pool } = await supabaseAdmin
       .from('pools')
       .select('name, event:events(name, year)')
       .eq('id', poolId)
-      .single()
+      .single() as { data: { name: string; event: { name: string; year: number } } | null }
 
     if (!pool) {
       return NextResponse.json({ error: 'Pool not found' }, { status: 404 })
     }
 
     // Get standings
-    const { data: standings, error } = await supabase
+    const { data: standings, error } = await supabaseAdmin
       .rpc('calculate_standings', { p_pool_id: poolId })
 
     if (error) {
@@ -31,7 +30,7 @@ export async function GET(request, { params }) {
 
     // Build CSV
     const headers = ['Rank', 'Entry Name', 'Email', 'Points']
-    const rows = standings.map(entry => [
+    const rows = standings.map((entry: any) => [
       entry.rank,
       `"${entry.entry_name}"`,
       `"${entry.email || ''}"`,
@@ -43,7 +42,7 @@ export async function GET(request, { params }) {
       `# Exported: ${new Date().toISOString()}`,
       '',
       headers.join(','),
-      ...rows.map(row => row.join(','))
+      ...rows.map((row: any) => row.join(','))
     ].join('\n')
 
     // Return as downloadable CSV
@@ -55,7 +54,7 @@ export async function GET(request, { params }) {
         'Content-Disposition': `attachment; filename="${filename}"`
       }
     })
-  } catch (err) {
+  } catch (err: any) {
     console.error('CSV export error:', err)
     return NextResponse.json({ error: 'Export failed' }, { status: 500 })
   }

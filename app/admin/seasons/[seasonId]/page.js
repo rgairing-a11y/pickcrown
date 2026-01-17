@@ -1,15 +1,22 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+export const dynamic = 'force-dynamic'
+
+import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { createClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-)
-
 export default function ManageSeasonPage({ params }) {
+  const supabase = useMemo(() => {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    if (!url || !key) {
+      console.error('Missing Supabase environment variables')
+      return null
+    }
+    return createClient(url, key)
+  }, [])
+
   const [seasonId, setSeasonId] = useState(null)
   const [season, setSeason] = useState(null)
   const [seasonEvents, setSeasonEvents] = useState([])
@@ -26,6 +33,7 @@ export default function ManageSeasonPage({ params }) {
   }, [seasonId])
 
   async function loadData() {
+    if (!supabase) return
     setLoading(true)
 
     // Get season

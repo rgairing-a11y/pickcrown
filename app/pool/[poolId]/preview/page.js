@@ -1,10 +1,15 @@
 export const dynamic = 'force-dynamic'
 
-import { supabase } from '../../../../lib/supabase'
+import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
 import { formatDateTime, isEventLocked } from '../../../../lib/utils'
 
 export default async function PoolPreviewPage({ params }) {
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  )
+
   const { poolId } = await params
 
   const { data: pool } = await supabase

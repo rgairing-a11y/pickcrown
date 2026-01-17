@@ -1,12 +1,11 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, NextRequest } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-)
-
-export async function POST(request) {
+export async function POST(request: NextRequest) {
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
   try {
     const { eventId, newYear, newStartTime, newName } = await request.json()
 
@@ -15,7 +14,7 @@ export async function POST(request) {
     }
 
     // Get source event with categories and options
-    const { data: sourceEvent, error: fetchError } = await supabase
+    const { data: sourceEvent, error: fetchError } = await supabaseAdmin
       .from('events')
       .select(`
         *,
@@ -32,7 +31,7 @@ export async function POST(request) {
     }
 
     // Create new event
-    const { data: newEvent, error: eventError } = await supabase
+    const { data: newEvent, error: eventError } = await supabaseAdmin
       .from('events')
       .insert({
         name: newName || sourceEvent.name,
@@ -59,10 +58,10 @@ export async function POST(request) {
     }
 
     // Clone categories and options (for pick-one/hybrid events)
-    const sortedCategories = (sourceEvent.categories || []).sort((a, b) => a.order_index - b.order_index)
+    const sortedCategories = (sourceEvent.categories || []).sort((a: any, b: any) => a.order_index - b.order_index)
 
     for (const category of sortedCategories) {
-      const { data: newCategory, error: catError } = await supabase
+      const { data: newCategory, error: catError } = await supabaseAdmin
         .from('categories')
         .insert({
           event_id: newEvent.id,
@@ -80,29 +79,29 @@ export async function POST(request) {
 
       clonedCounts.categories++
 
-      const options = (category.options || []).map(opt => ({
+      const options = (category.options || []).map((opt: any) => ({
         category_id: newCategory.id,
         name: opt.name,
         is_correct: null
       }))
 
       if (options.length > 0) {
-        await supabase.from('category_options').insert(options)
+        await supabaseAdmin.from('category_options').insert(options)
       }
     }
 
     // Clone rounds (for bracket events)
-    const { data: sourceRounds } = await supabase
+    const { data: sourceRounds } = await supabaseAdmin
       .from('rounds')
       .select('*')
       .eq('event_id', eventId)
       .order('round_order')
 
-    const roundIdMap = {}
+    const roundIdMap: Record<string, string> = {}
 
     if (sourceRounds && sourceRounds.length > 0) {
       for (const round of sourceRounds) {
-        const { data: newRound } = await supabase
+        const { data: newRound } = await supabaseAdmin
           .from('rounds')
           .insert({
             event_id: newEvent.id,
@@ -121,17 +120,17 @@ export async function POST(request) {
     }
 
     // Clone teams
-    const { data: sourceTeams } = await supabase
+    const { data: sourceTeams } = await supabaseAdmin
       .from('teams')
       .select('*')
       .eq('event_id', eventId)
       .order('seed')
 
-    const teamIdMap = {}
+    const teamIdMap: Record<string, string> = {}
 
     if (sourceTeams && sourceTeams.length > 0) {
       for (const team of sourceTeams) {
-        const { data: newTeam } = await supabase
+        const { data: newTeam } = await supabaseAdmin
           .from('teams')
           .insert({
             event_id: newEvent.id,
@@ -150,14 +149,14 @@ export async function POST(request) {
     }
 
     // Clone matchups (without results)
-    const { data: sourceMatchups } = await supabase
+    const { data: sourceMatchups } = await supabaseAdmin
       .from('matchups')
       .select('*')
       .eq('event_id', eventId)
 
     if (sourceMatchups && sourceMatchups.length > 0) {
       for (const matchup of sourceMatchups) {
-        await supabase
+        await supabaseAdmin
           .from('matchups')
           .insert({
             event_id: newEvent.id,
@@ -177,7 +176,7 @@ export async function POST(request) {
       cloned: clonedCounts
     })
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Clone event error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }

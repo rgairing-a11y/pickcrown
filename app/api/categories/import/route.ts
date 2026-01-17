@@ -1,12 +1,11 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, NextRequest } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-)
-
-export async function POST(request) {
+export async function POST(request: NextRequest) {
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
   try {
     const body = await request.json()
     
@@ -22,7 +21,7 @@ export async function POST(request) {
     }
 
     // Validate event exists
-    const { data: event, error: eventError } = await supabase
+    const { data: event, error: eventError } = await supabaseAdmin
       .from('events')
       .select('id, name')
       .eq('id', eventId)
@@ -37,10 +36,10 @@ export async function POST(request) {
 
     let categoriesCreated = 0
     let optionsCreated = 0
-    const errors = []
+    const errors: string[] = []
 
     // Get existing max order_index for this event
-    const { data: existingCats } = await supabase
+    const { data: existingCats } = await supabaseAdmin
       .from('categories')
       .select('order_index')
       .eq('event_id', eventId)
@@ -62,7 +61,7 @@ export async function POST(request) {
       }
 
       // Create category
-      const { data: newCategory, error: catError } = await supabase
+      const { data: newCategory, error: catError } = await supabaseAdmin
         .from('categories')
         .insert({
           event_id: eventId,
@@ -83,15 +82,15 @@ export async function POST(request) {
 
       // Create options for this category
       const optionsToInsert = category.options
-        .filter(opt => opt && typeof opt === 'string' && opt.trim())
-        .map((optionName, idx) => ({
+        .filter((opt: any) => opt && typeof opt === 'string' && opt.trim())
+        .map((optionName: string, idx: number) => ({
           category_id: newCategory.id,
           name: optionName.trim(),
           order_index: idx + 1
         }))
 
       if (optionsToInsert.length > 0) {
-        const { error: optError } = await supabase
+        const { error: optError } = await supabaseAdmin
           .from('category_options')
           .insert(optionsToInsert)
 
@@ -105,7 +104,14 @@ export async function POST(request) {
     }
 
     // Return result
-    const result = {
+    const result: {
+      success: boolean
+      categories_created: number
+      options_created: number
+      event_id: any
+      event_name: any
+      warnings?: string[]
+    } = {
       success: categoriesCreated > 0,
       categories_created: categoriesCreated,
       options_created: optionsCreated,
@@ -118,7 +124,7 @@ export async function POST(request) {
     }
 
     return NextResponse.json(result)
-  } catch (error) {
+  } catch (error: any) {
     console.error('Import error:', error)
     return NextResponse.json(
       { error: 'Import failed: ' + error.message },
@@ -128,7 +134,11 @@ export async function POST(request) {
 }
 
 // GET endpoint to preview what would be imported
-export async function GET(request) {
+export async function GET(request: NextRequest) {
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
   const { searchParams } = new URL(request.url)
   const eventId = searchParams.get('event_id')
 
@@ -137,7 +147,7 @@ export async function GET(request) {
   }
 
   // Get existing categories for this event
-  const { data: categories, error } = await supabase
+  const { data: categories, error } = await supabaseAdmin
     .from('categories')
     .select(`
       id,

@@ -1,16 +1,26 @@
 'use client'
 
 import { useState } from 'react'
+import type { Standing } from '../lib/types'
+
+interface MedalStyle {
+  background: string
+  borderColor: string
+  icon: string
+}
+
+interface StandingsTableProps {
+  standings?: Standing[]
+  showPoints?: boolean
+  showMaxPossible?: boolean
+  highlightEmail?: string | null
+  compact?: boolean
+  eventStatus?: 'upcoming' | 'in_progress' | 'completed'
+  onEntryClick?: (entry: Standing) => void
+}
 
 /**
  * StandingsTable - A refined standings display with better visual hierarchy
- * 
- * @param {array} standings - Array of standing entries
- * @param {boolean} showPoints - Show points column
- * @param {boolean} showMaxPossible - Show max possible column
- * @param {string} highlightEmail - Email to highlight (current user)
- * @param {boolean} compact - Use compact mode for mobile
- * @param {string} eventStatus - 'upcoming' | 'in_progress' | 'completed'
  */
 export default function StandingsTable({
   standings = [],
@@ -20,15 +30,16 @@ export default function StandingsTable({
   compact = false,
   eventStatus = 'in_progress',
   onEntryClick
-}) {
-  const [expandedEntry, setExpandedEntry] = useState(null)
+}: StandingsTableProps) {
+  const [expandedEntry, setExpandedEntry] = useState<string | null>(null)
 
   if (!standings || standings.length === 0) {
     return null
   }
 
   // Medal colors for top 3
-  const getMedalStyle = (rank) => {
+  const getMedalStyle = (rank: number | undefined): MedalStyle | null => {
+    if (!rank) return null
     switch (rank) {
       case 1:
         return {
@@ -151,7 +162,7 @@ export default function StandingsTable({
                     textAlign: 'center',
                     padding: 'var(--spacing-4)',
                     borderBottom: '1px solid var(--color-border-light)',
-                    fontWeight: entry.rank <= 3 ? 'var(--font-bold)' : 'var(--font-normal)'
+                    fontWeight: entry.rank && entry.rank <= 3 ? 'var(--font-bold)' : 'var(--font-normal)'
                   }}>
                     {medal ? (
                       <span style={{ fontSize: '1.25rem' }}>{medal.icon}</span>
@@ -165,7 +176,7 @@ export default function StandingsTable({
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-2)' }}>
                       <span style={{
-                        fontWeight: entry.rank <= 3 ? 'var(--font-semibold)' : 'var(--font-normal)',
+                        fontWeight: entry.rank && entry.rank <= 3 ? 'var(--font-semibold)' : 'var(--font-normal)',
                         color: isHighlighted ? 'var(--color-primary-dark)' : 'var(--color-text)'
                       }}>
                         {entry.entry_name || entry.display_name || 'Anonymous'}
@@ -190,7 +201,7 @@ export default function StandingsTable({
                       borderBottom: '1px solid var(--color-border-light)',
                       fontWeight: 'var(--font-semibold)',
                       fontVariantNumeric: 'tabular-nums',
-                      fontSize: entry.rank <= 3 ? 'var(--font-size-lg)' : 'var(--font-size-base)'
+                      fontSize: entry.rank && entry.rank <= 3 ? 'var(--font-size-lg)' : 'var(--font-size-base)'
                     }}>
                       {entry.total_points ?? entry.points ?? 0}
                     </td>
@@ -268,7 +279,7 @@ export default function StandingsTable({
               {/* Name */}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{
-                  fontWeight: entry.rank <= 3 ? 'var(--font-semibold)' : 'var(--font-normal)',
+                  fontWeight: entry.rank && entry.rank <= 3 ? 'var(--font-semibold)' : 'var(--font-normal)',
                   color: isHighlighted ? 'var(--color-primary-dark)' : 'var(--color-text)',
                   whiteSpace: 'nowrap',
                   overflow: 'hidden',
@@ -304,7 +315,7 @@ export default function StandingsTable({
               {showPoints && (
                 <div style={{
                   fontWeight: 'var(--font-bold)',
-                  fontSize: entry.rank <= 3 ? 'var(--font-size-xl)' : 'var(--font-size-lg)',
+                  fontSize: entry.rank && entry.rank <= 3 ? 'var(--font-size-xl)' : 'var(--font-size-lg)',
                   color: isHighlighted ? 'var(--color-primary-dark)' : 'var(--color-text)',
                   fontVariantNumeric: 'tabular-nums'
                 }}>
