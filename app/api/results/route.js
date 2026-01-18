@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
-import { supabaseAdmin } from '../../../lib/supabase-admin'
+import { getSupabaseAdmin } from '../../../lib/supabase-admin'
 
 export async function PUT(request) {
+  const supabaseAdmin = getSupabaseAdmin()
   const body = await request.json()
   const { categoryId, optionId } = body
 

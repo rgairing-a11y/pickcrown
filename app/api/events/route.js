@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server'
-import { supabaseAdmin } from '../../../lib/supabase-admin'
+import { getSupabaseAdmin } from '../../../lib/supabase-admin'
 
 export async function POST(request) {
+  const supabaseAdmin = getSupabaseAdmin()
   const body = await request.json()
-  
+
   const { data, error } = await supabaseAdmin
     .from('events')
     .insert(body)
@@ -18,6 +19,7 @@ export async function POST(request) {
 }
 
 export async function PUT(request) {
+  const supabaseAdmin = getSupabaseAdmin()
   const body = await request.json()
   const { id, ...updates } = body
 
@@ -36,9 +38,10 @@ export async function PUT(request) {
 }
 
 export async function GET(request) {
+  const supabaseAdmin = getSupabaseAdmin()
   const { searchParams } = new URL(request.url)
   const id = searchParams.get('id')
-  
+
   // If no id, return all events (or handle as needed)
   if (!id) {
     const { data } = await supabaseAdmin.from('events').select('*')
