@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
+import { adminFetch } from '@/lib/adminFetch'
+
 
 function getSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -17,37 +19,38 @@ function getSupabase() {
 
 // SORTING RULE: Locked beats open. Seasons beat events. Now beats later.
 
+
+
+// SORTING RULE: Locked beats open. Seasons beat events. Now beats later.
+
 export default function AdminPage() {
   const [events, setEvents] = useState([])
   const [seasons, setSeasons] = useState([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all') // all, active, completed
+  const [error, setError] = useState(null)
+
 
   useEffect(() => {
     loadData()
   }, [])
 
-  async function loadData() {
-    // Get all events with pools
-    const { data: eventsData } = await supabase
-      .from('events')
-      .select(`
-        *,
-        pools (*),
-        season:seasons(id, name)
-      `)
-      .order('start_time', { ascending: false })
+async function loadData() {
+  try {
+    setLoading(true)
+    setError(null)
 
-    // Get all seasons
-    const { data: seasonsData } = await supabase
-      .from('seasons')
-      .select('*')
-      .order('created_at', { ascending: false })
-
-    setEvents(eventsData || [])
-    setSeasons(seasonsData || [])
+    const json = await adminFetch('/api/admin/events')
+    setEvents(json.events || [])
+  } catch (err) {
+    console.error('[ADMIN PAGE LOAD ERROR]', err)
+    setError('Unable to load admin data. Please refresh or try again.')
+  } finally {
     setLoading(false)
   }
+}
+
+
 
   // Helper functions
   const isHappeningNow = (event) => {
@@ -437,6 +440,8 @@ export default function AdminPage() {
       </div>
     )
   }
+
+  
 
   return (
     <div style={{ maxWidth: 1000, margin: '0 auto', padding: 24 }}>
