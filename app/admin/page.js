@@ -1,21 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
 import { adminFetch } from '@/lib/adminFetch'
 
-
-function getSupabase() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-  if (!url || !key) {
-    throw new Error('Supabase client missing env vars')
-  }
-
-  return createClient(url, key)
-}
 
 // SORTING RULE: Locked beats open. Seasons beat events. Now beats later.
 
@@ -40,8 +28,14 @@ async function loadData() {
     setLoading(true)
     setError(null)
 
-    const json = await adminFetch('/api/admin/events')
-    setEvents(json.events || [])
+    const { data, error } = await adminFetch('/api/admin/events')
+
+    if (error) {
+      setError(error)
+      return
+    }
+
+    setEvents(data || [])
   } catch (err) {
     console.error('[ADMIN PAGE LOAD ERROR]', err)
     setError('Unable to load admin data. Please refresh or try again.')
@@ -49,7 +43,6 @@ async function loadData() {
     setLoading(false)
   }
 }
-
 
 
   // Helper functions

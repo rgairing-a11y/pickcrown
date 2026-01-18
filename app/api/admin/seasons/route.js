@@ -6,16 +6,19 @@ export async function GET() {
     const supabase = getSupabaseAdmin()
 
     const { data, error } = await supabase
-      .from('events')
+      .from('seasons')
       .select(`
         *,
-        pools (*),
-        season:seasons(id, name)
+        events (id)
       `)
-      .order('start_time', { ascending: false })
+      .order('created_at', { ascending: false })
 
     if (error) {
-      throw error
+      console.error('[ADMIN SEASONS FETCH ERROR]', error)
+      return NextResponse.json(
+        { success: false, error: 'Failed to load seasons' },
+        { status: 500 }
+      )
     }
 
     return NextResponse.json({
@@ -23,12 +26,12 @@ export async function GET() {
       data: data ?? []
     })
   } catch (err) {
-    console.error('[ADMIN EVENTS FETCH ERROR]', err)
+    console.error('[ADMIN SEASONS FETCH ERROR]', err)
 
     return NextResponse.json(
       {
         success: false,
-        error: 'Failed to load events',
+        error: 'Failed to load seasons',
         hint: 'Please refresh and try again'
       },
       { status: 500 }

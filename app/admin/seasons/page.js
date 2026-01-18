@@ -2,7 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { createClient } from '@supabase/supabase-js'
+import { adminFetch } from '@/lib/adminFetch'
+
+
 
 function getSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -23,18 +25,25 @@ export default function SeasonsAdminPage() {
     loadSeasons()
   }, [])
 
-  async function loadSeasons() {
-    const { data } = await supabase
-      .from('seasons')
-      .select(`
-        *,
-        events(id, name, year, status)
-      `)
-      .order('year', { ascending: false })
+async function loadSeasons() {
+  try {
+    setLoading(true)
+
+    const { data, error } = await adminFetch('/api/admin/seasons')
+
+    if (error) {
+      console.error(error)
+      return
+    }
 
     setSeasons(data || [])
+  } catch (err) {
+    console.error('[ADMIN SEASONS LOAD ERROR]', err)
+  } finally {
     setLoading(false)
   }
+}
+
 
   if (loading) {
     return <div style={{ padding: 24 }}>Loading seasons...</div>
