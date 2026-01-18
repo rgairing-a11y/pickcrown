@@ -2,10 +2,10 @@ import { NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '../../../lib/supabase-admin'
 
 export async function POST(request) {
-  const supabase = getSupabaseAdmin()
+  const supabaseAdmin = getSupabaseAdmin()
   const body = await request.json()
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('events')
     .insert(body)
     .select()
@@ -19,11 +19,11 @@ export async function POST(request) {
 }
 
 export async function PUT(request) {
-  const supabase = getSupabaseAdmin()
+  const supabaseAdmin = getSupabaseAdmin()
   const body = await request.json()
   const { id, ...updates } = body
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('events')
     .update(updates)
     .eq('id', id)
@@ -38,33 +38,26 @@ export async function PUT(request) {
 }
 
 export async function GET(request) {
-  const supabase = getSupabaseAdmin()
+  const supabaseAdmin = getSupabaseAdmin()
   const { searchParams } = new URL(request.url)
   const id = searchParams.get('id')
 
-  // Return all events
+  // If no id, return all events (or handle as needed)
   if (!id) {
-    const { data, error } = await supabase
-      .from('events')
-      .select('*')
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
-
-    return NextResponse.json(data)
+    const { data } = await supabaseAdmin.from('events').select('*')
+    return Response.json(data)
   }
-
-  // Return single event
-  const { data, error } = await supabase
+  
+  // Get specific event
+  const { data, error } = await supabaseAdmin
     .from('events')
     .select('*')
     .eq('id', id)
     .single()
-
+    
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return Response.json({ error: error.message }, { status: 500 })
   }
-
-  return NextResponse.json(data)
+  
+  return Response.json(data)
 }
