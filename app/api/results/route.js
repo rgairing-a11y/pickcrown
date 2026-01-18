@@ -1,19 +1,19 @@
 import { NextResponse } from 'next/server'
-import { getsupabaseAdmin } from '../../../lib/supabase-admin'
+import { getSupabaseAdmin } from '../../../lib/supabase-admin'
 
 export async function PUT(request) {
+  const supabase = getSupabaseAdmin()
   const body = await request.json()
   const { categoryId, optionId } = body
 
   // Unmark all options in category
-  await supabaseAdmin
+  await supabase
     .from('category_options')
     .update({ is_correct: false })
     .eq('category_id', categoryId)
 
   // Mark correct option
-  const supabase = getSupabaseAdmin()
-  const { data, error } = await getsupabase
+  const { data, error } = await supabase
     .from('category_options')
     .update({ is_correct: true })
     .eq('id', optionId)

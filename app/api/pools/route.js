@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
-import { getsupabaseAdmin } from '../../../lib/supabase-admin'
+import { getSupabaseAdmin } from '../../../lib/supabase-admin'
 
 export async function POST(request) {
-  const body = await request.json()
-  
   const supabase = getSupabaseAdmin()
+  const body = await request.json()
+
   const { data, error } = await supabase
     .from('pools')
     .insert(body)
@@ -19,10 +19,11 @@ export async function POST(request) {
 }
 
 export async function PUT(request) {
+  const supabase = getSupabaseAdmin()
   const body = await request.json()
   const { id, ...updates } = body
 
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await supabase
     .from('pools')
     .update(updates)
     .eq('id', id)
@@ -37,10 +38,11 @@ export async function PUT(request) {
 }
 
 export async function DELETE(request) {
+  const supabase = getSupabaseAdmin()
   const { searchParams } = new URL(request.url)
   const id = searchParams.get('id')
 
-  const { error } = await supabaseAdmin
+  const { error } = await supabase
     .from('pools')
     .delete()
     .eq('id', id)
