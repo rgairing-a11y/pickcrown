@@ -9,11 +9,10 @@ export async function DELETE(
   const supabase = getSupabaseAdmin()
   const { poolId } = await params
 
-
   const url = new URL(request.url)
   const force = url.searchParams.get('force') === 'true'
 
-  // 1. Load pool
+  // 1️⃣ Load pool
   const { data: pool, error: fetchError } = await supabase
     .from('pools')
     .select('*')
@@ -25,22 +24,20 @@ export async function DELETE(
       action: 'delete_pool',
       target_type: 'pool',
       target_id: poolId,
-      success: false,
-      error_message: 'Pool not found',
-      metadata: { force }
+      metadata: {
+        success: false,
+        error_message: 'Pool not found',
+        force
+      }
     })
 
     return NextResponse.json(
-      {
-        success: false,
-        error: 'Pool not found',
-        code: 'NOT_FOUND'
-      },
+      { success: false, error: 'Pool not found', code: 'NOT_FOUND' },
       { status: 404 }
     )
   }
 
-  // 2. If NOT archived → archive it
+  // 2️⃣ Soft delete → archive
   if (pool.status !== 'archived') {
     const { error: archiveError } = await supabase
       .from('pools')
@@ -52,16 +49,16 @@ export async function DELETE(
         action: 'archive_pool',
         target_type: 'pool',
         target_id: poolId,
-        success: false,
-        error_message: archiveError.message,
-        metadata: { previous_status: pool.status, force }
+        metadata: {
+          success: false,
+          error_message: archiveError.message,
+          previous_status: pool.status,
+          force
+        }
       })
 
       return NextResponse.json(
-        {
-          success: false,
-          error: 'Failed to archive pool'
-        },
+        { success: false, error: 'Failed to archive pool' },
         { status: 500 }
       )
     }
@@ -70,8 +67,8 @@ export async function DELETE(
       action: 'archive_pool',
       target_type: 'pool',
       target_id: poolId,
-      success: true,
       metadata: {
+        success: true,
         previous_status: pool.status,
         new_status: 'archived',
         force
@@ -84,7 +81,7 @@ export async function DELETE(
     })
   }
 
-  // 3. Already archived → hard delete
+  // 3️⃣ Hard delete (only if already archived)
   const { error: deleteError } = await supabase
     .from('pools')
     .delete()
@@ -95,16 +92,16 @@ export async function DELETE(
       action: 'delete_pool',
       target_type: 'pool',
       target_id: poolId,
-      success: false,
-      error_message: deleteError.message,
-      metadata: { previous_status: 'archived', force }
+      metadata: {
+        success: false,
+        error_message: deleteError.message,
+        previous_status: 'archived',
+        force
+      }
     })
 
     return NextResponse.json(
-      {
-        success: false,
-        error: 'Failed to delete pool'
-      },
+      { success: false, error: 'Failed to delete pool' },
       { status: 500 }
     )
   }
@@ -113,8 +110,8 @@ export async function DELETE(
     action: 'delete_pool',
     target_type: 'pool',
     target_id: poolId,
-    success: true,
     metadata: {
+      success: true,
       previous_status: 'archived',
       force
     }

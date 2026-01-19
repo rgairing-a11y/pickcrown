@@ -12,7 +12,7 @@ export async function POST(
   const url = new URL(request.url)
   const force = url.searchParams.get('force') === 'true'
 
-  // 1. Load event
+  // 1️⃣ Load event
   const { data: event, error: fetchError } = await supabase
     .from('events')
     .select('*')
@@ -24,9 +24,11 @@ export async function POST(
       action: 'complete_event',
       target_type: 'event',
       target_id: eventId,
-      success: false,
-      error_message: 'Event not found',
-      metadata: { force }
+      metadata: {
+        success: false,
+        error_message: 'Event not found',
+        force
+      }
     })
 
     return NextResponse.json(
@@ -35,15 +37,15 @@ export async function POST(
     )
   }
 
-  // 2. Guardrail: already completed
+  // 2️⃣ Guardrail: already completed
   if (event.status === 'completed' && !force) {
     await logAudit({
       action: 'complete_event',
       target_type: 'event',
       target_id: eventId,
-      success: false,
-      error_message: 'Event already completed',
       metadata: {
+        success: false,
+        error_message: 'Event already completed',
         previous_status: event.status,
         blocked_by_guardrail: true,
         guardrail_type: 'already_completed',
@@ -62,7 +64,7 @@ export async function POST(
     )
   }
 
-  // 3. Update status
+  // 3️⃣ Update status
   const { error: updateError } = await supabase
     .from('events')
     .update({ status: 'completed' })
@@ -73,9 +75,9 @@ export async function POST(
       action: 'complete_event',
       target_type: 'event',
       target_id: eventId,
-      success: false,
-      error_message: updateError.message,
       metadata: {
+        success: false,
+        error_message: updateError.message,
         previous_status: event.status,
         force
       }
@@ -87,13 +89,13 @@ export async function POST(
     )
   }
 
-  // 4. Audit success
+  // 4️⃣ Audit success
   await logAudit({
     action: 'complete_event',
     target_type: 'event',
     target_id: eventId,
-    success: true,
     metadata: {
+      success: true,
       previous_status: event.status,
       new_status: 'completed',
       force

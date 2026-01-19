@@ -12,7 +12,15 @@ export async function POST(
   const url = new URL(request.url)
   const force = url.searchParams.get('force') === 'true'
 
-  const { winner_team_id } = await request.json()
+  // Read body safely
+  let body: any = null
+  try {
+    body = await request.json()
+  } catch {
+    body = null
+  }
+
+  const winner_team_id = body?.winner_team_id
 
   if (!winner_team_id) {
     return NextResponse.json(
@@ -22,20 +30,22 @@ export async function POST(
   }
 
   // 1️⃣ Load matchup
-  const { data: matchup } = await supabase
+  const { data: matchup, error: fetchError } = await supabase
     .from('matchups')
     .select('*')
     .eq('id', matchupId)
     .single()
 
-  if (!matchup) {
+  if (!matchup || fetchError) {
     await logAudit({
       action: 'set_matchup_winner',
       target_type: 'matchup',
       target_id: matchupId,
-      success: false,
-      error_message: 'Matchup not found',
-      metadata: { force }
+      metadata: {
+        success: false,
+        error_message: 'Matchup not found',
+        force
+      }
     })
 
     return NextResponse.json(
@@ -50,12 +60,13 @@ export async function POST(
       action: 'set_matchup_winner',
       target_type: 'matchup',
       target_id: matchupId,
-      success: false,
-      error_message: 'Winner already set',
       metadata: {
+        success: false,
+        error_message: 'Winner already set',
         previous_winner_team_id: matchup.winner_team_id,
         attempted_winner_team_id: winner_team_id,
         guardrail_type: 'winner_already_set',
+        blocked_by_guardrail: true,
         force
       }
     })
@@ -71,38 +82,39 @@ export async function POST(
     )
   }
 
-  // 3️⃣ Guardrail: validate team belongs to matchup (NORMALIZED)
-const winner = String(winner_team_id)
-const teamA = String(matchup.team_a_id)
-const teamB = String(matchup.team_b_id)
+  // 3️⃣ Guardrail: validate team belongs to matchup
+  const winner = String(winner_team_id)
+  const teamA = String(matchup.team_a_id)
+  const teamB = String(matchup.team_b_id)
 
-const validWinner = winner === teamA || winner === teamB
+  const validWinner = winner === teamA || winner === teamB
 
-if (!validWinner) {
-  await logAudit({
-    action: 'set_matchup_winner',
-    target_type: 'matchup',
-    target_id: matchupId,
-    success: false,
-    error_message: 'Invalid winner for matchup',
-    metadata: {
-      attempted_winner_team_id: winner,
-      team_a_id: teamA,
-      team_b_id: teamB,
-      guardrail_type: 'invalid_winner',
-      force
-    }
-  })
+  if (!validWinner) {
+    await logAudit({
+      action: 'set_matchup_winner',
+      target_type: 'matchup',
+      target_id: matchupId,
+      metadata: {
+        success: false,
+        error_message: 'Invalid winner for matchup',
+        attempted_winner_team_id: winner_team_id,
+        team_a_id: matchup.team_a_id,
+        team_b_id: matchup.team_b_id,
+        guardrail_type: 'invalid_winner',
+        blocked_by_guardrail: true,
+        force
+      }
+    })
 
-  return NextResponse.json(
-    {
-      success: false,
-      error: 'Winner does not belong to this matchup',
-      code: 'INVALID_WINNER'
-    },
-    { status: 400 }
-  )
-}
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Winner does not belong to this matchup',
+        code: 'INVALID_WINNER'
+      },
+      { status: 400 }
+    )
+  }
 
   // 4️⃣ Update matchup
   const { error: updateError } = await supabase
@@ -115,9 +127,9 @@ if (!validWinner) {
       action: 'set_matchup_winner',
       target_type: 'matchup',
       target_id: matchupId,
-      success: false,
-      error_message: updateError.message,
       metadata: {
+        success: false,
+        error_message: updateError.message,
         attempted_winner_team_id: winner_team_id,
         force
       }
@@ -134,8 +146,8 @@ if (!validWinner) {
     action: 'set_matchup_winner',
     target_type: 'matchup',
     target_id: matchupId,
-    success: true,
     metadata: {
+      success: true,
       previous_winner_team_id: matchup.winner_team_id,
       new_winner_team_id: winner_team_id,
       force

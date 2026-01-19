@@ -34,9 +34,11 @@ export async function POST(
       action: 'set_category_winner',
       target_type: 'category',
       target_id: categoryId,
-      success: false,
-      error_message: 'Category not found',
-      metadata: { force }
+      metadata: {
+        success: false,
+        error_message: 'Category not found',
+        force
+      }
     })
 
     return NextResponse.json(
@@ -45,15 +47,15 @@ export async function POST(
     )
   }
 
-  // 2️⃣ Guardrail: winner already set
+  // 2️⃣ Guardrail: already set
   if (category.winner_option_id && !force) {
     await logAudit({
       action: 'set_category_winner',
       target_type: 'category',
       target_id: categoryId,
-      success: false,
-      error_message: 'Winner already set',
       metadata: {
+        success: false,
+        error_message: 'Winner already set',
         previous_winner_option_id: category.winner_option_id,
         attempted_winner_option_id: winner_option_id,
         guardrail_type: 'winner_already_set',
@@ -85,9 +87,9 @@ export async function POST(
       action: 'set_category_winner',
       target_type: 'category',
       target_id: categoryId,
-      success: false,
-      error_message: 'Invalid winner for category',
       metadata: {
+        success: false,
+        error_message: 'Invalid winner for category',
         attempted_winner_option_id: winner_option_id,
         guardrail_type: 'invalid_option',
         force
@@ -115,10 +117,9 @@ export async function POST(
       action: 'set_category_winner',
       target_type: 'category',
       target_id: categoryId,
-      success: false,
-      error_message: updateError.message,
       metadata: {
-        attempted_winner_option_id: winner_option_id,
+        success: false,
+        error_message: updateError.message,
         force
       }
     })
@@ -134,8 +135,8 @@ export async function POST(
     action: 'set_category_winner',
     target_type: 'category',
     target_id: categoryId,
-    success: true,
     metadata: {
+      success: true,
       previous_winner_option_id: category.winner_option_id,
       new_winner_option_id: winner_option_id,
       force
