@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { assertEventAllowsResults } from '@/lib/assertEventAllowsResults'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -49,7 +50,7 @@ export async function POST(request) {
     .order('bracket_position', { ascending: false })
     .limit(1)
 
-  const nextPosition = bracketPosition || 
+  const nextPosition = bracketPosition ||
     (existingMatchups?.[0]?.bracket_position ? existingMatchups[0].bracket_position + 1 : 1)
 
   const { data, error } = await supabase
@@ -93,6 +94,19 @@ export async function PUT(request) {
     return NextResponse.json({ error: matchupError.message }, { status: 500 })
   }
 
+  // Fetch event to check status
+  const { data: event, error: eventError } = await supabase
+    .from('events')
+    .select('id, status')
+    .eq('id', matchup.event_id)
+    .single()
+
+  if (eventError) {
+    return NextResponse.json({ error: eventError.message }, { status: 500 })
+  }
+
+  assertEventAllowsResults(event)
+
   // Update the winner
   const { data, error } = await supabase
     .from('matchups')
@@ -131,7 +145,7 @@ export async function PUT(request) {
 // SUPPORTS BYES: If a slot is already filled (bye team), fills the other slot
 async function advanceWinnerToNextRound(eventId, currentRoundOrder, bracketPosition, winnerTeamId) {
   console.log(`[ADVANCE] Round ${currentRoundOrder}, Pos ${bracketPosition} -> Winner: ${winnerTeamId}`)
-  
+
   // Get the next round
   const { data: nextRound, error: nextRoundError } = await supabase
     .from('rounds')
@@ -151,7 +165,7 @@ async function advanceWinnerToNextRound(eventId, currentRoundOrder, bracketPosit
   // Positions 1,2 feed into next round position 1
   // Positions 3,4 feed into next round position 2, etc.
   const nextBracketPosition = Math.ceil(bracketPosition / 2)
-  
+
   // Default slot based on odd/even position
   const defaultIsTeamA = bracketPosition % 2 === 1
 
@@ -176,7 +190,7 @@ async function advanceWinnerToNextRound(eventId, currentRoundOrder, bracketPosit
   // If both empty, use the default formula
   // If both filled, log warning
   let updateData
-  
+
   if (nextMatchup.team_a_id && nextMatchup.team_b_id) {
     console.log(`[ADVANCE] WARNING: Both slots already filled in next matchup!`)
     console.log(`[ADVANCE] team_a: ${nextMatchup.team_a_id}, team_b: ${nextMatchup.team_b_id}`)
@@ -192,7 +206,7 @@ async function advanceWinnerToNextRound(eventId, currentRoundOrder, bracketPosit
   } else {
     // Both empty, use default formula
     console.log(`[ADVANCE] No bye detected, using default slot: ${defaultIsTeamA ? 'Team A' : 'Team B'}`)
-    updateData = defaultIsTeamA 
+    updateData = defaultIsTeamA
       ? { team_a_id: winnerTeamId }
       : { team_b_id: winnerTeamId }
   }
@@ -234,10 +248,10 @@ async function clearFromNextRound(eventId, currentRoundOrder, bracketPosition) {
 
   if (nextMatchup) {
     // Clear the appropriate team slot
-    const updateData = isTeamA 
+    const updateData = isTeamA
       ? { team_a_id: null }
       : { team_b_id: null }
-    
+
     // Also clear the winner if it was this team
     await supabase
       .from('matchups')

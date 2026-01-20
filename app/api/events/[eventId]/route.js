@@ -1,28 +1,35 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { assertEventAllowsResults } from '@/lib/assertEventAllowsResults'
 
 export async function POST(request, { params }) {
   try {
     const supabase = createClient()
     const { eventId } = await params
-    
+
     const actorEmail = request.headers.get('x-user-email') || 'system'
-    
+
     // Get event details
-    const { data: event } = await supabase
+    const { data: event, error: eventError } = await supabase
       .from('events')
-      .select('name, status')
+      .select('id, name, status')
       .eq('id', eventId)
       .single()
-    
+
+    if (eventError) {
+      throw eventError
+    }
+
+    assertEventAllowsResults(event)
+
     // Update event status to completed
     const { error } = await supabase
       .from('events')
       .update({ status: 'completed' })
       .eq('id', eventId)
-    
+
     if (error) throw error
-    
+
     // Log the action
     try {
       await supabase.rpc('log_audit_event', {
@@ -35,12 +42,12 @@ export async function POST(request, { params }) {
     } catch (e) {
       // Audit log function may not exist yet
     }
-    
+
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Error marking event complete:', error)
     return NextResponse.json(
-      { error: 'Failed to mark event complete' },
+      { error: error.message || 'Failed to mark event complete' },
       { status: 500 }
     )
   }

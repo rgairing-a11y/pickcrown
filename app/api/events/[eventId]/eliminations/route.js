@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { assertEventAllowsResults } from '@/lib/assertEventAllowsResults'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -33,6 +34,19 @@ export async function POST(request, { params }) {
     if (!team_id) {
       return NextResponse.json({ error: 'team_id is required' }, { status: 400 })
     }
+
+    // Fetch event to check status
+    const { data: event, error: eventError } = await supabaseAdmin
+      .from('events')
+      .select('id, status')
+      .eq('id', eventId)
+      .single()
+
+    if (eventError) {
+      throw eventError
+    }
+
+    assertEventAllowsResults(event)
 
     if (eliminated_in_round_id) {
       // Upsert elimination record
@@ -72,6 +86,19 @@ export async function POST(request, { params }) {
 export async function DELETE(request, { params }) {
   try {
     const { eventId } = await params
+
+    // Fetch event to check status
+    const { data: event, error: eventError } = await supabaseAdmin
+      .from('events')
+      .select('id, status')
+      .eq('id', eventId)
+      .single()
+
+    if (eventError) {
+      throw eventError
+    }
+
+    assertEventAllowsResults(event)
 
     const { error } = await supabaseAdmin
       .from('team_eliminations')
