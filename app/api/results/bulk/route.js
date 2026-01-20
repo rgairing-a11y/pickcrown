@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { assertEventAllowsResults } from '@/lib/assertEventAllowsResults'
+import { logAudit } from '@/lib/audit'
 
 export async function POST(request) {
   try {
@@ -54,12 +55,12 @@ export async function POST(request) {
     }
 
     // Log the bulk update
-    await supabase.rpc('log_audit_event', {
-      p_action: 'bulk_results_entry',
-      p_actor_email: actorEmail,
-      p_target_type: 'event',
-      p_target_id: eventId,
-      p_metadata: {
+    await logAudit({
+      action: 'bulk_results_entry',
+      actor_email: actorEmail,
+      target_type: 'event',
+      target_id: eventId,
+      metadata: {
         results_count: results.length,
         updated_count: updated.length,
         errors_count: errors.length,

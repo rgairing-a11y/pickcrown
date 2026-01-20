@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { assertEventAllowsResults } from '@/lib/assertEventAllowsResults'
+import { logAudit } from '@/lib/audit'
 
 export async function POST(request, { params }) {
   try {
@@ -31,12 +32,12 @@ export async function POST(request, { params }) {
     if (error) throw error
 
     // Log the action
-    await supabase.rpc('log_audit_event', {
-      p_action: 'mark_event_complete',
-      p_actor_email: actorEmail,
-      p_target_type: 'event',
-      p_target_id: eventId,
-      p_metadata: { event_name: event?.name, previous_status: event?.status }
+    await logAudit({
+      action: 'mark_event_complete',
+      actor_email: actorEmail,
+      target_type: 'event',
+      target_id: eventId,
+      metadata: { event_name: event?.name, previous_status: event?.status }
     })
 
     return NextResponse.json({ success: true })
