@@ -33,7 +33,6 @@ export async function POST(
       action: 'set_matchup_winner',
       target_type: 'matchup',
       target_id: matchupId,
-      success: false,
       error_message: 'Matchup not found',
       metadata: { force }
     })
