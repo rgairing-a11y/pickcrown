@@ -25,9 +25,9 @@ export async function DELETE(
       action: 'delete_pool',
       target_type: 'pool',
       target_id: poolId,
-      success: false,
-      error_message: 'Pool not found',
-      metadata: { force }
+
+      metadata: {       success: false, 
+      error_message: 'Pool not found', force }
     })
 
     return NextResponse.json(
@@ -52,9 +52,9 @@ export async function DELETE(
         action: 'archive_pool',
         target_type: 'pool',
         target_id: poolId,
-        success: false,
-        error_message: archiveError.message,
-        metadata: { previous_status: pool.status, force }
+        
+        
+        metadata: { success: false, error_message: archiveError.message, previous_status: pool.status, force }
       })
 
       return NextResponse.json(
@@ -70,8 +70,8 @@ export async function DELETE(
       action: 'archive_pool',
       target_type: 'pool',
       target_id: poolId,
-      success: true,
-      metadata: {
+     
+      metadata: {  success: true,
         previous_status: pool.status,
         new_status: 'archived',
         force
@@ -95,9 +95,9 @@ export async function DELETE(
       action: 'delete_pool',
       target_type: 'pool',
       target_id: poolId,
-      success: false,
-      error_message: deleteError.message,
-      metadata: { previous_status: 'archived', force }
+
+      
+      metadata: {        success: false,  error_message: deleteError.message, previous_status: 'archived', force }
     })
 
     return NextResponse.json(
@@ -113,8 +113,8 @@ export async function DELETE(
     action: 'delete_pool',
     target_type: 'pool',
     target_id: poolId,
-    success: true,
     metadata: {
+          success: true,
       previous_status: 'archived',
       force
     }

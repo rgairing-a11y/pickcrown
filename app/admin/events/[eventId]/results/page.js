@@ -32,13 +32,26 @@ export default function AdminResultsPage({ params }) {
   const [cloneStartTime, setCloneStartTime] = useState('')
   const [cloning, setCloning] = useState(false)
 
-  useEffect(() => {
-    params.then(p => setEventId(p.eventId))
-  }, [params])
 
-  useEffect(() => {
-    if (eventId) loadEvent()
-  }, [eventId])
+
+useEffect(() => {
+  if (params?.eventId) {
+    setEventId(params.eventId)
+  }
+}, [params])
+
+useEffect(() => {
+  if (eventId) {
+    loadData()
+  }
+}, [eventId])
+
+
+
+console.log('params:', params)
+console.log('eventId:', eventId)
+
+
 
   async function loadEvent() {
     setLoading(true)
@@ -142,15 +155,15 @@ export default function AdminResultsPage({ params }) {
 
     try {
       for (const [categoryId, optionId] of Object.entries(pendingResults)) {
-        const res = await fetch('/api/results', {
-          method: 'PUT',
+        const res = await fetch(`/api/admin/events/${eventId}/categories/${categoryId}/set-correct`, {
+          method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ categoryId, optionId })
+          body: JSON.stringify({ optionId })
         })
 
         if (!res.ok) {
           const err = await res.json()
-          alert('Error saving: ' + err.error)
+          alert('Error saving: ' + (err.details || err.error))
           setSaving(false)
           return
         }
@@ -601,13 +614,27 @@ export default function AdminResultsPage({ params }) {
   const totalCategories = categories.length
   const answeredCount = Object.keys(pendingResults).length
   const allAnswered = answeredCount === totalCategories
+  const canEditResults = event.status === 'in_progress'
 
   return (
     <div style={{ maxWidth: 700 }}>
-      <PageHeader 
-        title="Enter Results" 
+      <PageHeader
+        title="Enter Results"
         subtitle={event.name}
       />
+
+      {/* Timing Guard Alert */}
+      {!canEditResults && (
+        <Alert variant="warning" style={{ marginBottom: 'var(--spacing-lg)' }}>
+          <strong>Results entry is disabled</strong>
+          <p style={{ margin: '8px 0 0 0', fontSize: '14px' }}>
+            {event.status === 'upcoming' && 'Event status is "upcoming". Set to "in_progress" to enter results.'}
+            {event.status === 'completed' && 'Event is completed. Results cannot be modified.'}
+            {event.status !== 'upcoming' && event.status !== 'completed' && event.status !== 'in_progress' &&
+              `Event status is "${event.status}". Set to "in_progress" to enter results.`}
+          </p>
+        </Alert>
+      )}
 
       {/* Progress indicator */}
       <Card style={{ marginBottom: 'var(--spacing-lg)', background: '#f0f9ff' }}>
@@ -620,7 +647,7 @@ export default function AdminResultsPage({ params }) {
           </div>
           <Button
             onClick={handleSaveAll}
-            disabled={saving || !hasUnsavedChanges}
+            disabled={saving || !hasUnsavedChanges || !canEditResults}
             variant="primary"
           >
             {saving ? 'Saving...' : 'Save All Results'}
@@ -666,6 +693,7 @@ export default function AdminResultsPage({ params }) {
               <select
                 value={selectedOptionId || ''}
                 onChange={(e) => handleSelectResult(category.id, e.target.value)}
+                disabled={!canEditResults}
                 style={{
                   width: '100%',
                   padding: '12px',
@@ -673,7 +701,9 @@ export default function AdminResultsPage({ params }) {
                   border: '1px solid #d1d5db',
                   borderRadius: 6,
                   marginBottom: 'var(--spacing-md)',
-                  background: selectedOptionId ? '#f0fdf4' : 'white'
+                  background: selectedOptionId ? '#f0fdf4' : 'white',
+                  cursor: canEditResults ? 'pointer' : 'not-allowed',
+                  opacity: canEditResults ? 1 : 0.6
                 }}
               >
                 <option value="">-- Select winner --</option>
@@ -686,13 +716,14 @@ export default function AdminResultsPage({ params }) {
 
               <div style={{ fontSize: '14px', color: '#666' }}>
                 {category.options?.map(option => (
-                  <label 
-                    key={option.id} 
-                    style={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
+                  <label
+                    key={option.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
                       padding: '6px 0',
-                      cursor: 'pointer'
+                      cursor: canEditResults ? 'pointer' : 'not-allowed',
+                      opacity: canEditResults ? 1 : 0.6
                     }}
                   >
                     <input
@@ -700,7 +731,8 @@ export default function AdminResultsPage({ params }) {
                       name={'category_' + category.id}
                       checked={selectedOptionId === option.id}
                       onChange={() => handleSelectResult(category.id, option.id)}
-                      style={{ marginRight: 8 }}
+                      disabled={!canEditResults}
+                      style={{ marginRight: 8, cursor: canEditResults ? 'pointer' : 'not-allowed' }}
                     />
                     <span style={{ 
                       fontWeight: selectedOptionId === option.id ? 'bold' : 'normal',

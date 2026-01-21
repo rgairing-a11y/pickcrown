@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { assertEventAllowsResults } from '@/lib/assertEventAllowsResults'
 
 export async function POST(request, { params }) {
   try {

@@ -17,7 +17,7 @@ export async function POST(
 
   if (!winner_option_id) {
     return NextResponse.json(
-      { error: 'winner_option_id is required' },
+      { success: false, error: 'winner_option_id is required' },
       { status: 400 }
     )
   }
@@ -34,12 +34,15 @@ export async function POST(
       action: 'set_category_winner',
       target_type: 'category',
       target_id: categoryId,
-      
-      metadata: { error: 'Category not found', force }
+      metadata: {
+        success: false,
+        error_message: 'Category not found',
+        force
+      }
     })
 
     return NextResponse.json(
-      { error: 'Category not found', code: 'NOT_FOUND' },
+      { success: false, error: 'Category not found', code: 'NOT_FOUND' },
       { status: 404 }
     )
   }
@@ -50,14 +53,19 @@ export async function POST(
       action: 'set_category_winner',
       target_type: 'category',
       target_id: categoryId,
-      
-      metadata: { error: 'Winner already set',
-        existing_winner_option_id: category.winner_option_id
+      metadata: {
+        success: false,
+        error_message: 'Winner already set',
+        previous_winner_option_id: category.winner_option_id,
+        attempted_winner_option_id: winner_option_id,
+        guardrail_type: 'winner_already_set',
+        force
       }
     })
 
     return NextResponse.json(
       {
+        success: false,
         error: 'Winner already set',
         code: 'CONFLICT',
         hint: 'Use ?force=true to override'
@@ -79,8 +87,9 @@ export async function POST(
       action: 'set_category_winner',
       target_type: 'category',
       target_id: categoryId,
-      
-      metadata: { error: 'Invalid winner for category',
+      metadata: {
+        success: false,
+        error_message: 'Invalid winner for category',
         attempted_winner_option_id: winner_option_id,
         guardrail_type: 'invalid_option',
         force
@@ -89,6 +98,7 @@ export async function POST(
 
     return NextResponse.json(
       {
+        success: false,
         error: 'Winner does not belong to this category',
         code: 'INVALID_WINNER'
       },
@@ -107,15 +117,16 @@ export async function POST(
       action: 'set_category_winner',
       target_type: 'category',
       target_id: categoryId,
-     
-      metadata: {  error: updateError.message,
+      metadata: {
+        success: false,
+        error_message: updateError.message,
         attempted_winner_option_id: winner_option_id,
         force
       }
     })
 
     return NextResponse.json(
-      { error: 'Failed to set winner' },
+      { success: false, error: 'Failed to set winner' },
       { status: 500 }
     )
   }
@@ -126,6 +137,7 @@ export async function POST(
     target_type: 'category',
     target_id: categoryId,
     metadata: {
+      success: true,
       previous_winner_option_id: category.winner_option_id,
       new_winner_option_id: winner_option_id,
       force
@@ -133,6 +145,7 @@ export async function POST(
   })
 
   return NextResponse.json({
+    success: true,
     data: {
       category_id: categoryId,
       winner_option_id

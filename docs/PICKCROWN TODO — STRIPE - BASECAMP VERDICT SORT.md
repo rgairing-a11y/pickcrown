@@ -6,6 +6,147 @@ This is meant to be **final, readable, and enforceable**.
 
 # 🧪 PICKCROWN TODO — STRIPE / BASECAMP VERDICT SORT
 
+From Envt separation:
+Perfect instinct. This is exactly the kind of thing that **belongs on a durable TODO**, not rattling around in your head.
+
+Here’s a clean, copy-ready **new TODO entry** you can drop straight into your master list / roadmap. It’s structured so Future-You knows **what**, **why**, and **how safe** it is.
+
+---
+
+
+---
+
+If you want, next we can:
+
+* Add this into your **v2.3 Stability bucket**
+* Convert it into a **reusable fetch helper**
+* Or do a quick sweep to flag other similar assumptions now that DEV is live
+---
+🧱 TODO — Refactor Admin Event Creation to Remove Service Role Dependency
+
+Category: Architecture / Security Hardening
+Priority: Medium (post-DEV stabilization)
+Status: Deferred by design (intentional)
+
+Problem
+
+Admin event creation currently relies on the Supabase service role key inside API routes.
+This works, but increases:
+
+environment complexity
+
+secret surface area
+
+risk during local/DEV development
+
+It also caused DEV failures when the service role key was intentionally omitted.
+
+Goal
+
+Allow standard admin actions (e.g., creating events) to run using the anon Supabase client, with permissions enforced via Row Level Security (RLS) instead of privileged keys.
+
+Service role usage should be reserved only for:
+
+background jobs
+
+system maintenance
+
+migrations
+
+truly non-user-initiated operations
+
+Planned Changes
+1️⃣ Replace service-role usage in admin routes
+
+Remove supabaseAdmin from:
+
+/api/events
+
+/api/admin/* routes that represent normal admin UI actions
+
+Use the standard Supabase client (anon key) instead
+
+2️⃣ Enforce permissions via RLS
+
+Define clear RLS policies such as:
+
+“Only admins can insert into events”
+
+Avoid bypassing RLS with service role for UI-driven actions
+
+3️⃣ Reduce environment secret requirements
+
+Remove SUPABASE_SERVICE_ROLE_KEY dependency for:
+
+local development
+
+DEV environment
+
+Keep service role keys isolated to:
+
+PROD-only
+
+server-only contexts where truly required
+
+Why This Is Deferred
+
+Current priority is DEV usability and momentum
+
+Temporary service-role usage is acceptable while:
+
+EMAIL is disabled in DEV
+
+environments are fully separated
+
+Refactor will be simpler and safer once admin flows are stable
+
+Completion Criteria
+
+ Admin event creation works without service role key
+
+ RLS policies correctly gate admin actions
+
+ DEV can run with zero privileged Supabase keys
+
+ Service role usage documented and minimized
+
+Notes
+
+This is an architecture cleanup, not a bug fix.
+Deferring this work is intentional and aligned with development pacing.
+---
+Design a safe, repeatable process for selectively copying non-user prod tables into DEV (events, categories, rounds), without full DB cloning.
+---
+
+---
+
+---
+
+---
+
+---
+
+---
+
+---
+
+---
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ---
 
 ## 🟢 KEEP — **REQUIRED FOR v1.0 (DONE LINE)**
@@ -13,6 +154,14 @@ This is meant to be **final, readable, and enforceable**.
 These **must ship** to call PickCrown v1.0 complete.
 They either **reduce friction** (Stripe) or **reduce anxiety** (Basecamp).
 No further justification required.
+
+
+* Loading skeleton states
+* Mobile bracket pinch-to-zoom
+* Focus management
+
+
+
 
 ### Commissioner UX (Orientation & Trust)
 
@@ -51,6 +200,12 @@ Anything below this line is **explicitly optional**.
 # 🟡 KEEP — **v1.1 / v1.2 (POLISH & COMPLETENESS)**
 
 These improve calmness, confidence, and finish — but **nothing breaks without them**.
+
+
+
+
+
+
 
 ### v1.1 — *Confidence & Transparency*
 
@@ -91,12 +246,8 @@ These support repeat use without introducing pressure.
 Important eventually, but **do not justify delaying real usage**.
 
 ### UX & Accessibility
-
-* Loading skeleton states
-* Mobile bracket pinch-to-zoom
 * Screen reader improvements
 * Keyboard navigation for forms
-* Focus management
 * Color contrast audit
 * ARIA labels audit
 

@@ -24,9 +24,8 @@ export async function POST(
       action: 'complete_event',
       target_type: 'event',
       target_id: eventId,
-      success: false,
-      error_message: 'Event not found',
-      metadata: { force }
+      
+      metadata: { error: 'Event not found', force }
     })
 
     return NextResponse.json(
@@ -41,9 +40,8 @@ export async function POST(
       action: 'complete_event',
       target_type: 'event',
       target_id: eventId,
-      success: false,
-      error_message: 'Event already completed',
-      metadata: {
+      
+      metadata: { error: 'Event already completed',
         previous_status: event.status,
         blocked_by_guardrail: true,
         guardrail_type: 'already_completed',
@@ -73,9 +71,8 @@ export async function POST(
       action: 'complete_event',
       target_type: 'event',
       target_id: eventId,
-      success: false,
-      error_message: updateError.message,
-      metadata: {
+
+      metadata: { error: updateError.message,
         previous_status: event.status,
         force
       }
@@ -92,7 +89,6 @@ export async function POST(
     action: 'complete_event',
     target_type: 'event',
     target_id: eventId,
-    success: true,
     metadata: {
       previous_status: event.status,
       new_status: 'completed',

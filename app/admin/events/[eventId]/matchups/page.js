@@ -17,13 +17,25 @@ export default function MatchupsAdminPage({ params }) {
   const [teamB, setTeamB] = useState('')
   const [saving, setSaving] = useState(false)
 
-  useEffect(() => {
-    params.then(p => setEventId(p.eventId))
-  }, [params])
 
-  useEffect(() => {
-    if (eventId) loadData()
-  }, [eventId])
+
+useEffect(() => {
+  if (params?.eventId) {
+    setEventId(params.eventId)
+  }
+}, [params])
+
+useEffect(() => {
+  if (eventId) {
+    loadData()
+  }
+}, [eventId])
+
+
+console.log('params:', params)
+console.log('eventId:', eventId)
+
+
 
   async function loadData() {
     setLoading(true)
@@ -84,15 +96,15 @@ export default function MatchupsAdminPage({ params }) {
   async function handleSetWinner(matchupId, winnerId) {
     setSaving(true)
 
-    const res = await fetch('/api/matchups', {
-      method: 'PUT',
+    const res = await fetch(`/api/admin/events/${eventId}/matchups/${matchupId}/set-winner`, {
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: matchupId, winnerTeamId: winnerId })
+      body: JSON.stringify({ winnerTeamId: winnerId })
     })
 
     const data = await res.json()
     if (data.error) {
-      alert('Error: ' + data.error)
+      alert('Error: ' + (data.details || data.error))
     }
 
     await loadData()
@@ -132,6 +144,8 @@ export default function MatchupsAdminPage({ params }) {
     return label
   }
 
+  const canEditResults = event.status === 'in_progress'
+
   return (
     <div style={{ padding: 24, maxWidth: 900, margin: '0 auto' }}>
       <Link href="/admin" style={{ color: '#3b82f6', fontSize: '14px' }}>
@@ -169,6 +183,19 @@ export default function MatchupsAdminPage({ params }) {
           🔧 Bracket Setup
         </Link>
       </div>
+
+      {/* Timing Guard Alert */}
+      {!canEditResults && (
+        <div style={{ padding: 16, marginBottom: 24, background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 8, color: '#92400e' }}>
+          <strong>Results entry is disabled</strong>
+          <p style={{ margin: '8px 0 0 0', fontSize: '14px' }}>
+            {event.status === 'upcoming' && 'Event status is "upcoming". Set to "in_progress" to enter results.'}
+            {event.status === 'completed' && 'Event is completed. Results cannot be modified.'}
+            {event.status !== 'upcoming' && event.status !== 'completed' && event.status !== 'in_progress' &&
+              `Event status is "${event.status}". Set to "in_progress" to enter results.`}
+          </p>
+        </div>
+      )}
 
       {/* Prerequisites check */}
       {(teams.length === 0 || rounds.length === 0) && (
@@ -268,7 +295,7 @@ export default function MatchupsAdminPage({ params }) {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                       <button
                         onClick={() => handleSetWinner(matchup.id, matchup.team_a?.id)}
-                        disabled={saving}
+                        disabled={saving || !canEditResults}
                         style={{
                           flex: 1,
                           minWidth: 150,
@@ -276,9 +303,10 @@ export default function MatchupsAdminPage({ params }) {
                           background: matchup.winner_team_id === matchup.team_a?.id ? '#dcfce7' : 'white',
                           border: matchup.winner_team_id === matchup.team_a?.id ? '2px solid #22c55e' : '1px solid #d1d5db',
                           borderRadius: 6,
-                          cursor: 'pointer',
+                          cursor: (saving || !canEditResults) ? 'not-allowed' : 'pointer',
                           fontWeight: matchup.winner_team_id === matchup.team_a?.id ? 'bold' : 'normal',
-                          textAlign: 'center'
+                          textAlign: 'center',
+                          opacity: canEditResults ? 1 : 0.6
                         }}
                       >
                         {formatTeam(matchup.team_a)}
@@ -289,7 +317,7 @@ export default function MatchupsAdminPage({ params }) {
 
                       <button
                         onClick={() => handleSetWinner(matchup.id, matchup.team_b?.id)}
-                        disabled={saving}
+                        disabled={saving || !canEditResults}
                         style={{
                           flex: 1,
                           minWidth: 150,
@@ -297,9 +325,10 @@ export default function MatchupsAdminPage({ params }) {
                           background: matchup.winner_team_id === matchup.team_b?.id ? '#dcfce7' : 'white',
                           border: matchup.winner_team_id === matchup.team_b?.id ? '2px solid #22c55e' : '1px solid #d1d5db',
                           borderRadius: 6,
-                          cursor: 'pointer',
+                          cursor: (saving || !canEditResults) ? 'not-allowed' : 'pointer',
                           fontWeight: matchup.winner_team_id === matchup.team_b?.id ? 'bold' : 'normal',
-                          textAlign: 'center'
+                          textAlign: 'center',
+                          opacity: canEditResults ? 1 : 0.6
                         }}
                       >
                         {formatTeam(matchup.team_b)}
@@ -309,8 +338,17 @@ export default function MatchupsAdminPage({ params }) {
                       {matchup.winner_team_id && (
                         <button
                           onClick={() => handleSetWinner(matchup.id, null)}
-                          disabled={saving}
-                          style={{ padding: '8px 12px', background: 'transparent', color: '#6b7280', border: '1px solid #d1d5db', borderRadius: 6, cursor: 'pointer', fontSize: '12px' }}
+                          disabled={saving || !canEditResults}
+                          style={{
+                            padding: '8px 12px',
+                            background: 'transparent',
+                            color: '#6b7280',
+                            border: '1px solid #d1d5db',
+                            borderRadius: 6,
+                            cursor: (saving || !canEditResults) ? 'not-allowed' : 'pointer',
+                            fontSize: '12px',
+                            opacity: canEditResults ? 1 : 0.6
+                          }}
                         >
                           Clear
                         </button>

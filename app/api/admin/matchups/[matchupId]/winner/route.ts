@@ -33,8 +33,11 @@ export async function POST(
       action: 'set_matchup_winner',
       target_type: 'matchup',
       target_id: matchupId,
-      error_message: 'Matchup not found',
-      metadata: { force }
+      metadata: {
+        success: false,
+        error_message: 'Matchup not found',
+        force
+      }
     })
 
     return NextResponse.json(
@@ -49,9 +52,9 @@ export async function POST(
       action: 'set_matchup_winner',
       target_type: 'matchup',
       target_id: matchupId,
-      success: false,
-      error_message: 'Winner already set',
       metadata: {
+        success: false,
+        error_message: 'Winner already set',
         previous_winner_team_id: matchup.winner_team_id,
         attempted_winner_team_id: winner_team_id,
         guardrail_type: 'winner_already_set',
@@ -82,9 +85,9 @@ if (!validWinner) {
     action: 'set_matchup_winner',
     target_type: 'matchup',
     target_id: matchupId,
-    success: false,
-    error_message: 'Invalid winner for matchup',
     metadata: {
+      success: false,
+      error_message: 'Invalid winner for matchup',
       attempted_winner_team_id: winner,
       team_a_id: teamA,
       team_b_id: teamB,
@@ -114,9 +117,9 @@ if (!validWinner) {
       action: 'set_matchup_winner',
       target_type: 'matchup',
       target_id: matchupId,
-      success: false,
-      error_message: updateError.message,
       metadata: {
+        success: false,
+        error_message: updateError.message,
         attempted_winner_team_id: winner_team_id,
         force
       }
@@ -133,8 +136,8 @@ if (!validWinner) {
     action: 'set_matchup_winner',
     target_type: 'matchup',
     target_id: matchupId,
-    success: true,
     metadata: {
+      success: true,
       previous_winner_team_id: matchup.winner_team_id,
       new_winner_team_id: winner_team_id,
       force
