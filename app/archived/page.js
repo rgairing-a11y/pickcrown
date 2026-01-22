@@ -1,19 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { createClient } from '@supabase/supabase-js'
+import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
-
-function getSupabase() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-  if (!url || !key) {
-    throw new Error('Supabase client missing env vars')
-  }
-
-  return createClient(url, key)
-}
 
 export default function ArchivedPage() {
   const [email, setEmail] = useState('')
@@ -88,7 +77,7 @@ export default function ArchivedPage() {
 
     // Combine and deduplicate
     const allPools = new Map()
-    
+
     // Add pools from entries
     entriesData?.forEach(entry => {
       if (entry.pool && isArchived(entry.pool)) {
@@ -129,9 +118,9 @@ export default function ArchivedPage() {
     // Set status to active and clear archive_date
     const { error } = await supabase
       .from('pools')
-      .update({ 
+      .update({
         status: 'active',
-        archive_date: null 
+        archive_date: null
       })
       .eq('id', poolId)
 
@@ -236,17 +225,17 @@ export default function ArchivedPage() {
                       <p style={{ margin: '0 0 4px', fontSize: 14, color: '#666' }}>
                         {pool.event?.name} {pool.event?.year}
                       </p>
-                      
+
                       {/* Archive reason */}
-                      <p style={{ 
-                        margin: '8px 0 0', 
-                        fontSize: 12, 
+                      <p style={{
+                        margin: '8px 0 0',
+                        fontSize: 12,
                         color: '#9ca3af',
                         display: 'flex',
                         alignItems: 'center',
                         gap: 4
                       }}>
-                        <span style={{ 
+                        <span style={{
                           display: 'inline-block',
                           width: 8,
                           height: 8,

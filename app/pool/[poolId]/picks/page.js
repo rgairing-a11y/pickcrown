@@ -2,25 +2,11 @@
 // Updated All Picks page that handles both standard brackets and NFL reseeding
 
 export const dynamic = 'force-dynamic'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 
-
-
-function getSupabase() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-  if (!url || !key) {
-    throw new Error('Supabase client missing env vars')
-  }
-
-  return createClient(url, key)
-}
-
-
 export default async function AllPicksPage({ params }) {
-  const supabase = getSupabase()
+  const supabase = createClient()
   const { poolId } = await params
 
   // Get pool with event details

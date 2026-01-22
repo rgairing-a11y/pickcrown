@@ -1,19 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { createClient } from '@supabase/supabase-js'
+import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
-
-function getSupabase() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-  if (!url || !key) {
-    throw new Error('Supabase client missing env vars')
-  }
-
-  return createClient(url, key)
-}
 
 // SORTING RULE: Locked beats open. Seasons beat events. Now beats later.
 
@@ -22,15 +11,15 @@ function getSupabase() {
 function isPoolVisible(pool) {
   if (!pool) return false
   if (pool.status === 'archived') return false
-  
+
   const now = new Date()
-  
+
   // Check open_date (if set and in future, not visible yet)
   if (pool.open_date && new Date(pool.open_date) > now) return false
-  
+
   // Check archive_date (if set and in past, auto-archived)
   if (pool.archive_date && new Date(pool.archive_date) < now) return false
-  
+
   return true
 }
 
@@ -51,7 +40,6 @@ export default function HomePage() {
 
   async function loadUserData(userEmail) {
     if (!userEmail) return
-    const supabase = getSupabase()
     setLoading(true)
     setHasSearched(true)
 
@@ -157,7 +145,7 @@ export default function HomePage() {
       const bHasActive = b.entries.some(e => isHappeningNow(e.pool?.event) || isOpen(e.pool?.event))
       if (aHasActive && !bHasActive) return -1
       if (!aHasActive && bHasActive) return 1
-      
+
       const aEarliest = Math.min(...a.entries.map(e => new Date(e.pool?.event?.start_time || 0)))
       const bEarliest = Math.min(...b.entries.map(e => new Date(e.pool?.event?.start_time || 0)))
       return aEarliest - bEarliest
@@ -226,13 +214,13 @@ export default function HomePage() {
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {happening && (
-            <span style={{ 
-              padding: '4px 10px', 
-              background: '#f59e0b', 
-              color: 'white', 
-              borderRadius: 12, 
-              fontSize: 11, 
-              fontWeight: 600 
+            <span style={{
+              padding: '4px 10px',
+              background: '#f59e0b',
+              color: 'white',
+              borderRadius: 12,
+              fontSize: 11,
+              fontWeight: 600
             }}>
               🔒 LIVE
             </span>
@@ -276,8 +264,8 @@ export default function HomePage() {
   const SeasonCard = ({ seasonData }) => {
     const [expanded, setExpanded] = useState(true)
     const { season, entries: seasonEntries } = seasonData
-    
-    const activeCount = seasonEntries.filter(e => 
+
+    const activeCount = seasonEntries.filter(e =>
       isHappeningNow(e.pool?.event) || isOpen(e.pool?.event)
     ).length
     const hasActive = activeCount > 0
@@ -294,7 +282,7 @@ export default function HomePage() {
           style={{
             width: '100%',
             padding: 16,
-            background: hasActive 
+            background: hasActive
               ? 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)'
               : '#f3f4f6',
             color: hasActive ? 'white' : '#374151',
@@ -338,7 +326,7 @@ export default function HomePage() {
             <span style={{ fontSize: 18 }}>{expanded ? '▼' : '▶'}</span>
           </div>
         </button>
-        
+
         {expanded && (
           <div style={{ padding: 12, background: hasActive ? '#faf5ff' : '#fafafa' }}>
             {seasonEntries.map(entry => (
@@ -480,9 +468,9 @@ export default function HomePage() {
               {/* SECTION 2: YOUR SEASONS */}
               {seasons.length > 0 && (
                 <section style={{ marginBottom: 32 }}>
-                  <h2 style={{ 
-                    fontSize: 16, 
-                    color: '#666', 
+                  <h2 style={{
+                    fontSize: 16,
+                    color: '#666',
                     marginBottom: 16,
                     textTransform: 'uppercase',
                     letterSpacing: '0.5px'
@@ -498,9 +486,9 @@ export default function HomePage() {
               {/* SECTION 3: STANDALONE EVENTS */}
               {standalone.length > 0 && (
                 <section style={{ marginBottom: 32 }}>
-                  <h2 style={{ 
-                    fontSize: 16, 
-                    color: '#666', 
+                  <h2 style={{
+                    fontSize: 16,
+                    color: '#666',
                     marginBottom: 16,
                     textTransform: 'uppercase',
                     letterSpacing: '0.5px'
@@ -516,9 +504,9 @@ export default function HomePage() {
               {/* SECTION 4: POOLS YOU MANAGE */}
               {managedPools.length > 0 && (
                 <section style={{ marginBottom: 32 }}>
-                  <h2 style={{ 
-                    fontSize: 16, 
-                    color: '#666', 
+                  <h2 style={{
+                    fontSize: 16,
+                    color: '#666',
                     marginBottom: 16,
                     textTransform: 'uppercase',
                     letterSpacing: '0.5px'
