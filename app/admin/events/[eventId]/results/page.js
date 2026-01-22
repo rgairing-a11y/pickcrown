@@ -6,7 +6,7 @@ import { Card, PageHeader, Button, EmptyState, LoadingState, Alert } from '../..
 import { sortByOrderIndex } from '../../../../../lib/utils'
 import SendResultsSection from '../../../../../components/SendResultsSection'
 
-export default function AdminResultsPage({ params }) {
+export default async function AdminResultsPage({ params }) {
   const [eventId, setEventId] = useState(null)
   const [event, setEvent] = useState(null)
   const [pools, setPools] = useState([])
