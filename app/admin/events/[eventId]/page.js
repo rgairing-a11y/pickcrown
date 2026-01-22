@@ -4,16 +4,10 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
 
-function getSupabase() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-  if (!url || !key) {
-    throw new Error('Supabase client missing env vars')
-  }
-
-  return createClient(url, key)
-}
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+)
 
 // Presets for common round structures
 const PRESETS = {
@@ -70,7 +64,7 @@ export default function RoundsAdminPage({ params }) {
   const [rounds, setRounds] = useState([])
   const [teams, setTeams] = useState([])
   const [loading, setLoading] = useState(true)
-  
+
   // Form state
   const [roundName, setRoundName] = useState('')
   const [roundOrder, setRoundOrder] = useState('')
@@ -87,13 +81,13 @@ export default function RoundsAdminPage({ params }) {
 
   async function loadData() {
     setLoading(true)
-    
+
     const { data: eventData } = await supabase
       .from('events')
       .select('*')
       .eq('id', eventId)
       .single()
-    
+
     setEvent(eventData)
 
     const { data: roundsData } = await supabase
@@ -158,7 +152,7 @@ export default function RoundsAdminPage({ params }) {
   async function handleApplyPreset(presetKey) {
     const preset = PRESETS[presetKey]
     if (!preset) return
-    
+
     if (!confirm(`Add ${preset.rounds.length} rounds for ${preset.name}?`)) return
 
     setSaving(true)
@@ -194,9 +188,9 @@ export default function RoundsAdminPage({ params }) {
       <p style={{ color: '#666', marginBottom: 24 }}>{event.name}</p>
 
       {/* Navigation */}
-      <div style={{ 
-        display: 'flex', 
-        gap: 12, 
+      <div style={{
+        display: 'flex',
+        gap: 12,
         marginBottom: 24,
         padding: 16,
         background: '#f3f4f6',
@@ -223,9 +217,9 @@ export default function RoundsAdminPage({ params }) {
       </div>
 
       {/* Shortcuts */}
-      <div style={{ 
-        display: 'flex', 
-        gap: 12, 
+      <div style={{
+        display: 'flex',
+        gap: 12,
         marginBottom: 24,
         flexWrap: 'wrap'
       }}>
@@ -284,9 +278,9 @@ export default function RoundsAdminPage({ params }) {
       </div>
 
       {/* Add Round Form */}
-      <div style={{ 
-        padding: 20, 
-        background: '#f9fafb', 
+      <div style={{
+        padding: 20,
+        background: '#f9fafb',
         borderRadius: 8,
         marginBottom: 24
       }}>
@@ -360,9 +354,9 @@ export default function RoundsAdminPage({ params }) {
 
       {/* Quick Start Presets */}
       {rounds.length === 0 && (
-        <div style={{ 
-          padding: 20, 
-          background: '#f0f9ff', 
+        <div style={{
+          padding: 20,
+          background: '#f0f9ff',
           border: '1px solid #bae6fd',
           borderRadius: 8,
           marginBottom: 24
@@ -451,10 +445,10 @@ export default function RoundsAdminPage({ params }) {
           </table>
 
           {/* Total Points */}
-          <div style={{ 
-            marginTop: 16, 
-            padding: 16, 
-            background: '#f0fdf4', 
+          <div style={{
+            marginTop: 16,
+            padding: 16,
+            background: '#f0fdf4',
             borderRadius: 8,
             textAlign: 'center'
           }}>
