@@ -5,16 +5,10 @@ import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
-function getSupabase() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-  if (!url || !key) {
-    throw new Error('Supabase client missing env vars')
-  }
-
-  return createClient(url, key)
-}
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+)
 
 export default function CloneEventPage({ params }) {
   const router = useRouter()
@@ -39,13 +33,13 @@ export default function CloneEventPage({ params }) {
 
   async function loadEvent() {
     setLoading(true)
-    
+
     const { data } = await supabase
       .from('events')
       .select('*, categories(id), rounds:rounds(id), teams:teams(id), matchups:matchups(id)')
       .eq('id', eventId)
       .single()
-    
+
     if (data) {
       setEvent(data)
       setNewName(data.name)
@@ -226,7 +220,7 @@ export default function CloneEventPage({ params }) {
           border: '2px solid #22c55e'
         }}>
           <h3 style={{ margin: '0 0 16px', color: '#166534' }}>✅ Event Cloned!</h3>
-          
+
           <div style={{ marginBottom: 16 }}>
             <strong>{result.event.name} {result.event.year}</strong>
           </div>
@@ -287,7 +281,7 @@ export default function CloneEventPage({ params }) {
           <li>Teams with seeds and regions</li>
           <li>Matchup structure (without results)</li>
         </ul>
-        
+
         <h4 style={{ margin: '16px 0 8px', color: '#0369a1' }}>What doesn't get cloned:</h4>
         <ul style={{ margin: 0, paddingLeft: 20, color: '#0c4a6e', fontSize: 14 }}>
           <li>Season assignment</li>

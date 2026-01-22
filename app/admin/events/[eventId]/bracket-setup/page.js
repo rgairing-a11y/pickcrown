@@ -4,16 +4,10 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
 
-function getSupabase() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-  if (!url || !key) {
-    throw new Error('Supabase client missing env vars')
-  }
-
-  return createClient(url, key)
-}
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+)
 
 // Bye Team Setup Component
 function ByeTeamSetup({ eventId, rounds, matchups, teams, onUpdate }) {
@@ -39,7 +33,7 @@ function ByeTeamSetup({ eventId, rounds, matchups, teams, onUpdate }) {
 
     setSaving(true)
 
-    const updateData = selectedSlot === 'a' 
+    const updateData = selectedSlot === 'a'
       ? { team_a_id: selectedTeam }
       : { team_b_id: selectedTeam }
 
@@ -65,7 +59,7 @@ function ByeTeamSetup({ eventId, rounds, matchups, teams, onUpdate }) {
 
     setSaving(true)
 
-    const updateData = slot === 'a' 
+    const updateData = slot === 'a'
       ? { team_a_id: null }
       : { team_b_id: null }
 
@@ -121,7 +115,7 @@ function ByeTeamSetup({ eventId, rounds, matchups, teams, onUpdate }) {
     }}>
       <h3 style={{ margin: '0 0 8px', color: '#7c3aed' }}>🎫 Bye Team Setup</h3>
       <p style={{ margin: '0 0 16px', fontSize: 14, color: '#6b7280' }}>
-        For tournaments where top seeds skip early rounds (like CFB Playoff), 
+        For tournaments where top seeds skip early rounds (like CFB Playoff),
         set bye teams in later round matchups. Winners will fill the empty slot.
       </p>
 
@@ -167,10 +161,10 @@ function ByeTeamSetup({ eventId, rounds, matchups, teams, onUpdate }) {
       )}
 
       {/* Add Bye Form */}
-      <div style={{ 
-        display: 'flex', 
-        gap: 12, 
-        flexWrap: 'wrap', 
+      <div style={{
+        display: 'flex',
+        gap: 12,
+        flexWrap: 'wrap',
         alignItems: 'flex-end',
         padding: 16,
         background: 'white',
@@ -250,7 +244,7 @@ function ByeTeamSetup({ eventId, rounds, matchups, teams, onUpdate }) {
 
       {/* Help Text */}
       <p style={{ margin: '16px 0 0', fontSize: 12, color: '#7c3aed' }}>
-        💡 <strong>Tip:</strong> For CFB Playoff, set #1, #2, #3, #4 seeds as byes in Quarterfinals. 
+        💡 <strong>Tip:</strong> For CFB Playoff, set #1, #2, #3, #4 seeds as byes in Quarterfinals.
         When First Round winners advance, they'll fill the empty slot to face the bye team.
       </p>
     </div>
@@ -317,12 +311,12 @@ export default function BracketSetupPage({ params }) {
     // Calculate matchups needed per round
     // For a bracket, each round has half the matchups of the previous
     const roundMatchups = []
-    
+
     for (let i = 0; i < rounds.length; i++) {
       const round = rounds[i]
       // Count existing matchups in this round
       const existingInRound = matchups.filter(m => m.round_id === round.id).length
-      
+
       // First round: based on teams or existing matchups
       let neededMatchups
       if (i === 0) {
@@ -333,7 +327,7 @@ export default function BracketSetupPage({ params }) {
         const prevNeeded = roundMatchups[i - 1]
         neededMatchups = Math.ceil(prevNeeded / 2)
       }
-      
+
       roundMatchups.push(neededMatchups)
     }
 
@@ -342,16 +336,16 @@ export default function BracketSetupPage({ params }) {
       const round = rounds[i]
       const existingMatchups = matchups.filter(m => m.round_id === round.id)
       const existingPositions = new Set(existingMatchups.map(m => m.bracket_position).filter(Boolean))
-      
+
       const needed = roundMatchups[i]
-      
+
       for (let pos = 1; pos <= needed; pos++) {
         // Skip if this position already exists
         if (existingPositions.has(pos)) continue
-        
+
         // Check if there's a matchup without position we can update
         const unpositioned = existingMatchups.find(m => !m.bracket_position)
-        
+
         if (unpositioned) {
           // Update existing matchup with position
           await supabase
@@ -414,17 +408,17 @@ export default function BracketSetupPage({ params }) {
 
     // Get rounds after first
     const laterRounds = rounds.filter(r => r.round_order > 1)
-    
+
     for (const round of laterRounds) {
       const roundMatchups = matchups.filter(m => m.round_id === round.id)
-      
+
       for (const matchup of roundMatchups) {
         await supabase
           .from('matchups')
-          .update({ 
-            team_a_id: null, 
-            team_b_id: null, 
-            winner_team_id: null 
+          .update({
+            team_a_id: null,
+            team_b_id: null,
+            winner_team_id: null
           })
           .eq('id', matchup.id)
       }
@@ -464,11 +458,11 @@ export default function BracketSetupPage({ params }) {
     }
 
     // For rounds 2+, clear only the teams that came from advancement (not byes)
-    // We determine this by checking: if a team is in round 2+, and that team 
+    // We determine this by checking: if a team is in round 2+, and that team
     // also appears in an earlier round, it's from advancement (not a bye)
     const round1 = rounds.find(r => r.round_order === 1)
     const round1TeamIds = new Set()
-    
+
     if (round1) {
       const round1Matchups = matchups.filter(m => m.round_id === round1.id)
       round1Matchups.forEach(m => {
@@ -479,13 +473,13 @@ export default function BracketSetupPage({ params }) {
 
     // Clear advanced teams from later rounds (teams that were in round 1)
     const laterRounds = rounds.filter(r => r.round_order > 1)
-    
+
     for (const round of laterRounds) {
       const roundMatchups = matchups.filter(m => m.round_id === round.id)
-      
+
       for (const matchup of roundMatchups) {
         const updates = {}
-        
+
         // If team_a was in round 1, it's from advancement - clear it
         if (matchup.team_a_id && round1TeamIds.has(matchup.team_a_id)) {
           updates.team_a_id = null
@@ -494,7 +488,7 @@ export default function BracketSetupPage({ params }) {
         if (matchup.team_b_id && round1TeamIds.has(matchup.team_b_id)) {
           updates.team_b_id = null
         }
-        
+
         if (Object.keys(updates).length > 0) {
           await supabase
             .from('matchups')
@@ -576,7 +570,7 @@ export default function BracketSetupPage({ params }) {
         >
           {generating ? '...' : '1️⃣ Fix Bracket Positions'}
         </button>
-        
+
         <button
           onClick={generateBracketStructure}
           disabled={generating}
@@ -628,7 +622,7 @@ export default function BracketSetupPage({ params }) {
 
       {/* BYE TEAM SETUP */}
       {rounds.length > 1 && teams.length > 0 && (
-        <ByeTeamSetup 
+        <ByeTeamSetup
           eventId={eventId}
           rounds={rounds}
           matchups={matchups}
@@ -639,7 +633,7 @@ export default function BracketSetupPage({ params }) {
 
       {/* Current Bracket Structure */}
       <h2 style={{ fontSize: 18, marginBottom: 16 }}>Current Bracket Structure</h2>
-      
+
       {rounds.length === 0 ? (
         <div style={{ padding: 24, background: '#fee2e2', borderRadius: 8, color: '#dc2626' }}>
           <strong>No rounds created!</strong> Go to Rounds tab first.
@@ -656,10 +650,10 @@ export default function BracketSetupPage({ params }) {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                 <h3 style={{ margin: 0 }}>
                   {round.name}
-                  <span style={{ 
-                    marginLeft: 8, 
-                    fontSize: 12, 
-                    background: '#dbeafe', 
+                  <span style={{
+                    marginLeft: 8,
+                    fontSize: 12,
+                    background: '#dbeafe',
                     color: '#1d4ed8',
                     padding: '2px 8px',
                     borderRadius: 4
@@ -689,7 +683,7 @@ export default function BracketSetupPage({ params }) {
                     const isTeamA = (matchup.bracket_position || idx + 1) % 2 === 1
 
                     return (
-                      <div 
+                      <div
                         key={matchup.id}
                         style={{
                           padding: 12,
@@ -720,7 +714,7 @@ export default function BracketSetupPage({ params }) {
                             )}
                           </div>
                         </div>
-                        
+
                         {round.round_order < rounds.length && (
                           <div style={{ fontSize: 12, color: '#666', textAlign: 'right' }}>
                             Feeds to: Round {round.round_order + 1}, Pos {feedsTo}
