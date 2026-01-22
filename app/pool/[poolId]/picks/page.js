@@ -5,22 +5,12 @@ export const dynamic = 'force-dynamic'
 import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
 
-
-
-function getSupabase() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-  if (!url || !key) {
-    throw new Error('Supabase client missing env vars')
-  }
-
-  return createClient(url, key)
-}
-
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+)
 
 export default async function AllPicksPage({ params }) {
-  const supabase = getSupabase()
   const { poolId } = await params
 
   // Get pool with event details
@@ -90,7 +80,7 @@ export default async function AllPicksPage({ params }) {
   if (usesReseeding) {
     // NFL-style: Load advancement_picks
     const entryIds = entries.map(e => e.id)
-    
+
     const { data: advancementPicks } = await supabase
       .from('advancement_picks')
       .select('*')
@@ -117,7 +107,7 @@ export default async function AllPicksPage({ params }) {
     elimData?.forEach(e => {
       eliminations[e.team_id] = e.eliminated_in_round_id
     })
-    
+
     // Track winners (defeated_by_team_id) by round
     const winners = {}
     elimData?.forEach(e => {
@@ -143,7 +133,7 @@ export default async function AllPicksPage({ params }) {
 
     // Load bracket picks
     const entryIds = entries.map(e => e.id)
-    
+
     const { data: bracketPicks } = await supabase
       .from('bracket_picks')
       .select('*')
@@ -197,7 +187,7 @@ export default async function AllPicksPage({ params }) {
         <Link href={`/pool/${poolId}/standings`} style={{ color: '#3b82f6' }}>
           ← Back to Standings
         </Link>
-        
+
         <h1 style={{ marginTop: 16 }}>
           🏈 {pool.event.name} — {pool.name} — All Picks
         </h1>
@@ -221,7 +211,7 @@ export default async function AllPicksPage({ params }) {
         {/* Picks by Round */}
         {(rounds || []).map(round => {
           const roundOrder = round.round_order
-          
+
           return (
             <div key={round.id} style={{ marginBottom: 32 }}>
               <h2 style={{
@@ -251,8 +241,8 @@ export default async function AllPicksPage({ params }) {
                 }}>
                   <thead>
                     <tr style={{ borderBottom: '2px solid #e5e7eb' }}>
-                      <th style={{ 
-                        textAlign: 'left', 
+                      <th style={{
+                        textAlign: 'left',
                         padding: '12px 8px',
                         position: 'sticky',
                         left: 0,
@@ -269,7 +259,7 @@ export default async function AllPicksPage({ params }) {
                   <tbody>
                     {entries.map(entry => {
                       const entryPicks = picksData[entry.id]?.[round.id] || []
-                      
+
                       return (
                         <tr key={entry.id} style={{ borderBottom: '1px solid #e5e7eb' }}>
                           <td style={{
@@ -296,7 +286,7 @@ export default async function AllPicksPage({ params }) {
                                   const winners = eliminations._winners || {}
                                   const wonRoundIds = winners[teamId] || []
                                   let isCorrect = null
-                                  
+
                                   if (elimRoundId) {
                                     const elimRound = rounds?.find(r => r.id === elimRoundId)
                                     if (elimRound) {
@@ -309,7 +299,7 @@ export default async function AllPicksPage({ params }) {
                                       }
                                     }
                                   }
-                                  
+
                                   // Check if team WON a game in this round
                                   if (isCorrect === null && wonRoundIds.length > 0) {
                                     const wonThisRound = wonRoundIds.some(roundId => {
@@ -321,24 +311,24 @@ export default async function AllPicksPage({ params }) {
                                     }
                                   }
 
-                                  const bgColor = isCorrect === true 
-                                    ? '#dcfce7' 
-                                    : isCorrect === false 
-                                      ? '#fee2e2' 
+                                  const bgColor = isCorrect === true
+                                    ? '#dcfce7'
+                                    : isCorrect === false
+                                      ? '#fee2e2'
                                       : '#f3f4f6'
-                                  const textColor = isCorrect === true 
-                                    ? '#166534' 
-                                    : isCorrect === false 
-                                      ? '#991b1b' 
+                                  const textColor = isCorrect === true
+                                    ? '#166534'
+                                    : isCorrect === false
+                                      ? '#991b1b'
                                       : '#374151'
-                                  const borderColor = isCorrect === true 
-                                    ? '#16a34a' 
-                                    : isCorrect === false 
-                                      ? '#ef4444' 
+                                  const borderColor = isCorrect === true
+                                    ? '#16a34a'
+                                    : isCorrect === false
+                                      ? '#ef4444'
                                       : '#d1d5db'
 
                                   return (
-                                    <span 
+                                    <span
                                       key={teamId}
                                       style={{
                                         padding: '4px 10px',
@@ -398,7 +388,7 @@ export default async function AllPicksPage({ params }) {
       <Link href={`/pool/${poolId}/standings`} style={{ color: '#3b82f6' }}>
         ← Back to Standings
       </Link>
-      
+
       <h1 style={{ marginTop: 16 }}>
         📊 {pool.event.name} — {pool.name} — All Picks
       </h1>
@@ -432,8 +422,8 @@ export default async function AllPicksPage({ params }) {
               marginBottom: 12
             }}>
               {roundData.name}
-              <span style={{ 
-                fontWeight: 'normal', 
+              <span style={{
+                fontWeight: 'normal',
                 color: '#6b7280',
                 marginLeft: 12,
                 fontSize: 14
@@ -450,8 +440,8 @@ export default async function AllPicksPage({ params }) {
               }}>
                 <thead>
                   <tr style={{ borderBottom: '2px solid #e5e7eb' }}>
-                    <th style={{ 
-                      textAlign: 'left', 
+                    <th style={{
+                      textAlign: 'left',
                       padding: '12px 8px',
                       minWidth: 250,
                       color: '#6b7280',
@@ -462,10 +452,10 @@ export default async function AllPicksPage({ params }) {
                       MATCHUP
                     </th>
                     {entries.map(entry => (
-                      <th 
+                      <th
                         key={entry.id}
-                        style={{ 
-                          textAlign: 'center', 
+                        style={{
+                          textAlign: 'center',
                           padding: '12px 8px',
                           minWidth: 100,
                           color: '#6b7280',
@@ -499,10 +489,10 @@ export default async function AllPicksPage({ params }) {
                         {entries.map(entry => {
                           const pick = picksData[entry.id]?.[matchup.id]
                           const pickedTeam = pick ? teamMap[pick] : null
-                          
+
                           let bgColor = 'transparent'
                           let textColor = '#374151'
-                          
+
                           if (winner && pick) {
                             if (pick === winner) {
                               bgColor = '#dcfce7'
@@ -514,9 +504,9 @@ export default async function AllPicksPage({ params }) {
                           }
 
                           return (
-                            <td 
+                            <td
                               key={entry.id}
-                              style={{ 
+                              style={{
                                 padding: '12px 8px',
                                 textAlign: 'center',
                                 background: bgColor,
