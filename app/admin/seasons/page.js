@@ -4,19 +4,6 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { adminFetch } from '@/lib/adminFetch'
 
-
-
-function getSupabase() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-  if (!url || !key) {
-    throw new Error('Supabase client missing env vars')
-  }
-
-  return createClient(url, key)
-}
-
 export default function SeasonsAdminPage() {
   const [seasons, setSeasons] = useState([])
   const [loading, setLoading] = useState(true)
