@@ -1,16 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-function getSupabaseAdmin() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-  if (!url || !key) {
-    throw new Error('Supabase admin client missing env vars')
-  }
-
-  return createClient(url, key)
-}
+import { getSupabaseAdmin } from '@/lib/supabase-admin'
 
 export async function GET(request) {
   const supabase = getSupabaseAdmin()
@@ -57,7 +46,7 @@ export async function POST(request) {
     .order('bracket_position', { ascending: false })
     .limit(1)
 
-  const nextPosition = bracketPosition || 
+  const nextPosition = bracketPosition ||
     (existingMatchups?.[0]?.bracket_position ? existingMatchups[0].bracket_position + 1 : 1)
 
   const { data, error } = await supabase
@@ -161,7 +150,7 @@ async function advanceWinnerToNextRound(eventId, currentRoundOrder, bracketPosit
   // Positions 1,2 feed into next round position 1
   // Positions 3,4 feed into next round position 2, etc.
   const nextBracketPosition = Math.ceil(bracketPosition / 2)
-  
+
   // Default slot based on odd/even position
   const defaultIsTeamA = bracketPosition % 2 === 1
 
@@ -186,7 +175,7 @@ async function advanceWinnerToNextRound(eventId, currentRoundOrder, bracketPosit
   // If both empty, use the default formula
   // If both filled, log warning
   let updateData
-  
+
   if (nextMatchup.team_a_id && nextMatchup.team_b_id) {
     console.log(`[ADVANCE] WARNING: Both slots already filled in next matchup!`)
     console.log(`[ADVANCE] team_a: ${nextMatchup.team_a_id}, team_b: ${nextMatchup.team_b_id}`)
@@ -202,7 +191,7 @@ async function advanceWinnerToNextRound(eventId, currentRoundOrder, bracketPosit
   } else {
     // Both empty, use default formula
     console.log(`[ADVANCE] No bye detected, using default slot: ${defaultIsTeamA ? 'Team A' : 'Team B'}`)
-    updateData = defaultIsTeamA 
+    updateData = defaultIsTeamA
       ? { team_a_id: winnerTeamId }
       : { team_b_id: winnerTeamId }
   }
@@ -245,10 +234,10 @@ async function clearFromNextRound(eventId, currentRoundOrder, bracketPosition) {
 
   if (nextMatchup) {
     // Clear the appropriate team slot
-    const updateData = isTeamA 
+    const updateData = isTeamA
       ? { team_a_id: null }
       : { team_b_id: null }
-    
+
     // Also clear the winner if it was this team
     await supabase
       .from('matchups')

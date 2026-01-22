@@ -1,17 +1,6 @@
 import { NextResponse } from 'next/server'
 import sgMail from '@sendgrid/mail'
-import { createClient } from '@supabase/supabase-js'
-
-function getSupabaseAdmin() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-  if (!url || !key) {
-    throw new Error('Supabase admin client missing env vars')
-  }
-
-  return createClient(url, key)
-}
+import { getSupabaseAdmin } from '@/lib/supabase-admin'
 
 sgMail.setApiKey(process.env.SENDGRID_API_KEY)
 
@@ -82,11 +71,11 @@ export async function POST(request) {
               <h1 style="color: #1a1a1a; font-size: 24px; margin-bottom: 20px;">
                 👑 Quick Reminder
               </h1>
-              
+
               <p style="font-size: 16px; color: #333; line-height: 1.6;">
                 Hey! Just a friendly nudge – your picks for <strong>${pool.name}</strong> are due soon.
               </p>
-              
+
               <div style="background: #f8f9fa; border-radius: 8px; padding: 16px; margin: 24px 0; border-left: 4px solid #3b82f6;">
                 <p style="margin: 0 0 8px; font-size: 15px; color: #333;">
                   <strong>${pool.event.name}</strong>
@@ -95,21 +84,21 @@ export async function POST(request) {
                   ⏰ Picks lock: <strong>${deadline}</strong>
                 </p>
               </div>
-              
+
               <p style="font-size: 15px; color: #333; line-height: 1.6; margin-bottom: 24px;">
                 <strong>What happens next:</strong> Once picks lock, you'll be able to see everyone's picks and track the standings as results come in. No pressure – just fun!
               </p>
-              
+
               <a href="${poolUrl}" style="display: inline-block; background: #3b82f6; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px;">
                 Submit Your Picks →
               </a>
-              
+
               <p style="font-size: 14px; color: #666; margin-top: 32px;">
                 Good luck! 🍀
               </p>
-              
+
               <hr style="border: none; border-top: 1px solid #eee; margin: 32px 0;">
-              
+
               <p style="font-size: 12px; color: #999;">
                 You're receiving this because you joined a PickCrown pool. No action needed if you've already submitted.
               </p>

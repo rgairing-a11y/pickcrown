@@ -1,17 +1,6 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import sgMail from '@sendgrid/mail'
-
-function getSupabaseAdmin() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-  if (!url || !key) {
-    throw new Error('Supabase admin client missing env vars')
-  }
-
-  return createClient(url, key)
-}
 
 sgMail.setApiKey(process.env.SENDGRID_API_KEY)
 
@@ -39,7 +28,7 @@ async function getEventPodium(eventId) {
 
   // Get standings from all pools and combine
   const allEntries = []
-  
+
   for (const pool of pools) {
     const standings = await getPoolStandings(pool.id)
     allEntries.push(...standings)
@@ -95,8 +84,8 @@ export async function POST(request) {
 
     // Check if event is completed
     if (event.status !== 'completed') {
-      return NextResponse.json({ 
-        error: 'Event must be marked as completed before sending results emails' 
+      return NextResponse.json({
+        error: 'Event must be marked as completed before sending results emails'
       }, { status: 400 })
     }
 
@@ -135,7 +124,7 @@ export async function POST(request) {
     for (const pool of pools) {
       // Get standings for this pool
       const standings = await getPoolStandings(pool.id)
-      
+
       // Find pool champion
       const champion = standings.find(s => s.rank === 1)
 
@@ -166,7 +155,7 @@ export async function POST(request) {
         try {
           // Build the email
           const standingsUrl = `${baseUrl}/pool/${pool.id}/standings`
-          
+
           // Build podium HTML
           let podiumHtml = ''
           if (eventPodium.length > 0) {
@@ -208,11 +197,11 @@ export async function POST(request) {
               <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
                 <h1 style="color: #7c3aed; margin-bottom: 8px;">📊 ${event.name} Results</h1>
                 <p style="color: #666; margin-top: 0;">Pool: ${pool.name}</p>
-                
+
                 <div style="background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); padding: 24px; border-radius: 12px; margin: 24px 0; text-align: center;">
                   ${resultMessage}
                 </div>
-                
+
                 <div style="background: #f9fafb; padding: 20px; border-radius: 8px; margin: 24px 0;">
                   <h3 style="margin: 0 0 16px;">Your Stats</h3>
                   <table style="width: 100%;">
@@ -232,17 +221,17 @@ export async function POST(request) {
                     ` : ''}
                   </table>
                 </div>
-                
+
                 <div style="text-align: center; margin: 32px 0;">
                   <a href="${standingsUrl}" style="display: inline-block; padding: 16px 32px; background: #7c3aed; color: white; text-decoration: none; border-radius: 8px; font-weight: bold;">
                     View Full Standings
                   </a>
                 </div>
-                
+
                 ${podiumHtml}
-                
+
                 <hr style="border: none; border-top: 1px solid #eee; margin: 32px 0;" />
-                
+
                 <p style="color: #999; font-size: 12px; text-align: center;">
                   PickCrown — Bragging rights only 😄<br>
                   Thanks for playing! Until next time. 🙌
@@ -267,9 +256,9 @@ export async function POST(request) {
       }
     }
 
-    return NextResponse.json({ 
-      success: true, 
-      sent, 
+    return NextResponse.json({
+      success: true,
+      sent,
       deduplicated,
       errors: errors.length > 0 ? errors : undefined,
       podiumEntries: eventPodium.length

@@ -1,17 +1,6 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import sgMail from '@sendgrid/mail'
-
-function getSupabaseAdmin() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-  if (!url || !key) {
-    throw new Error('Supabase admin client missing env vars')
-  }
-
-  return createClient(url, key)
-}
 
 sgMail.setApiKey(process.env.SENDGRID_API_KEY)
 
@@ -66,33 +55,33 @@ export async function POST(request) {
           html: `
             <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
               <h1 style="color: #7c3aed; margin-bottom: 16px;">👑 You're Invited!</h1>
-              
+
               <p style="font-size: 16px; line-height: 1.6; color: #333;">
                 You've been invited to join <strong>${pool.name}</strong> for ${pool.event.name}.
               </p>
-              
+
               <div style="background: #f8f9fa; border-radius: 8px; padding: 16px; margin: 24px 0; border-left: 4px solid #7c3aed;">
                 <p style="margin: 0; font-size: 14px; color: #666;">
                   ⏰ Picks lock: <strong>${deadline}</strong>
                 </p>
               </div>
-              
+
               <p style="font-size: 15px; color: #333; margin-bottom: 24px;">
                 <strong>What to do:</strong> Click the button below, enter your email, and make your picks before the deadline. It only takes a few minutes!
               </p>
-              
+
               <div style="margin: 32px 0;">
                 <a href="${poolUrl}" style="display: inline-block; padding: 16px 32px; background: #7c3aed; color: white; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 15px;">
                   Make Your Picks →
                 </a>
               </div>
-              
+
               <p style="color: #666; font-size: 14px; margin-top: 32px;">
                 Good luck! 🍀
               </p>
-              
+
               <hr style="border: none; border-top: 1px solid #eee; margin: 32px 0;" />
-              
+
               <p style="color: #999; font-size: 12px;">
                 PickCrown — Bragging rights only 😄
               </p>
@@ -114,9 +103,9 @@ export async function POST(request) {
       }
     }
 
-    return NextResponse.json({ 
-      success: true, 
-      sent, 
+    return NextResponse.json({
+      success: true,
+      sent,
       errors: errors.length > 0 ? errors : undefined
     })
 

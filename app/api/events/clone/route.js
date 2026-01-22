@@ -1,16 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-function getSupabaseAdmin() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-  if (!url || !key) {
-    throw new Error('Supabase admin client missing env vars')
-  }
-
-  return createClient(url, key)
-}
+import { getSupabaseAdmin } from '@/lib/supabase-admin'
 
 export async function POST(request) {
   const supabase = getSupabaseAdmin()
@@ -119,7 +108,7 @@ export async function POST(request) {
           })
           .select()
           .single()
-        
+
         if (newRound) {
           roundIdMap[round.id] = newRound.id
           clonedCounts.rounds++
@@ -148,7 +137,7 @@ export async function POST(request) {
           })
           .select()
           .single()
-        
+
         if (newTeam) {
           teamIdMap[team.id] = newTeam.id
           clonedCounts.teams++
@@ -178,8 +167,8 @@ export async function POST(request) {
       }
     }
 
-    return NextResponse.json({ 
-      success: true, 
+    return NextResponse.json({
+      success: true,
       event: newEvent,
       cloned: clonedCounts
     })

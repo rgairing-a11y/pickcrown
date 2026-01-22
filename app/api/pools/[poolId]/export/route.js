@@ -1,18 +1,5 @@
-import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
-
-function getSupabaseAdmin() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key =
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-  if (!url || !key) {
-    throw new Error('Supabase admin client missing env vars')
-  }
-
-  return createClient(url, key)
-}
+import { getSupabaseAdmin } from '@/lib/supabase-admin'
 
 export async function GET(request, { params }) {
   const supabase = getSupabaseAdmin()
@@ -57,7 +44,7 @@ export async function GET(request, { params }) {
 
     // Return as downloadable CSV
     const filename = `${pool.name.replace(/[^a-z0-9]/gi, '_')}_standings.csv`
-    
+
     return new NextResponse(csv, {
       headers: {
         'Content-Type': 'text/csv',
