@@ -4,16 +4,10 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
 
-function getSupabase() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-  if (!url || !key) {
-    throw new Error('Supabase client missing env vars')
-  }
-
-  return createClient(url, key)
-}
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+)
 
 export default function ImportBracketPage({ params }) {
   const [eventId, setEventId] = useState(null)
@@ -40,7 +34,7 @@ export default function ImportBracketPage({ params }) {
       .select('*')
       .eq('id', eventId)
       .single()
-    
+
     setEvent(data)
     setLoading(false)
   }
@@ -60,19 +54,19 @@ export default function ImportBracketPage({ params }) {
   function parseCSV(text) {
     const lines = text.trim().split('\n')
     const teams = []
-    
+
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim()
       if (!line || line.startsWith('#')) continue
-      
+
       // Parse: Seed, Team Name, Region (optional)
       const parts = line.split(',').map(p => p.trim())
-      
+
       if (parts.length >= 2) {
         const seed = parseInt(parts[0]) || null
         const name = parts[1]
         const region = parts[2] || null
-        
+
         if (name) {
           teams.push({ seed, name, region, line: i + 1 })
         }
@@ -168,10 +162,10 @@ export default function ImportBracketPage({ params }) {
         <p style={{ fontSize: 14, color: '#0c4a6e', margin: '0 0 8px' }}>
           One team per line: <code>Seed, Team Name, Region (optional)</code>
         </p>
-        <pre style={{ 
-          background: '#e0f2fe', 
-          padding: 12, 
-          borderRadius: 6, 
+        <pre style={{
+          background: '#e0f2fe',
+          padding: 12,
+          borderRadius: 6,
           fontSize: 13,
           overflow: 'auto',
           margin: 0
@@ -292,7 +286,7 @@ export default function ImportBracketPage({ params }) {
           marginTop: 16
         }}>
           <strong style={{ color: '#166534' }}>✅ Imported {result.imported} teams!</strong>
-          
+
           {result.errors.length > 0 && (
             <div style={{ marginTop: 12, color: '#b91c1c' }}>
               <strong>Errors:</strong>
