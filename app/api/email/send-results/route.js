@@ -1,23 +1,12 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server'
 import sgMail from '@sendgrid/mail'
-
-function getSupabaseAdmin() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-  if (!url || !key) {
-    throw new Error('Supabase admin client missing env vars')
-  }
-
-  return createClient(url, key)
-}
 
 sgMail.setApiKey(process.env.SENDGRID_API_KEY)
 
 // Calculate standings for a pool
 async function getPoolStandings(poolId) {
-  const supabase = getSupabaseAdmin()
+  const supabase = createClient()
   const { data, error } = await supabase.rpc('calculate_standings', { p_pool_id: poolId })
   if (error) {
     console.error('Error calculating standings:', error)
@@ -28,7 +17,7 @@ async function getPoolStandings(poolId) {
 
 // Calculate overall event podium (Top 3 across ALL pools)
 async function getEventPodium(eventId) {
-  const supabase = getSupabaseAdmin()
+  const supabase = createClient()
   // Get all pools for this event
   const { data: pools } = await supabase
     .from('pools')
@@ -62,7 +51,7 @@ async function getEventPodium(eventId) {
 }
 
 export async function POST(request) {
-  const supabase = getSupabaseAdmin()
+  const supabase = createClient()
   try {
     const { eventId, poolId } = await request.json()
 

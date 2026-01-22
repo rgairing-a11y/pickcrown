@@ -1,20 +1,9 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-function getSupabaseAdmin() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-  if (!url || !key) {
-    throw new Error('Supabase admin client missing env vars')
-  }
-
-  return createClient(url, key)
-}
+import { createClient } from '@/lib/supabase/server'
 
 // GET - Fetch all eliminations for an event
 export async function GET(request, { params }) {
-  const supabaseAdmin = getSupabaseAdmin()
+  const supabaseAdmin = createClient()
   try {
     const { eventId } = await params
 
@@ -33,7 +22,7 @@ export async function GET(request, { params }) {
 
 // POST - Set elimination for a team
 export async function POST(request, { params }) {
-  const supabaseAdmin = getSupabaseAdmin()
+  const supabaseAdmin = createClient()
   try {
     const { eventId } = await params
     const { team_id, eliminated_in_round_id } = await request.json()
@@ -78,7 +67,7 @@ export async function POST(request, { params }) {
 
 // DELETE - Clear all eliminations for an event (reset)
 export async function DELETE(request, { params }) {
-  const supabaseAdmin = getSupabaseAdmin()
+  const supabaseAdmin = createClient()
   try {
     const { eventId } = await params
 

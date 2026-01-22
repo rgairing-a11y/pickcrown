@@ -1,12 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { createClient } from '@supabase/supabase-js'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-)
+import { supabase } from '@/lib/supabase'
 
 export default function PickSubmissionForm({ pool }) {
   const [entryName, setEntryName] = useState('')
@@ -17,7 +12,7 @@ export default function PickSubmissionForm({ pool }) {
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState('')
-  
+
   // Edit mode state
   const [existingEntry, setExistingEntry] = useState(null)
   const [isEditMode, setIsEditMode] = useState(false)
@@ -36,7 +31,7 @@ export default function PickSubmissionForm({ pool }) {
       const savedEmail = localStorage.getItem('pickcrown_email')
       if (savedEmail) {
         setEmail(savedEmail)
-        
+
         // Check if this email has an entry in this pool
         const { data: entry } = await supabase
           .from('pool_entries')
@@ -373,10 +368,10 @@ export default function PickSubmissionForm({ pool }) {
           cursor: isComplete ? 'pointer' : 'not-allowed'
         }}
       >
-        {submitting 
-          ? 'Saving...' 
-          : isEditMode 
-            ? '✏️ Update Picks' 
+        {submitting
+          ? 'Saving...'
+          : isEditMode
+            ? '✏️ Update Picks'
             : 'Submit All Picks'
         }
       </button>

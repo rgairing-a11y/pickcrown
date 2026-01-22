@@ -1,21 +1,8 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-function getSupabaseAdmin() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key =
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-  if (!url || !key) {
-    throw new Error('Supabase admin client missing env vars')
-  }
-
-  return createClient(url, key)
-}
+import { createClient } from '@/lib/supabase/server'
 
 export async function GET(request) {
-  const supabase = getSupabaseAdmin()
+  const supabase = createClient()
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
@@ -44,7 +31,7 @@ export async function GET(request) {
 }
 
 export async function POST(request) {
-  const supabase = getSupabaseAdmin()
+  const supabase = createClient()
   try {
     const body = await request.json()
     const { name, description, year } = body
@@ -71,7 +58,7 @@ export async function POST(request) {
 }
 
 export async function DELETE(request) {
-  const supabase = getSupabaseAdmin()
+  const supabase = createClient()
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')

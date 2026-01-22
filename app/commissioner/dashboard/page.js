@@ -1,20 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { createClient } from '@supabase/supabase-js'
+import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
 import UserAvatar from '../../../components/UserAvatar'
-
-function getSupabase() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-  if (!url || !key) {
-    throw new Error('Supabase client missing env vars')
-  }
-
-  return createClient(url, key)
-}
 
 export default function CommissionerDashboardPage() {
   const [loading, setLoading] = useState(true)

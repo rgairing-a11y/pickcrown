@@ -1,19 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { createClient } from '@supabase/supabase-js'
+import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
-
-function getSupabase() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-  if (!url || !key) {
-    throw new Error('Supabase client missing env vars')
-  }
-
-  return createClient(url, key)
-}
 
 // SORTING RULE: Locked beats open. Seasons beat events. Now beats later.
 
@@ -51,7 +40,6 @@ export default function HomePage() {
 
   async function loadUserData(userEmail) {
     if (!userEmail) return
-    const supabase = getSupabase()
     setLoading(true)
     setHasSearched(true)
 

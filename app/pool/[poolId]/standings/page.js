@@ -3,7 +3,7 @@
 // Adding new event types does NOT require modifying this file
 
 export const dynamic = 'force-dynamic'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { getEventTypeConfig, getScoringFunction, hasFeature } from '../../../../lib/eventTypes'
 
@@ -11,20 +11,8 @@ import { getEventTypeConfig, getScoringFunction, hasFeature } from '../../../../
 import ScenarioSimulator from '../../../../components/ScenarioSimulator'
 import MyPicksButton from '../../../../components/MyPicksButton'
 
-function getSupabase() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-  if (!url || !key) {
-    throw new Error('Supabase client missing env vars')
-  }
-
-  return createClient(url, key)
-}
-
-
 export default async function StandingsPage({ params }) {
-  const supabase = getSupabase()
+  const supabase = createClient()
   const { poolId } = await params
 
   // =====================================================

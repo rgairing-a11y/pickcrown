@@ -1,16 +1,13 @@
 // app/api/entries/[entryId]/edit/route.js
 // API route for editing entries with deadline enforcement
 
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server';
 import { validateEditRequest, getEditStatus } from '@/lib/entry-editing';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
-
 export async function PUT(request, { params }) {
+  const supabase = createClient()
+
   try {
     const { entryId } = params;
     const body = await request.json();
@@ -54,7 +51,7 @@ export async function PUT(request, { params }) {
 
     if (entryError || !entry) {
       return NextResponse.json(
-        { 
+        {
           error: 'Entry not found',
           suggestion: 'Check that you have the correct entry ID',
         },
@@ -65,7 +62,7 @@ export async function PUT(request, { params }) {
     // Verify email matches (basic auth)
     if (email && entry.email.toLowerCase() !== email.toLowerCase()) {
       return NextResponse.json(
-        { 
+        {
           error: 'Email does not match entry',
           suggestion: 'Make sure you are editing your own entry',
         },
@@ -91,7 +88,7 @@ export async function PUT(request, { params }) {
 
     if (!editStatus.canEdit) {
       return NextResponse.json(
-        { 
+        {
           error: editStatus.message,
           reason: editStatus.reason,
           lockTime: editStatus.lockTime,
@@ -120,7 +117,7 @@ export async function PUT(request, { params }) {
     if (updateError) {
       console.error('Update error:', updateError);
       return NextResponse.json(
-        { 
+        {
           error: 'Failed to save changes',
           suggestion: 'Please try again in a moment',
         },
@@ -147,7 +144,7 @@ export async function PUT(request, { params }) {
   } catch (error) {
     console.error('Edit entry error:', error);
     return NextResponse.json(
-      { 
+      {
         error: 'An unexpected error occurred',
         suggestion: 'Please try again or contact support if the problem persists',
       },
@@ -160,6 +157,8 @@ export async function PUT(request, { params }) {
  * GET - Check edit status without making changes
  */
 export async function GET(request, { params }) {
+  const supabase = createClient()
+
   try {
     const { entryId } = params;
 
@@ -227,7 +226,7 @@ function calculateChanges(oldPicks, newPicks) {
   // Compare category picks
   const oldCats = oldPicks.categories || {};
   const newCats = newPicks.categories || {};
-  
+
   const allCatIds = new Set([...Object.keys(oldCats), ...Object.keys(newCats)]);
   for (const catId of allCatIds) {
     if (oldCats[catId] !== newCats[catId]) {
@@ -245,7 +244,7 @@ function calculateChanges(oldPicks, newPicks) {
   // Compare bracket picks
   const oldBracket = oldPicks.bracket || {};
   const newBracket = newPicks.bracket || {};
-  
+
   const allMatchIds = new Set([...Object.keys(oldBracket), ...Object.keys(newBracket)]);
   for (const matchId of allMatchIds) {
     if (oldBracket[matchId] !== newBracket[matchId]) {
