@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import { logAudit } from '@/lib/audit'
+import { assertEventAllowsResultsWrite } from '@/lib/assertEventAllowsResults'
 
 export async function POST(
   request: Request,
@@ -25,7 +26,7 @@ export async function POST(
   // 1️⃣ Load category
   const { data: category } = await supabase
     .from('categories')
-    .select('*')
+    .select('*, event:events(id, status)')
     .eq('id', categoryId)
     .single()
 
@@ -44,6 +45,29 @@ export async function POST(
     return NextResponse.json(
       { success: false, error: 'Category not found', code: 'NOT_FOUND' },
       { status: 404 }
+    )
+  }
+
+  // 1a️⃣ Guard: event must allow result writes
+  try {
+    assertEventAllowsResultsWrite(category.event)
+  } catch (err: any) {
+    await logAudit({
+      action: 'set_category_winner',
+      target_type: 'category',
+      target_id: categoryId,
+      metadata: {
+        success: false,
+        error_message: err.message,
+        event_status: category.event?.status,
+        guardrail_type: 'event_status_check',
+        force
+      }
+    })
+
+    return NextResponse.json(
+      { success: false, error: err.message, code: 'FORBIDDEN' },
+      { status: err.status || 403 }
     )
   }
 

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import { logAudit } from '@/lib/audit'
+import { assertEventAllowsResultsWrite } from '@/lib/assertEventAllowsResults'
 
 export async function POST(
   request: Request,
@@ -24,7 +25,7 @@ export async function POST(
   // 1️⃣ Load matchup
   const { data: matchup } = await supabase
     .from('matchups')
-    .select('*')
+    .select('*, event:events(id, status)')
     .eq('id', matchupId)
     .single()
 
@@ -43,6 +44,29 @@ export async function POST(
     return NextResponse.json(
       { success: false, error: 'Matchup not found', code: 'NOT_FOUND' },
       { status: 404 }
+    )
+  }
+
+  // 1a️⃣ Guard: event must allow result writes
+  try {
+    assertEventAllowsResultsWrite(matchup.event)
+  } catch (err: any) {
+    await logAudit({
+      action: 'set_matchup_winner',
+      target_type: 'matchup',
+      target_id: matchupId,
+      metadata: {
+        success: false,
+        error_message: err.message,
+        event_status: matchup.event?.status,
+        guardrail_type: 'event_status_check',
+        force
+      }
+    })
+
+    return NextResponse.json(
+      { success: false, error: err.message, code: 'FORBIDDEN' },
+      { status: err.status || 403 }
     )
   }
 

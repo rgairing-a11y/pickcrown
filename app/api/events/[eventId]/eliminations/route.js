@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { assertEventAllowsResultsWrite, assertEventAllowsResultsRead } from '@/lib/assertEventAllowsResults'
 
 function getSupabaseAdmin() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -17,6 +18,24 @@ export async function GET(request, { params }) {
   const supabaseAdmin = getSupabaseAdmin()
   try {
     const { eventId } = await params
+
+    // Load event to check status
+    const { data: event, error: eventError } = await supabaseAdmin
+      .from('events')
+      .select('id, status')
+      .eq('id', eventId)
+      .single()
+
+    if (eventError || !event) {
+      return NextResponse.json({ error: 'Event not found' }, { status: 404 })
+    }
+
+    // Guard: event must allow reading results
+    try {
+      assertEventAllowsResultsRead(event)
+    } catch (err) {
+      return NextResponse.json({ error: err.message }, { status: err.status || 403 })
+    }
 
     const { data, error } = await supabaseAdmin
       .from('team_eliminations')
@@ -40,6 +59,24 @@ export async function POST(request, { params }) {
 
     if (!team_id) {
       return NextResponse.json({ error: 'team_id is required' }, { status: 400 })
+    }
+
+    // Load event to check status
+    const { data: event, error: eventError } = await supabaseAdmin
+      .from('events')
+      .select('id, status')
+      .eq('id', eventId)
+      .single()
+
+    if (eventError || !event) {
+      return NextResponse.json({ error: 'Event not found' }, { status: 404 })
+    }
+
+    // Guard: event must allow writing results
+    try {
+      assertEventAllowsResultsWrite(event)
+    } catch (err) {
+      return NextResponse.json({ error: err.message }, { status: err.status || 403 })
     }
 
     if (eliminated_in_round_id) {
@@ -81,6 +118,24 @@ export async function DELETE(request, { params }) {
   const supabaseAdmin = getSupabaseAdmin()
   try {
     const { eventId } = await params
+
+    // Load event to check status
+    const { data: event, error: eventError } = await supabaseAdmin
+      .from('events')
+      .select('id, status')
+      .eq('id', eventId)
+      .single()
+
+    if (eventError || !event) {
+      return NextResponse.json({ error: 'Event not found' }, { status: 404 })
+    }
+
+    // Guard: event must allow writing results
+    try {
+      assertEventAllowsResultsWrite(event)
+    } catch (err) {
+      return NextResponse.json({ error: err.message }, { status: err.status || 403 })
+    }
 
     const { error } = await supabaseAdmin
       .from('team_eliminations')

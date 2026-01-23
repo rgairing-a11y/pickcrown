@@ -1,16 +1,41 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { assertEventAllowsResultsWrite } from '@/lib/assertEventAllowsResults'
 
 export async function POST(request) {
   try {
     const supabase = createClient()
     const { eventId, results } = await request.json()
-    
+
     const actorEmail = request.headers.get('x-user-email') || 'system'
-    
+
+    // Load event to check status
+    const { data: event, error: eventError } = await supabase
+      .from('events')
+      .select('id, status')
+      .eq('id', eventId)
+      .single()
+
+    if (eventError || !event) {
+      return NextResponse.json(
+        { error: 'Event not found' },
+        { status: 404 }
+      )
+    }
+
+    // Guard: event must allow result writes
+    try {
+      assertEventAllowsResultsWrite(event)
+    } catch (err) {
+      return NextResponse.json(
+        { error: err.message },
+        { status: err.status || 403 }
+      )
+    }
+
     const errors = []
     const updated = []
-    
+
     for (const result of results) {
       if (result.matchupId) {
         // Update bracket matchup
@@ -18,7 +43,7 @@ export async function POST(request) {
           .from('matchups')
           .update({ winner_id: result.winnerId })
           .eq('id', result.matchupId)
-        
+
         if (error) {
           errors.push(`Matchup ${result.matchupId}: ${error.message}`)
         } else {
@@ -30,7 +55,7 @@ export async function POST(request) {
           .from('categories')
           .update({ correct_option_id: result.winnerId })
           .eq('id', result.categoryId)
-        
+
         if (error) {
           errors.push(`Category ${result.categoryId}: ${error.message}`)
         } else {
@@ -38,7 +63,7 @@ export async function POST(request) {
         }
       }
     }
-    
+
     // Log the bulk update
     await supabase.rpc('log_audit_event', {
       p_action: 'bulk_results_entry',
@@ -52,7 +77,7 @@ export async function POST(request) {
         errors: errors.length > 0 ? errors : undefined
       }
     })
-    
+
     return NextResponse.json({
       success: errors.length === 0,
       updated: updated.length,
