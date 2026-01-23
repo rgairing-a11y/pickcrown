@@ -1,18 +1,20 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { use, useState, useEffect } from 'react'
 import { supabase } from '../../../../../lib/supabase'
 import { Card, PageHeader, Button, EmptyState, LoadingState, Alert } from '../../../../../components/ui'
 import { sortByOrderIndex } from '../../../../../lib/utils'
 import SendResultsSection from '../../../../../components/SendResultsSection'
 
-export default async function AdminResultsPage({ params }) {
+export default function AdminResultsPage({ params }) {
+  const paramsResolved = use(params)
+
   const [eventId, setEventId] = useState(null)
   const [event, setEvent] = useState(null)
   const [pools, setPools] = useState([])
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(true)
-  
+
   // Category mode state
   const [pendingResults, setPendingResults] = useState({})
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
@@ -35,10 +37,10 @@ export default async function AdminResultsPage({ params }) {
 
 
 useEffect(() => {
-  if (params?.eventId) {
-    setEventId(params.eventId)
+  if (paramsResolved?.eventId) {
+    setEventId(paramsResolved.eventId)
   }
-}, [params])
+}, [paramsResolved])
 
 useEffect(() => {
   if (eventId) {
@@ -48,7 +50,7 @@ useEffect(() => {
 
 
 
-console.log('params:', params)
+console.log('params:', paramsResolved)
 console.log('eventId:', eventId)
 
 
@@ -69,7 +71,7 @@ console.log('eventId:', eventId)
 
     if (data) {
       setEvent(data)
-      
+
       // If category-based event, load pending results
       if (!data.uses_reseeding) {
         const initial = {}
@@ -81,7 +83,7 @@ console.log('eventId:', eventId)
         })
         setPendingResults(initial)
       }
-      
+
       // If NFL-style event, load teams, rounds, eliminations
       if (data.uses_reseeding) {
         await loadNFLData(eventId)
@@ -93,7 +95,7 @@ console.log('eventId:', eventId)
       .from('pools')
       .select('id, name')
       .eq('event_id', eventId)
-    
+
     setPools(poolsData || [])
 
     setLoading(false)
@@ -116,7 +118,7 @@ console.log('eventId:', eventId)
       .eq('event_id', eventId)
       .order('round_order')
     setRounds(roundsData || [])
-    
+
     // Default to first round
     if (roundsData?.length > 0 && !selectedRound) {
       setSelectedRound(roundsData[0].id)
@@ -247,15 +249,15 @@ console.log('eventId:', eventId)
   async function handleMarkComplete() {
     const confirmed = window.confirm('Mark this event as completed? This will finalize all standings.')
     if (!confirmed) return
-    
+
     setSaving(true)
-    
+
     const res = await fetch(`/api/events/${eventId}/complete`, {
       method: 'POST',
-      headers: { 
+      headers: {
         'Content-Type': 'application/json',
-        'x-user-email': typeof window !== 'undefined' 
-          ? localStorage.getItem('pickcrown_email') || 'admin' 
+        'x-user-email': typeof window !== 'undefined'
+          ? localStorage.getItem('pickcrown_email') || 'admin'
           : 'admin'
       }
     })
@@ -266,7 +268,7 @@ console.log('eventId:', eventId)
     } else {
       alert('Event marked as complete!')
     }
-    
+
     await loadEvent()
     setSaving(false)
   }
@@ -336,15 +338,15 @@ console.log('eventId:', eventId)
 
     return (
       <div style={{ maxWidth: 700 }}>
-        <PageHeader 
-          title="🏈 Enter NFL Results" 
+        <PageHeader
+          title="🏈 Enter NFL Results"
           subtitle={event.name}
         />
 
         {/* Quick Stats */}
-        <div style={{ 
-          display: 'flex', 
-          gap: 16, 
+        <div style={{
+          display: 'flex',
+          gap: 16,
           marginBottom: 24,
           flexWrap: 'wrap'
         }}>
@@ -365,7 +367,7 @@ console.log('eventId:', eventId)
         {/* Record Game Result */}
         <Card style={{ marginBottom: 24 }}>
           <h3 style={{ margin: '0 0 16px' }}>Record Game Result</h3>
-          
+
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16 }}>
             {/* Round Select */}
             <div>
@@ -467,13 +469,13 @@ console.log('eventId:', eventId)
         {/* Results History */}
         <Card style={{ marginBottom: 24 }}>
           <h3 style={{ margin: '0 0 16px' }}>Results History</h3>
-          
+
           {eliminations.length === 0 ? (
             <p style={{ color: '#6b7280' }}>No results recorded yet.</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {eliminations.map(elim => (
-                <div 
+                <div
                   key={elim.id}
                   style={{
                     padding: 12,
@@ -521,7 +523,7 @@ console.log('eventId:', eventId)
         {/* Team Status */}
         <Card style={{ marginBottom: 24 }}>
           <h3 style={{ margin: '0 0 16px' }}>Team Status</h3>
-          
+
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
             {/* AFC */}
             <div>
@@ -529,7 +531,7 @@ console.log('eventId:', eventId)
               {teams.filter(t => t.conference === 'AFC').map(team => {
                 const elim = eliminations.find(e => e.team_id === team.id)
                 return (
-                  <div 
+                  <div
                     key={team.id}
                     style={{
                       padding: '6px 10px',
@@ -555,7 +557,7 @@ console.log('eventId:', eventId)
               {teams.filter(t => t.conference === 'NFC').map(team => {
                 const elim = eliminations.find(e => e.team_id === team.id)
                 return (
-                  <div 
+                  <div
                     key={team.id}
                     style={{
                       padding: '6px 10px',
@@ -578,7 +580,7 @@ console.log('eventId:', eventId)
         </Card>
 
         {/* Mark Complete */}
-        <Card style={{ 
+        <Card style={{
           textAlign: 'center',
           background: event.status === 'completed' ? '#dcfce7' : 'white'
         }}>
@@ -599,8 +601,8 @@ console.log('eventId:', eventId)
         </Card>
 
         {/* Send Results */}
-        <SendResultsSection 
-          eventId={eventId} 
+        <SendResultsSection
+          eventId={eventId}
           eventName={event?.name}
           isCompleted={event?.status === 'completed'}
           pools={pools}
@@ -670,7 +672,7 @@ console.log('eventId:', eventId)
           const selectedOptionId = pendingResults[category.id]
           const savedCorrect = category.options?.find(o => o.is_correct)
           const isChanged = selectedOptionId && savedCorrect?.id !== selectedOptionId
-          
+
           return (
             <Card key={category.id} style={{ marginBottom: 'var(--spacing-lg)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--spacing-md)' }}>
@@ -678,9 +680,9 @@ console.log('eventId:', eventId)
                   {idx + 1}. {category.name}
                 </h3>
                 {selectedOptionId && (
-                  <span style={{ 
-                    fontSize: '12px', 
-                    padding: '2px 8px', 
+                  <span style={{
+                    fontSize: '12px',
+                    padding: '2px 8px',
                     borderRadius: 4,
                     background: isChanged ? '#fef3c7' : '#dcfce7',
                     color: isChanged ? '#92400e' : '#166534'
@@ -689,7 +691,7 @@ console.log('eventId:', eventId)
                   </span>
                 )}
               </div>
-              
+
               <select
                 value={selectedOptionId || ''}
                 onChange={(e) => handleSelectResult(category.id, e.target.value)}
@@ -734,7 +736,7 @@ console.log('eventId:', eventId)
                       disabled={!canEditResults}
                       style={{ marginRight: 8, cursor: canEditResults ? 'pointer' : 'not-allowed' }}
                     />
-                    <span style={{ 
+                    <span style={{
                       fontWeight: selectedOptionId === option.id ? 'bold' : 'normal',
                       color: selectedOptionId === option.id ? '#16a34a' : '#666'
                     }}>
@@ -784,7 +786,7 @@ console.log('eventId:', eventId)
         <p style={{ color: 'var(--color-text-light)', marginBottom: 'var(--spacing-md)', fontSize: '14px' }}>
           Create a copy of this event for next year with all categories and options (no results).
         </p>
-        
+
         {!showCloneModal ? (
           <Button onClick={() => {
             setCloneYear((event.year + 1).toString())
@@ -794,10 +796,10 @@ console.log('eventId:', eventId)
             Clone to Next Year
           </Button>
         ) : (
-          <div style={{ 
-            padding: 'var(--spacing-lg)', 
-            background: '#f9fafb', 
-            borderRadius: 8 
+          <div style={{
+            padding: 'var(--spacing-lg)',
+            background: '#f9fafb',
+            borderRadius: 8
           }}>
             <div style={{ marginBottom: 'var(--spacing-md)' }}>
               <label style={{ display: 'block', marginBottom: 4, fontWeight: 600, fontSize: '14px' }}>
@@ -817,7 +819,7 @@ console.log('eventId:', eventId)
                 }}
               />
             </div>
-            
+
             <div style={{ marginBottom: 'var(--spacing-md)' }}>
               <label style={{ display: 'block', marginBottom: 4, fontWeight: 600, fontSize: '14px' }}>
                 Year *
@@ -836,7 +838,7 @@ console.log('eventId:', eventId)
                 }}
               />
             </div>
-            
+
             <div style={{ marginBottom: 'var(--spacing-lg)' }}>
               <label style={{ display: 'block', marginBottom: 4, fontWeight: 600, fontSize: '14px' }}>
                 New Start Time (optional)
@@ -857,7 +859,7 @@ console.log('eventId:', eventId)
                 Leave blank to keep same date/time
               </p>
             </div>
-            
+
             <div style={{ display: 'flex', gap: 12 }}>
               <Button
                 onClick={handleCloneEvent}
@@ -878,13 +880,13 @@ console.log('eventId:', eventId)
       </Card>
 
       {/* Mark Complete Section */}
-      <Card style={{ 
-        marginTop: 'var(--spacing-xl)', 
+      <Card style={{
+        marginTop: 'var(--spacing-xl)',
         textAlign: 'center',
         background: event.status === 'completed' ? 'var(--color-success-light)' : 'var(--color-white)'
       }}>
         {event.status === 'completed' ? (
-          <div style={{ 
+          <div style={{
             padding: 'var(--spacing-md)',
             color: 'var(--color-success-dark)',
             fontWeight: 'bold'
@@ -908,8 +910,8 @@ console.log('eventId:', eventId)
       </Card>
 
       {/* Send Results Emails */}
-      <SendResultsSection 
-        eventId={eventId} 
+      <SendResultsSection
+        eventId={eventId}
         eventName={event?.name}
         isCompleted={event?.status === 'completed'}
         pools={pools}
