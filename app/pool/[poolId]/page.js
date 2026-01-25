@@ -6,6 +6,7 @@ import { supabase } from '../../../lib/supabase'
 import PickSubmissionForm from '../../../components/PickSubmissionForm'
 import BracketPickForm from '../../../components/BracketPickForm'
 import AdvancementPickForm from '../../../components/AdvancementPickForm'
+import NFLBracketPickForm from '../../../components/NFLBracketPickForm'
 import Link from 'next/link'
 
 export default function PoolPage() {
@@ -52,8 +53,8 @@ export default function PoolPage() {
           setCategories(cats || [])
         }
 
-        // For bracket or hybrid events, fetch bracket data
-        if (eventType === 'bracket' || eventType === 'hybrid') {
+        // For bracket, nfl_bracket, or hybrid events, fetch bracket data
+        if (eventType === 'bracket' || eventType === 'nfl_bracket' || eventType === 'hybrid') {
           const { data: roundsData } = await supabase
             .from('rounds')
             .select('*')
@@ -222,6 +223,15 @@ export default function PoolPage() {
           rounds={rounds}
           teams={teams}
           matchups={matchups}
+        />
+      )}
+
+      {eventType === 'nfl_bracket' && (
+        <NFLBracketPickForm
+          pool={pool}
+          rounds={rounds}
+          matchups={matchups}
+          teams={teams}
         />
       )}
 

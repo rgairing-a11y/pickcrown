@@ -5,8 +5,9 @@ import { supabase } from '../../../../../lib/supabase'
 import { Card, PageHeader, Button, EmptyState, LoadingState, Alert } from '../../../../../components/ui'
 import { sortByOrderIndex } from '../../../../../lib/utils'
 import SendResultsSection from '../../../../../components/SendResultsSection'
+import NFLBracketResultsAdmin from '../../../../../components/NFLBracketResultsAdmin'
 
-export default async function AdminResultsPage({ params }) {
+export default function AdminResultsPage({ params }) {
   const [eventId, setEventId] = useState(null)
   const [event, setEvent] = useState(null)
   const [pools, setPools] = useState([])
@@ -42,7 +43,7 @@ useEffect(() => {
 
 useEffect(() => {
   if (eventId) {
-    loadData()
+    loadEvent()
   }
 }, [eventId])
 
@@ -327,7 +328,63 @@ console.log('eventId:', eventId)
     )
   }
 
-  // ============ NFL Results UI ============
+  // ============ NFL Bracket Results UI (New) ============
+  if (event.event_type === 'nfl_bracket') {
+    return (
+      <div style={{ maxWidth: 800, margin: '0 auto' }}>
+        <PageHeader
+          title="NFL Bracket Results"
+          subtitle={`${event.name} ${event.year || ''}`}
+        />
+
+        {/* Instructions */}
+        <Card style={{ marginBottom: 24, background: '#eff6ff' }}>
+          <h4 style={{ margin: '0 0 8px', color: '#1e40af' }}>How to Enter Results</h4>
+          <ol style={{ margin: 0, paddingLeft: 20, color: '#1e3a8a' }}>
+            <li>Click on the winning team for each matchup to set the winner</li>
+            <li>After all Wild Card games are complete, click "Generate Divisional Matchups"</li>
+            <li>This will apply NFL reseeding rules (highest seed vs lowest remaining)</li>
+            <li>Continue entering results and generating matchups through Super Bowl</li>
+          </ol>
+        </Card>
+
+        {/* NFL Bracket Results Component */}
+        <NFLBracketResultsAdmin eventId={eventId} event={event} />
+
+        {/* Mark Complete Section */}
+        <Card style={{
+          marginTop: 24,
+          textAlign: 'center',
+          background: event.status === 'completed' ? '#dcfce7' : '#fff'
+        }}>
+          {event.status === 'completed' ? (
+            <div style={{ padding: 16, color: '#166534', fontWeight: 'bold' }}>
+              Event Completed
+            </div>
+          ) : (
+            <div>
+              <p style={{ color: '#666', marginBottom: 16 }}>
+                Once the Super Bowl is complete, mark the event as complete to finalize standings.
+              </p>
+              <Button onClick={handleMarkComplete} disabled={saving} variant="primary">
+                Mark Event Complete
+              </Button>
+            </div>
+          )}
+        </Card>
+
+        {/* Send Results */}
+        <SendResultsSection
+          eventId={eventId}
+          eventName={event?.name}
+          isCompleted={event?.status === 'completed'}
+          pools={pools}
+        />
+      </div>
+    )
+  }
+
+  // ============ NFL Results UI (Legacy Advancement) ============
   if (event.uses_reseeding) {
     const aliveTeams = getAliveTeams()
     const afcTeams = getTeamsByConference('AFC')
