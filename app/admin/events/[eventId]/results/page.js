@@ -11,7 +11,6 @@ export default function AdminResultsPage() {
 
   const { eventId } = useParams()
 
-  const [eventId, setEventId] = useState(null)
   const [event, setEvent] = useState(null)
   const [pools, setPools] = useState([])
   const [saving, setSaving] = useState(false)
