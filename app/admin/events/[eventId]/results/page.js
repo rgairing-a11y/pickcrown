@@ -1,6 +1,8 @@
-﻿'use client'
+'use client'
 
-import { use, useState, useEffect } from 'react'
+// client-bundle-bust-2026-01-25
+
+import { useState, useEffect } from 'react'
 import { supabase } from '../../../../../lib/supabase'
 import { Card, PageHeader, Button, EmptyState, LoadingState, Alert } from '../../../../../components/ui'
 import { sortByOrderIndex } from '../../../../../lib/utils'
@@ -36,12 +38,6 @@ export default function AdminResultsPage() {
   const [cloning, setCloning] = useState(false)
 
 
-
-useEffect(() => {
-  if (paramsResolved?.eventId) {
-    setEventId(paramsResolved.eventId)
-  }
-}, [paramsResolved])
 
 useEffect(() => {
   if (eventId) {
@@ -319,7 +315,7 @@ useEffect(() => {
         <PageHeader title="Event Not Found" />
         <Card>
           <EmptyState
-            icon="Γ¥î"
+            icon="X"
             title="Event not found"
             actionLabel="Back to Admin"
             actionHref="/admin"
@@ -339,7 +335,7 @@ useEffect(() => {
     return (
       <div style={{ maxWidth: 700 }}>
         <PageHeader
-          title="≡ƒÅê Enter NFL Results"
+          title="Enter NFL Results"
           subtitle={event.name}
         />
 
@@ -396,7 +392,7 @@ useEffect(() => {
             {/* Winner Select */}
             <div>
               <label style={{ display: 'block', marginBottom: 4, fontWeight: 600, fontSize: 14, color: '#16a34a' }}>
-                Γ£à Winner
+                Winner
               </label>
               <select
                 value={winnerTeam}
@@ -427,7 +423,7 @@ useEffect(() => {
             {/* Loser Select */}
             <div>
               <label style={{ display: 'block', marginBottom: 4, fontWeight: 600, fontSize: 14, color: '#dc2626' }}>
-                Γ¥î Loser
+                Loser
               </label>
               <select
                 value={loserTeam}
@@ -462,7 +458,7 @@ useEffect(() => {
             variant="primary"
             style={{ marginTop: 16 }}
           >
-            {saving ? 'Recording...' : '≡ƒÅê Record Result'}
+            {saving ? 'Recording...' : 'Record Result'}
           </Button>
         </Card>
 
@@ -586,7 +582,7 @@ useEffect(() => {
         }}>
           {event.status === 'completed' ? (
             <div style={{ padding: 16, color: '#166534', fontWeight: 'bold' }}>
-              Γ£ô Event Completed
+              Event Completed
             </div>
           ) : (
             <div>
@@ -660,7 +656,7 @@ useEffect(() => {
       {categories.length === 0 ? (
         <Card>
           <EmptyState
-            icon="≡ƒôï"
+            icon="?"
             title="No categories yet"
             description="Add categories before entering results"
             actionLabel="Add Categories"
@@ -741,7 +737,7 @@ useEffect(() => {
                       color: selectedOptionId === option.id ? '#16a34a' : '#666'
                     }}>
                       {option.name}
-                      {selectedOptionId === option.id && ' Γ£ô'}
+                      {selectedOptionId === option.id && ' ?'}
                     </span>
                   </label>
                 ))}
