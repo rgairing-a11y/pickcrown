@@ -46,7 +46,9 @@ useEffect(() => {
   }
 }, [eventId])
 
-
+async function loadData() {
+  await loadEvent()
+}
 
 console.log('params:', params)
 console.log('eventId:', eventId)
