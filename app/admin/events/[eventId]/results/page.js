@@ -8,7 +8,8 @@ import SendResultsSection from '../../../../../components/SendResultsSection'
 import { useParams } from 'next/navigation'
 
 export default function AdminResultsPage() {
-  const paramsResolved = use(params)
+
+  const { eventId } = useParams()
 
   const [eventId, setEventId] = useState(null)
   const [event, setEvent] = useState(null)
