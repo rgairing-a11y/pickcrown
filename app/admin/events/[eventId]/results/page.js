@@ -1,12 +1,13 @@
-'use client'
+﻿'use client'
 
 import { use, useState, useEffect } from 'react'
 import { supabase } from '../../../../../lib/supabase'
 import { Card, PageHeader, Button, EmptyState, LoadingState, Alert } from '../../../../../components/ui'
 import { sortByOrderIndex } from '../../../../../lib/utils'
 import SendResultsSection from '../../../../../components/SendResultsSection'
+import { useParams } from 'next/navigation'
 
-export default function AdminResultsPage({ params }) {
+export default function AdminResultsPage() {
   const paramsResolved = use(params)
 
   const [eventId, setEventId] = useState(null)
@@ -50,10 +51,9 @@ useEffect(() => {
 
 
 
-console.log('params:', paramsResolved)
-console.log('eventId:', eventId)
-
-
+  async function loadData() {
+    await loadEvent()
+  }
 
   async function loadEvent() {
     setLoading(true)
@@ -319,7 +319,7 @@ console.log('eventId:', eventId)
         <PageHeader title="Event Not Found" />
         <Card>
           <EmptyState
-            icon="❌"
+            icon="Γ¥î"
             title="Event not found"
             actionLabel="Back to Admin"
             actionHref="/admin"
@@ -339,7 +339,7 @@ console.log('eventId:', eventId)
     return (
       <div style={{ maxWidth: 700 }}>
         <PageHeader
-          title="🏈 Enter NFL Results"
+          title="≡ƒÅê Enter NFL Results"
           subtitle={event.name}
         />
 
@@ -396,7 +396,7 @@ console.log('eventId:', eventId)
             {/* Winner Select */}
             <div>
               <label style={{ display: 'block', marginBottom: 4, fontWeight: 600, fontSize: 14, color: '#16a34a' }}>
-                ✅ Winner
+                Γ£à Winner
               </label>
               <select
                 value={winnerTeam}
@@ -427,7 +427,7 @@ console.log('eventId:', eventId)
             {/* Loser Select */}
             <div>
               <label style={{ display: 'block', marginBottom: 4, fontWeight: 600, fontSize: 14, color: '#dc2626' }}>
-                ❌ Loser
+                Γ¥î Loser
               </label>
               <select
                 value={loserTeam}
@@ -462,7 +462,7 @@ console.log('eventId:', eventId)
             variant="primary"
             style={{ marginTop: 16 }}
           >
-            {saving ? 'Recording...' : '🏈 Record Result'}
+            {saving ? 'Recording...' : '≡ƒÅê Record Result'}
           </Button>
         </Card>
 
@@ -586,7 +586,7 @@ console.log('eventId:', eventId)
         }}>
           {event.status === 'completed' ? (
             <div style={{ padding: 16, color: '#166534', fontWeight: 'bold' }}>
-              ✓ Event Completed
+              Γ£ô Event Completed
             </div>
           ) : (
             <div>
@@ -644,7 +644,7 @@ console.log('eventId:', eventId)
           <div>
             <strong>{answeredCount}</strong> of <strong>{totalCategories}</strong> results selected
             {hasUnsavedChanges && (
-              <span style={{ color: '#f59e0b', marginLeft: 12 }}>• Unsaved changes</span>
+              <span style={{ color: '#f59e0b', marginLeft: 12 }}>ΓÇó Unsaved changes</span>
             )}
           </div>
           <Button
@@ -660,7 +660,7 @@ console.log('eventId:', eventId)
       {categories.length === 0 ? (
         <Card>
           <EmptyState
-            icon="📋"
+            icon="≡ƒôï"
             title="No categories yet"
             description="Add categories before entering results"
             actionLabel="Add Categories"
@@ -741,7 +741,7 @@ console.log('eventId:', eventId)
                       color: selectedOptionId === option.id ? '#16a34a' : '#666'
                     }}>
                       {option.name}
-                      {selectedOptionId === option.id && ' ✓'}
+                      {selectedOptionId === option.id && ' Γ£ô'}
                     </span>
                   </label>
                 ))}
@@ -782,7 +782,7 @@ console.log('eventId:', eventId)
 
       {/* Clone Event Section */}
       <Card style={{ marginTop: 'var(--spacing-xl)' }}>
-        <h3 style={{ margin: '0 0 var(--spacing-md)' }}>📋 Clone Event</h3>
+        <h3 style={{ margin: '0 0 var(--spacing-md)' }}>≡ƒôï Clone Event</h3>
         <p style={{ color: 'var(--color-text-light)', marginBottom: 'var(--spacing-md)', fontSize: '14px' }}>
           Create a copy of this event for next year with all categories and options (no results).
         </p>
@@ -891,7 +891,7 @@ console.log('eventId:', eventId)
             color: 'var(--color-success-dark)',
             fontWeight: 'bold'
           }}>
-            ✓ Event Completed
+            Γ£ô Event Completed
           </div>
         ) : (
           <div>
