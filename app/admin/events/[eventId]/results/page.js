@@ -53,7 +53,9 @@ useEffect(() => {
 console.log('params:', paramsResolved)
 console.log('eventId:', eventId)
 
-
+  async function loadData() {
+    await loadEvent()
+  }
 
   async function loadEvent() {
     setLoading(true)
