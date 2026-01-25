@@ -1,13 +1,14 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useParams } from 'next/navigation'
 import { supabase } from '../../../../../lib/supabase'
 import { Card, PageHeader, Button, EmptyState, LoadingState, Alert } from '../../../../../components/ui'
 import { sortByOrderIndex } from '../../../../../lib/utils'
 import SendResultsSection from '../../../../../components/SendResultsSection'
 
-export default async function AdminResultsPage({ params }) {
-  const [eventId, setEventId] = useState(null)
+export default function AdminResultsPage() {
+  const { eventId } = useParams()
   const [event, setEvent] = useState(null)
   const [pools, setPools] = useState([])
   const [saving, setSaving] = useState(false)
@@ -35,21 +36,10 @@ export default async function AdminResultsPage({ params }) {
 
 
 useEffect(() => {
-  if (params?.eventId) {
-    setEventId(params.eventId)
-  }
-}, [params])
-
-useEffect(() => {
   if (eventId) {
     loadData()
   }
 }, [eventId])
-
-
-
-console.log('params:', params)
-console.log('eventId:', eventId)
 
 
 

@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useParams } from 'next/navigation'
 import Link from 'next/link'
 
-export default function MatchupsAdminPage({ params }) {
-  const [eventId, setEventId] = useState(null)
+export default function MatchupsAdminPage() {
+  const { eventId } = useParams()
   const [event, setEvent] = useState(null)
   const [teams, setTeams] = useState([])
   const [rounds, setRounds] = useState([])
@@ -20,20 +21,10 @@ export default function MatchupsAdminPage({ params }) {
 
 
 useEffect(() => {
-  if (params?.eventId) {
-    setEventId(params.eventId)
-  }
-}, [params])
-
-useEffect(() => {
   if (eventId) {
     loadData()
   }
 }, [eventId])
-
-
-console.log('params:', params)
-console.log('eventId:', eventId)
 
 
 
